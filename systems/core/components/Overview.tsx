@@ -12,7 +12,7 @@ const PurchaseDashboard = dynamic(() => import('@/systems/purchase/components/Da
 const SYSTEM_VIEWS = [
   { value: 'overview', label: 'Overview' },
   { value: 'purchase', label: 'Purchase' },
-  // Future systems (e.g. Order Management) register their dashboard here.
+  { value: 'rm-sales', label: 'RM Sales' },
 ] as const;
 type SystemView = (typeof SYSTEM_VIEWS)[number]['value'];
 
@@ -364,6 +364,15 @@ export default function Overview() {
         <AuthProvider>
           <PurchaseDashboard />
         </AuthProvider>
+      ) : systemView === 'rm-sales' ? (
+        <div className="p-4">
+          <button
+            onClick={() => window.location.assign('/rm-sales')}
+            className="px-6 py-3 bg-[#2fa36b] text-white font-bold rounded-2xl shadow-md hover:bg-[#268a59] transition-all"
+          >
+            Launch RM Sales Portal →
+          </button>
+        </div>
       ) : (
     <div className="flex flex-col xl:flex-row gap-6">
       <div className="flex-1 min-w-0">

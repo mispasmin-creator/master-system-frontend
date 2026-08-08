@@ -128,7 +128,21 @@ const storeTabs = [
   { id: "administration", label: "Adminstration", path: "/administration" }
 ];
 
-export default function DashboardLayout({ children, hideRightSidebar = false, basePath }: { children?: ReactNode, hideRightSidebar?: boolean, basePath: '/dashboard' | '/purchase' | '/order' | '/production' | '/store' }) {
+const RmSalesIcon = icon(<><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="M7 21h10" /><path d="M12 3v18" /><path d="M3 7h18" /></>);
+
+const rmSalesTabs = [
+  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "sale-orders", label: "Sale Orders", path: "/sale-orders" },
+  { id: "logistics", label: "Logistics", path: "/logistics" },
+  { id: "invoices", label: "Invoices", path: "/invoices" },
+  { id: "inventory", label: "Inventory", path: "/inventory" },
+  { id: "masters", label: "Masters", path: "/masters" },
+  { id: "tracking", label: "Tracking", path: "/tracking" },
+  { id: "reports", label: "Reports", path: "/reports" },
+  { id: "settings", label: "Settings", path: "/settings" }
+];
+
+export default function DashboardLayout({ children, hideRightSidebar = false, basePath }: { children?: ReactNode, hideRightSidebar?: boolean, basePath: '/dashboard' | '/purchase' | '/order' | '/production' | '/store' | '/rm-sales' }) {
   const router = useRouter(); // Next.js Router — used for cross-system navigation (changes the actual URL path)
   const navigate = useNavigate(); // React Router — used for in-system navigation (hash-only, within the current Next.js page)
   const location = useLocation(); // React Router
@@ -146,12 +160,8 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
     }
     return false;
   });
-  // Which system is showing is now determined by which Next.js page we're on
-  // (basePath), not by the react-router hash path — each system lives on its
-  // own real URL (/dashboard vs /purchase) so the address bar reflects it.
-  const selectedSystem: 'overview' | 'purchase' | 'order' | 'production' | 'store' = basePath === '/purchase' ? 'purchase' : basePath === '/order' ? 'order' : basePath === '/production' ? 'production' : basePath === '/store' ? 'store' : 'overview';
-  // Purely a UI collapse toggle for the Purchase tab sublist while already on
-  // the /purchase page — independent of which system is active.
+  const selectedSystem: 'overview' | 'purchase' | 'order' | 'production' | 'store' | 'rm-sales' = basePath === '/purchase' ? 'purchase' : basePath === '/order' ? 'order' : basePath === '/production' ? 'production' : basePath === '/store' ? 'store' : basePath === '/rm-sales' ? 'rm-sales' : 'overview';
+
   const [purchaseExpanded, setPurchaseExpanded] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('purchaseExpanded');
@@ -180,6 +190,13 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
     }
     return basePath === '/store';
   });
+  const [rmSalesExpanded, setRmSalesExpanded] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('rmSalesExpanded');
+      if (saved !== null) return saved === 'true';
+    }
+    return basePath === '/rm-sales';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
 
@@ -187,10 +204,6 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
   const [poLoading, setPoLoading] = useState(true);
   const [pendingApprovals, setPendingApprovals] = useState(0);
 
-  // Cross-system navigation: if we're not already on the Purchase page, do a
-  // real Next.js navigation there (changes the URL path to /purchase), then
-  // land on the given in-system hash route. If already on /purchase, this is
-  // just a normal in-page hash navigation.
   const goToPurchase = (hashPath: string) => {
     if (basePath !== '/purchase') {
       router.push(`/purchase#${hashPath}`);
@@ -216,6 +229,13 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
   const goToStore = (hashPath: string) => {
     if (basePath !== '/store') {
       router.push(`/store#${hashPath}`);
+    } else {
+      navigate(hashPath);
+    }
+  };
+  const goToRmSales = (hashPath: string) => {
+    if (basePath !== '/rm-sales') {
+      router.push(`/rm-sales#${hashPath}`);
     } else {
       navigate(hashPath);
     }
@@ -697,6 +717,8 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
                     localStorage.setItem('orderExpanded', 'false');
                     setProductionExpanded(false);
                     localStorage.setItem('productionExpanded', 'false');
+                    setRmSalesExpanded(false);
+                    localStorage.setItem('rmSalesExpanded', 'false');
                   }
                   return next;
                 });
@@ -712,33 +734,93 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
               <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${storeExpanded ? 'rotate-180' : ''}`} />
             </button>
 
-          {!collapsed && (
-            <div className={`grid transition-all duration-300 ease-in-out ${storeExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
-              <div className="overflow-hidden">
-                <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
-                  {storeTabs.map((tab) => {
-                    const isActive = (basePath === '/store' && location.pathname === tab.path);
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => {
-                          goToStore(tab.path);
-                          setMobileNavOpen(false);
-                        }}
-                        className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40'
-                            : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                        }`}
-                      >
-                        <span className="truncate">{tab.label}</span>
-                      </button>
-                    );
-                  })}
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${storeExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {storeTabs.map((tab) => {
+                      const isActive = (basePath === '/store' && location.pathname === tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToStore(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* RM Sales System */}
+          <div className="mt-2">
+            <button
+              onClick={() => {
+                setRmSalesExpanded((v) => {
+                  const next = !v;
+                  localStorage.setItem('rmSalesExpanded', String(next));
+                  if (next) {
+                    setPurchaseExpanded(false);
+                    localStorage.setItem('purchaseExpanded', 'false');
+                    setOrderExpanded(false);
+                    localStorage.setItem('orderExpanded', 'false');
+                    setProductionExpanded(false);
+                    localStorage.setItem('productionExpanded', 'false');
+                    setStoreExpanded(false);
+                    localStorage.setItem('storeExpanded', 'false');
+                  }
+                  return next;
+                });
+              }}
+              className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                selectedSystem === 'rm-sales'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <RmSalesIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">RM Sales</span>
+              <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${rmSalesExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${rmSalesExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {rmSalesTabs.map((tab) => {
+                      const isActive = (basePath === '/rm-sales' && location.pathname === tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToRmSales(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
