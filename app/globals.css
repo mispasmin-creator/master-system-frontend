@@ -1,0 +1,276 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Brand */
+  --brand: #2fa36b;          /* primary actions, active nav, highlights */
+  --brand-dark: #268a59;     /* hover / pressed */
+  --brand-deep: #1b5e41;     /* emphasis text on mint, dark chart bars */
+  --brand-soft: #d9f2e4;     /* mint fills, selected-day, soft badges */
+  --brand-faint: #e8f4ec;    /* subtle hover washes */
+  --surface: #eef3ef;        /* page background (soft sage) */
+
+  /* shadcn-compatible tokens (consumed by ui primitives via @theme below) */
+  --background: #ffffff;
+  --foreground: #1a2b22;
+  --card: #ffffff;
+  --card-foreground: #1a2b22;
+  --popover: #ffffff;
+  --popover-foreground: #1a2b22;
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
+  --secondary: #f0f6f2;
+  --secondary-foreground: #1a2b22;
+  --muted: #f2f6f3;
+  --muted-foreground: #6b7a72;
+  --accent: var(--brand-faint);
+  --accent-foreground: var(--brand-deep);
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e4ebe6;
+  --input: #dfe8e2;
+  --ring: var(--brand);
+  --radius: 1rem;
+  --chart-1: var(--brand);
+  --chart-2: #0284c7;
+  --chart-3: #d97706;
+  --chart-4: #7c3aed;
+  --chart-5: #db2777;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-brand: var(--brand);
+  --color-brand-dark: var(--brand-dark);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-surface: var(--surface);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+.dark {
+  --brand: #5ec792;
+  --brand-dark: #4db381;
+  --brand-deep: #a7e3c4;
+  --brand-soft: #1e3b2d;
+  --brand-faint: #16281f;
+  --surface: #0c120e;
+
+  --background: #0c120e;
+  --foreground: #e7efe9;
+  --card: #131b16;
+  --card-foreground: #e7efe9;
+  --popover: #131b16;
+  --popover-foreground: #e7efe9;
+  --primary: var(--brand);
+  --primary-foreground: #0c120e;
+  --secondary: #1a241e;
+  --secondary-foreground: #e7efe9;
+  --muted: #1a241e;
+  --muted-foreground: #93a49a;
+  --accent: var(--brand-faint);
+  --accent-foreground: var(--brand-deep);
+  --destructive: #b91c1c;
+  --destructive-foreground: #fef2f2;
+  --border: #223028;
+  --input: #223028;
+  --ring: var(--brand);
+  --chart-1: var(--brand);
+  --chart-2: #38bdf8;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #f472b6;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Thin, brand-tinted scrollbar for scrollable tables/panels.
+   (Referenced across system pages; defined once here.) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--brand) 45%, transparent) transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--brand) 40%, transparent);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--brand) 65%, transparent);
+}
+
+/* ============================================================================
+   DARK MODE OVERRIDES FOR HARDCODED LIGHT STYLES
+   ----------------------------------------------------------------------------
+   Most Purchase-system page components were ported straight from a light-only
+   reference app: their cards/inputs/tables hardcode literal Tailwind classes
+   like bg-white, border-gray-200, text-gray-700 with no `dark:` variant at
+   all. Left alone, toggling dark mode leaves those surfaces stuck white while
+   shadcn's own dark-aware text/tint colors sit on top of them — result is
+   low-contrast, washed-out text on a background that never actually went
+   dark. Rather than hand-edit every component (which would touch a lot of
+   unrelated markup for a purely visual fix), catch the common hardcoded
+   classes globally here and remap them to the real dark tokens whenever
+   `.dark` is active. Purely cosmetic — no component markup/behavior changes.
+   ========================================================================== */
+/* Note: `[class*="…"]` (substring match on the whole class attribute,
+   not a single token) is used deliberately here instead of exact `.bg-white`
+   style selectors — the ported components hit this in a lot of shapes exact
+   matches can't see: opacity suffixes (`bg-white/50`), Tailwind variants
+   (`hover:bg-white`, `data-[state=active]:bg-white`), and gradient stops
+   (`from-gray-50`). One wildcard rule per color/shade covers all of them. */
+.dark [class*="bg-white"],
+.dark .bg-card,
+.dark [data-slot="card"],
+.dark [data-slot="popover-content"],
+.dark [data-slot="dialog-content"],
+.dark [data-slot="select-content"],
+.dark [data-slot="dropdown-menu-content"] {
+  background-color: var(--card) !important;
+  color: var(--card-foreground);
+}
+
+.dark [class*="bg-slate-50"],
+.dark [class*="bg-gray-50"],
+.dark [class*="bg-zinc-50"],
+.dark [class*="bg-slate-100"],
+.dark [class*="bg-gray-100"],
+.dark [class*="bg-zinc-100"] {
+  background-color: var(--background) !important;
+}
+
+.dark [class*="bg-slate-200"],
+.dark [class*="bg-gray-200"],
+.dark [class*="bg-zinc-200"] {
+  background-color: var(--muted) !important;
+}
+
+/* Gradients whose stops are white/near-white grays (light-mode hero/header
+   banners) — flatten to a solid dark card color instead of trying to remap
+   individual --tw-gradient-* stops. */
+.dark [class*="from-white"],
+.dark [class*="via-white"],
+.dark [class*="to-white"],
+.dark [class*="from-gray-50"],
+.dark [class*="to-gray-50"],
+.dark [class*="from-slate-50"],
+.dark [class*="to-slate-50"],
+.dark [class*="from-zinc-50"],
+.dark [class*="to-zinc-50"] {
+  background-image: none !important;
+  background-color: var(--card) !important;
+}
+
+.dark [class*="border-gray-100"],
+.dark [class*="border-gray-200"],
+.dark [class*="border-slate-100"],
+.dark [class*="border-slate-200"],
+.dark [class*="border-zinc-100"],
+.dark [class*="border-zinc-200"] {
+  border-color: var(--border) !important;
+}
+
+.dark [class*="text-gray-900"],
+.dark [class*="text-slate-900"],
+.dark [class*="text-zinc-900"],
+.dark [class*="text-gray-800"],
+.dark [class*="text-slate-800"],
+.dark [class*="text-zinc-800"],
+.dark [class*="text-gray-700"],
+.dark [class*="text-slate-700"],
+.dark [class*="text-zinc-700"] {
+  color: var(--foreground) !important;
+}
+
+.dark [class*="text-gray-600"],
+.dark [class*="text-slate-600"],
+.dark [class*="text-zinc-600"],
+.dark [class*="text-gray-500"],
+.dark [class*="text-slate-500"],
+.dark [class*="text-zinc-500"],
+.dark [class*="text-gray-400"],
+.dark [class*="text-slate-400"],
+.dark [class*="text-zinc-400"] {
+  color: var(--muted-foreground) !important;
+}
+
+/* Plain (non-shadcn) inputs/selects/textareas that some pages still use */
+.dark input:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+.dark table,
+.dark tr {
+  border-color: var(--border) !important;
+}
+
+.dark th {
+  background-color: var(--secondary) !important;
+  color: var(--foreground) !important;
+}
+
+.dark td {
+  color: var(--foreground) !important;
+}

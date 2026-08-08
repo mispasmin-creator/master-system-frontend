@@ -1,0 +1,824 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  History,
+  Info,
+  Loader2,
+  Search,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useNotification } from "../context/NotificationContext";
+import { useRealtime } from "../hooks/useRealtime";
+import { canViewFirm } from "../utils/firmFilter";
+import { API_URL, getToken } from "@/lib/auth";
+
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { XCircle } from "lucide-react";
+
+const formatDateTime = (isoString) => {
+  if (!isoString) return "-";
+  const date = new Date(isoString);
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  const day = date.getDate().toString().padStart(2, "0");
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+const getDelayDays = (expectedVendor, required) => {
+  if (!expectedVendor || !required) return null;
+  const d1 = new Date(expectedVendor);
+  const d2 = new Date(required);
+  d1.setHours(0, 0, 0, 0);
+  d2.setHours(0, 0, 0, 0);
+  const diffTime = d1 - d2;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
+const chemistryFields = [
+  ["Al2O3", "alumina"],
+  ["Fe2O3", "iron"],
+  ["SiO2", "sio2"],
+  ["CaO", "cao"],
+  ["AP", "ap"],
+  ["BD", "bd"],
+];
+
+const getTagTone = (tag) => {
+  if (tag === "T1") return "bg-emerald-100 text-emerald-700";
+  if (tag === "T2") return "bg-amber-100 text-amber-700";
+  return "bg-slate-100 text-slate-700";
+};
+
+export default function ManagementApprovals() {
+  const [pendingData, setPendingData] = useState([]);
+  const [historyData, setHistoryData] = useState([]);
+  const [filteredPendingData, setFilteredPendingData] = useState([]);
+  const [filteredHistoryData, setFilteredHistoryData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshData, setRefreshData] = useState(false);
+  const [selectedIndent, setSelectedIndent] = useState(null);
+  const [selectedVendorSlot, setSelectedVendorSlot] = useState("");
+  const [openDialog, setOpenDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+  const [selectedFirm, setSelectedFirm] = useState("all");
+  const [selectedProduct, setSelectedProduct] = useState("all");
+
+  const { user } = useAuth();
+  const { updateCount } = useNotification();
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [pendingRes, historyRes] = await Promise.all([
+        fetch(`${API_URL}/purchase/management-approval/pending`),
+        fetch(`${API_URL}/purchase/management-approval/history`),
+      ]);
+      if (!pendingRes.ok || !historyRes.ok) {
+        throw new Error("Failed to fetch management approvals");
+      }
+      const { data: pendingRaw } = await pendingRes.json();
+      const { data: historyRaw } = await historyRes.json();
+
+      let filteredPendingRaw = pendingRaw;
+      let filteredHistoryRaw = historyRaw;
+      if (user?.firmName) {
+        filteredPendingRaw = pendingRaw.filter((row) =>
+          canViewFirm(user.firmName, row.firmName),
+        );
+        filteredHistoryRaw = historyRaw.filter((row) =>
+          canViewFirm(user.firmName, row.firmName),
+        );
+      }
+
+      const pending = filteredPendingRaw.map((row) => ({
+        id: row.id,
+        indentId: row.indentId || "",
+        firmName: row.firmName || "",
+        indenter: row.generatedBy || "",
+        department: row.typeOfIndent || "",
+        product: row.material || "",
+        planned8: row.timestamp || row.createdAt || "",
+        expectedRequirementDate: row.expectedRequirementDate || "",
+        currentStock: row.currentStockAsPerFactory || "0",
+        indentQty: row.quantity || "",
+        vendors: row.vendors,
+      }));
+
+      const history = filteredHistoryRaw
+        .map((row) => ({
+          id: row.id,
+          indentId: row.indentId || "",
+          firmName: row.firmName || "",
+          indenter: row.generatedBy || "",
+          department: row.typeOfIndent || "",
+          product: row.material || "",
+          actual8: row.managementApproval?.approvedDate || "",
+          approvedVendorName: row.managementApproval?.approvedVendorName || "",
+          approvedRate: row.managementApproval?.approvedRate || "0",
+          approvedTag: row.approvedTag || "",
+          indentQty: row.quantity || "",
+          canRevert: row.canRevert ?? false,
+        }))
+        .sort((a, b) => new Date(b.actual8) - new Date(a.actual8));
+
+      setPendingData(pending);
+      setFilteredPendingData(pending);
+      setHistoryData(history);
+      setFilteredHistoryData(history);
+      updateCount("management", pending.length);
+    } catch (err) {
+      console.error("Error fetching management approvals:", err);
+      setError(err.message || "Failed to load management approvals");
+      toast.error("Failed to load management approvals", {
+        description: err.message,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [updateCount, user]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData, refreshData]);
+
+  // Realtime: Listen for changes in INDENT-PO and refresh
+  useRealtime("INDENT-PO", () => {
+    setRefreshData((prev) => !prev);
+  });
+
+  const firmOptions = useMemo(() => {
+    const firms = new Set(pendingData.map((item) => item.firmName));
+    return ["all", ...Array.from(firms).sort()];
+  }, [pendingData]);
+
+  const productOptions = useMemo(() => {
+    let filtered = pendingData;
+    if (selectedFirm !== "all") {
+      filtered = filtered.filter((item) => item.firmName === selectedFirm);
+    }
+    const products = new Set(filtered.map((item) => item.product));
+    return ["all", ...Array.from(products).sort()];
+  }, [pendingData, selectedFirm]);
+
+  // Reset product when firm changes if the current product is not in the new options
+  useEffect(() => {
+    if (selectedFirm !== "all" && selectedProduct !== "all") {
+      const isStillAvailable = pendingData.some(
+        (item) => item.firmName === selectedFirm && item.product === selectedProduct
+      );
+      if (!isStillAvailable) setSelectedProduct("all");
+    }
+  }, [selectedFirm, pendingData]);
+
+
+  useEffect(() => {
+    const query = searchQuery.trim().toLowerCase();
+    let filtered = [...pendingData];
+
+    if (selectedFirm !== "all") {
+      filtered = filtered.filter((item) => item.firmName === selectedFirm);
+    }
+
+    if (selectedProduct !== "all") {
+      filtered = filtered.filter((item) => item.product === selectedProduct);
+    }
+
+    if (query) {
+      filtered = filtered.filter((item) => {
+        const indentMatch = item.indentId.toLowerCase().includes(query);
+        const firmMatch = item.firmName.toLowerCase().includes(query);
+        const productMatch = item.product.toLowerCase().includes(query);
+        const vendorMatch = item.vendors.some((vendor) =>
+          vendor.name.toLowerCase().includes(query),
+        );
+        return indentMatch || firmMatch || productMatch || vendorMatch;
+      });
+    }
+
+    setFilteredPendingData(filtered);
+  }, [pendingData, searchQuery, selectedFirm, selectedProduct]);
+
+  useEffect(() => {
+    const query = historySearchQuery.trim().toLowerCase();
+    setFilteredHistoryData(
+      historyData.filter(
+        (item) =>
+          item.indentId.toLowerCase().includes(query) ||
+          item.firmName.toLowerCase().includes(query) ||
+          item.product.toLowerCase().includes(query) ||
+          item.approvedVendorName.toLowerCase().includes(query) ||
+          item.approvedTag.toLowerCase().includes(query),
+      ),
+    );
+  }, [historyData, historySearchQuery]);
+
+  const selectedVendor = useMemo(
+    () =>
+      selectedIndent?.vendors.find(
+        (vendor) => vendor.slot.toString() === selectedVendorSlot,
+      ) || null,
+    [selectedIndent, selectedVendorSlot],
+  );
+
+  const onApprove = async () => {
+    if (!selectedIndent || !selectedVendor) {
+      toast.error("Please select one vendor");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(
+        `${API_URL}/purchase/management-approval/${selectedIndent.id}/approve`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${getToken()}`,
+          },
+          body: JSON.stringify({ vendorSlot: selectedVendor.slot }),
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Management approval failed");
+
+      toast.success(`Management approved ${selectedIndent.indentId}`);
+      setOpenDialog(false);
+      setSelectedIndent(null);
+      setSelectedVendorSlot("");
+      setRefreshData((prev) => !prev);
+    } catch (error) {
+      console.error("Error completing management approval:", error);
+      toast.error("Management approval failed", {
+        description: error.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onReject = async () => {
+    if (!selectedIndent) return;
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(
+        `${API_URL}/purchase/management-approval/${selectedIndent.id}/reject`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${getToken()}` },
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Rejection failed");
+
+      toast.success(`Indent ${selectedIndent.indentId} rejected`);
+      setOpenDialog(false);
+      setSelectedIndent(null);
+      setSelectedVendorSlot("");
+      setRefreshData((prev) => !prev);
+    } catch (error) {
+      console.error("Error rejecting indent:", error);
+      toast.error("Rejection failed", {
+        description: error.message,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const onRevertIndent = async (item, e) => {
+    if (e) e.stopPropagation();
+
+    if (
+      !window.confirm(
+        `Revert Management Approval for indent ${item.indentId}? It will go back to Pending.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `${API_URL}/purchase/management-approval/${item.id}/revert`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${getToken()}` },
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to revert indent");
+
+      toast.success(`Reverted indent ${item.indentId}`);
+      setRefreshData((prev) => !prev);
+    } catch (error) {
+      console.error("Error reverting indent:", error);
+      toast.error("Failed to revert indent", { description: error.message });
+    }
+  };
+
+  return (
+    <Card className="w-full max-w-full mx-auto bg-white border border-gray-200 rounded-lg shadow-md">
+      <CardHeader className="p-4 border-b border-gray-200">
+        <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
+            <CheckCircle2 className="h-5 w-5 text-[#2fa36b]" />
+            Mgmt App.
+          </CardTitle>
+        
+        {user?.firmName && (
+          <p className="border-t border-gray-100 mt-2 pt-2 text-[#2fa36b] text-xs font-medium">
+            Showing data for: {" "}
+            <span className="font-bold">
+              {user.firmName === "all"
+                ? "All Firms"
+                : Array.isArray(user.firmName)
+                  ? user.firmName.join(", ")
+                  : user.firmName}
+            </span>
+          </p>
+        )}
+      </CardHeader>
+
+      <CardContent className="p-4">
+        <Tabs defaultValue="pending">
+          <TabsList className="mb-4">
+            <TabsTrigger value="pending" className="gap-2">
+              Pending <Badge variant="secondary">{pendingData.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
+              History <Badge variant="secondary">{historyData.length}</Badge>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="pending" className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-4 mb-2">
+              <div className="relative flex-1">
+                <Search className="absolute w-4 h-4 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search indent, firm, product, vendor..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Select value={selectedFirm} onValueChange={setSelectedFirm}>
+                  <SelectTrigger className="w-[180px] bg-white">
+                    <SelectValue placeholder="All Firms" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {firmOptions.map((firm) => (
+                      <SelectItem key={firm} value={firm}>
+                        {firm === "all" ? "All Firms" : firm}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={selectedProduct}
+                  onValueChange={setSelectedProduct}
+                >
+                  <SelectTrigger className="w-[200px] bg-white">
+                    <SelectValue placeholder="All Products" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productOptions.map((product) => (
+                      <SelectItem key={product} value={product}>
+                        {product === "all" ? "All Products" : product}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {(selectedFirm !== "all" ||
+                  selectedProduct !== "all" ||
+                  searchQuery) && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setSelectedFirm("all");
+                      setSelectedProduct("all");
+                      setSearchQuery("");
+                    }}
+                    className="text-gray-400 hover:text-red-500 h-9 w-9"
+                    title="Clear all filters"
+                  >
+                    <XCircle className="h-5 w-5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-[#2fa36b]" />
+              </div>
+            ) : error ? (
+              <div className="p-6 text-center border border-red-200 rounded-xl bg-red-50">
+                <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-red-500" />
+                <p className="font-medium text-red-700">{error}</p>
+              </div>
+            ) : filteredPendingData.length === 0 ? (
+              <div className="py-12 text-center border border-gray-200 border-dashed rounded-xl">
+                <Info className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm text-gray-500">
+                  No pending management approvals.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-auto border border-gray-200 rounded-xl max-h-[calc(100vh-400px)] relative custom-scrollbar">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="sticky top-0 z-30">
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Action</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Indent</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Firm</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Product</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Indent Qty</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Required On</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Current Stock</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Rate</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Tagged Vendors</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Factory Done</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {filteredPendingData.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                        <td className="px-4 py-3">
+                          <Button
+                            className="bg-[#2fa36b] hover:bg-[#268a59]"
+                            onClick={() => {
+                              setSelectedIndent(item);
+                              setSelectedVendorSlot("");
+                              setOpenDialog(true);
+                            }}
+                          >
+                            Review
+                          </Button>
+                        </td>
+                        <td className="px-4 py-3 font-medium">
+                          {item.indentId}
+                        </td>
+                        <td className="px-4 py-3">{item.firmName}</td>
+                        <td className="px-4 py-3">{item.product}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900">{item.indentQty || "-"}</td>
+                        <td className="px-4 py-3 text-xs font-medium text-blue-600">
+                          {formatDate(item.expectedRequirementDate)}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-700">
+                          {item.currentStock || "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-0.5">
+                            {item.vendors.map((vendor) => (
+                              <span key={vendor.slot} className="text-xs text-gray-700 whitespace-nowrap">
+                                ₹{vendor.rate} <span className="text-gray-400">({vendor.name.split(' ').slice(0, 2).join(' ')})</span>
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1.5 focus-within:z-10">
+                            {item.vendors.map((vendor) => (
+                              <Badge
+                                key={vendor.slot}
+                                className={`${getTagTone(vendor.technicalTag)} px-1.5 py-0.5 text-[10px]`}
+                              >
+                                {vendor.technicalTag} · {vendor.name.split(' ').slice(0, 2).join(' ')}
+                              </Badge>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-[10px] text-gray-500 whitespace-nowrap">{formatDateTime(item.planned8)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  </table>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            <div className="relative">
+              <Search className="absolute w-4 h-4 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
+              <Input
+                className="pl-9"
+                placeholder="Search approved history..."
+                value={historySearchQuery}
+                onChange={(e) => setHistorySearchQuery(e.target.value)}
+              />
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-[#2fa36b]" />
+              </div>
+            ) : filteredHistoryData.length === 0 ? (
+              <div className="py-12 text-center border border-gray-200 border-dashed rounded-xl">
+                <Info className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm text-gray-500">
+                  No management approval history yet.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-auto border border-gray-200 rounded-xl max-h-[calc(100vh-400px)] relative custom-scrollbar">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="sticky top-0 z-30">
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Indent</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Firm</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Product</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Indent Qty</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Approved Vendor</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Tag</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Rate</th>
+                      <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Approved On</th>
+                      <th className="px-4 py-3 text-xs font-bold text-red-700 uppercase text-left bg-red-50/95 backdrop-blur-sm shadow-sm">Revert</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-100">
+                    {filteredHistoryData.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50 transition-colors border-b border-gray-100">
+                        <td className="px-4 py-3">{item.indentId}</td>
+                        <td className="px-4 py-3">{item.firmName}</td>
+                        <td className="px-4 py-3">{item.product}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900">{item.indentQty || "-"}</td>
+                        <td className="px-4 py-3">{item.approvedVendorName}</td>
+                        <td className="px-4 py-3">
+                          {item.approvedTag ? (
+                            <Badge className={getTagTone(item.approvedTag)}>
+                              {item.approvedTag}
+                            </Badge>
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td className="px-4 py-3 font-semibold">
+                          ₹{item.approvedRate}
+                        </td>
+                        <td className="px-4 py-3">{formatDateTime(item.actual8)}</td>
+                        <td className="px-4 py-3">
+                          {item.canRevert ? (
+                            <Button
+                              variant="outline"
+                              onClick={(e) => onRevertIndent(item, e)}
+                              className="h-8 px-3 text-xs text-red-700 border-red-300 hover:bg-red-50"
+                            >
+                              Revert
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+
+      <Sheet
+        open={openDialog}
+        onOpenChange={(open) => {
+          setOpenDialog(open);
+          if (!open) {
+            setSelectedIndent(null);
+            setSelectedVendorSlot("");
+          }
+        }}
+      >
+        <SheetContent className="sm:max-w-[1100px]">
+          {selectedIndent && (
+            <>
+              <SheetHeader>
+                <SheetTitle>Management Vendor Review</SheetTitle>
+                <SheetDescription className="flex items-center flex-wrap gap-y-2 mt-2">
+                  <span>Review tagged vendors and approve one for</span>
+                  <span className="font-bold text-gray-900 mx-1">{selectedIndent.indentId}</span>
+                  <span>at</span>
+                  <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-800 border-amber-200 font-bold px-3 py-1 shadow-sm">
+                    {selectedIndent.firmName}
+                  </Badge>
+                  <span className="mx-2 text-gray-300">|</span>
+                  <span className="font-medium text-gray-700">Product:</span>
+                  <span className="font-bold text-gray-900 ml-1">{selectedIndent.product}</span>
+                  <span className="mx-2 text-gray-300">|</span>
+                  <span className="font-medium text-gray-700">Indent Qty:</span>
+                  <span className="font-bold text-gray-900 ml-1">{selectedIndent.indentQty || "-"}</span>
+                  <span className="mx-2 text-gray-300">|</span>
+                  <span className="font-medium text-gray-700">Stock:</span>
+                  <span className="font-bold text-gray-900 ml-1">{selectedIndent.currentStock}</span>
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="grid gap-4 py-2 lg:grid-cols-3">
+                {selectedIndent.vendors.map((vendor) => {
+                  const isSelected =
+                    selectedVendorSlot === vendor.slot.toString();
+
+                  return (
+                    <button
+                      key={vendor.slot}
+                      type="button"
+                      onClick={() =>
+                        setSelectedVendorSlot(vendor.slot.toString())
+                      }
+                      className={`rounded-2xl border p-4 text-left transition ${
+                        isSelected
+                          ? "border-brand bg-brand-soft shadow-sm"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <Badge className={getTagTone(vendor.technicalTag)}>
+                            {vendor.technicalTag}
+                          </Badge>
+                          <p className="mt-3 text-base font-semibold text-gray-900">
+                            {vendor.name}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-500">
+                            {vendor.paymentTerm || "Payment term not set"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-gray-900">
+                            ₹{vendor.rate}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {vendor.rateType}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 p-3 mt-4 text-xs text-gray-600 rounded-xl bg-slate-50">
+                        <div>
+                          <span className="block text-[10px] uppercase tracking-wide text-gray-400">
+                            Packaging
+                          </span>
+                          <span>{vendor.packaging || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] uppercase tracking-wide text-gray-400">
+                            Quote
+                          </span>
+                          <span>{vendor.quotationNumber || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] uppercase tracking-wide text-gray-400">
+                            Quote Date
+                          </span>
+                          <span>{vendor.quotationDate || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] uppercase tracking-wide text-gray-400">
+                            Advance
+                          </span>
+                          <span>
+                            {vendor.advancePercentage
+                              ? `${vendor.advancePercentage}%`
+                              : "-"}
+                          </span>
+                        </div>
+                        <div className="col-span-2 mt-2 pt-2 border-t border-slate-200">
+                          <span className="block text-[10px] uppercase tracking-wide text-gray-400 mb-1">
+                            Delivery Timeline
+                          </span>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-[10px] text-gray-500">Requirement</p>
+                              <p className="font-medium">{formatDate(selectedIndent.expectedRequirementDate)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[10px] text-gray-500">Vendor Commit</p>
+                              <p className="font-medium text-blue-600">{formatDate(vendor.expectedDate)}</p>
+                            </div>
+                          </div>
+                          {getDelayDays(vendor.expectedDate, selectedIndent.expectedRequirementDate) !== null && (
+                            <div className={`mt-2 text-center py-1 rounded text-[10px] font-bold uppercase ${
+                              getDelayDays(vendor.expectedDate, selectedIndent.expectedRequirementDate) > 0
+                                ? "bg-red-50 text-red-600"
+                                : "bg-green-50 text-green-600"
+                            }`}>
+                              {getDelayDays(vendor.expectedDate, selectedIndent.expectedRequirementDate) > 0
+                                ? `${getDelayDays(vendor.expectedDate, selectedIndent.expectedRequirementDate)} Days Delay`
+                                : "On Time / Early"}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="p-3 mt-4 border border-gray-200 border-dashed rounded-xl">
+                        <p className="mb-2 text-xs font-semibold text-gray-600">
+                          Chemical Details
+                        </p>
+                        <div className="grid grid-cols-3 gap-y-2 text-[11px] text-gray-600">
+                          {chemistryFields.map(([label, key]) => (
+                            <div key={key}>
+                              <span className="block text-[10px] text-gray-400">
+                                {label}
+                              </span>
+                              <span>{vendor[key] || "-"}</span>
+                            </div>
+                          ))}
+                          <div className="col-span-3">
+                            <span className="block text-[10px] text-gray-400">
+                              Fineness
+                            </span>
+                            <span>{vendor.fineness || "-"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <SheetFooter>
+                <Button variant="outline" onClick={() => setOpenDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={onReject}
+                  disabled={isSubmitting}
+                >
+                  Reject
+                </Button>
+                <Button
+                  className="bg-[#2fa36b] hover:bg-[#268a59]"
+                  onClick={onApprove}
+                  disabled={!selectedVendorSlot || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  Approve Selected Vendor
+                </Button>
+              </SheetFooter>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+    </Card>
+  );
+}

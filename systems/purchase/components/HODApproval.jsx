@@ -1,0 +1,1407 @@
+"use client";
+
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { MixerHorizontalIcon } from "@radix-ui/react-icons";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  Filter,
+  CheckCircle2,
+  History,
+  Shield,
+  Loader2,
+  AlertTriangle,
+  Info,
+  ChevronsUpDown,
+  ShieldCheck,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useNotification } from "../context/NotificationContext";
+import { useRealtime } from "../hooks/useRealtime";
+import { canViewFirm } from "../utils/firmFilter";
+import SuperAdminEditModal from "./SuperAdminEditModal";
+import { API_URL, getToken } from "@/lib/auth";
+
+
+// Helper function to clean remarks - extract only the user text
+const cleanRemark = (remark) => {
+  if (!remark || typeof remark !== "string") return "";
+
+  // Remove timestamp patterns like "(Approved: 21/07/2025 19:09:38)" or "[21/07/2025 19:09:38]"
+  const cleaned = remark
+    .replace(/\s*\([^)]*:\s*\d{2}\/\d{2}\/\d{4}[^)]*\)\s*$/i, "") // Remove "(Status: timestamp)"
+    .replace(/\s*\[[^\]]+\]\s*$/, "") // Remove "[timestamp]"
+    .trim();
+
+  return cleaned;
+};
+
+// Helper function to format timestamp as dd/mm/yyyy hh:mm:ss
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
+
+// Simple SearchableSelect Component (without Command)
+const SearchableSelect = ({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  className,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredOptions = options.filter((option) =>
+    option.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  return (
+    <div className="relative">
+      <Button
+        variant="outline"
+        role="combobox"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className={`w-full justify-between h-9 bg-white text-xs ${className}`}
+      >
+        {value === "all" || !value ? `All ${placeholder}` : value}
+        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+      </Button>
+
+      {open && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+          <div className="sticky top-0 bg-white p-2 border-b">
+            <Input
+              type="text"
+              placeholder={`Search ${placeholder.toLowerCase()}...`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-7 text-xs"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          <div className="py-1">
+            <div
+              className={`px-3 py-2 text-xs cursor-pointer hover:bg-gray-100 ${value === "all" ? "bg-green-50" : ""}`}
+              onClick={() => {
+                onValueChange("all");
+                setOpen(false);
+                setSearchTerm("");
+              }}
+            >
+              All {placeholder}
+            </div>
+            {filteredOptions.map((option, index) => (
+              <div
+                key={`${option}-${index}`}
+                className={`px-3 py-2 text-xs cursor-pointer hover:bg-gray-100 ${value === option ? "bg-green-50" : ""}`}
+                onClick={() => {
+                  onValueChange(option);
+                  setOpen(false);
+                  setSearchTerm("");
+                }}
+              >
+                {option}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {open && (
+        <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+      )}
+    </div>
+  );
+};
+
+// Map friendly headers to their corresponding Supabase columns
+const FRIENDLY_HEADER_TO_DATA_KEY_MAP = {
+  "RI No.": "Indent Id.",
+  "Delivery Order No.": "Delivery Order No.",
+  "Generated By": "Generated By",
+  "Firm Name": "firmName",
+  "Raw Material Name": "Material",
+  Quantity: "Quantity",
+  Priority: "Priority",
+  "Type Of Indent": "Type Of Indent",
+  "Current Stock As Per factory": "Current Stock As Per factory",
+  Notes: "Notes",
+  "Indent Date": "Planned1",
+};
+
+export default function StockApproval() {
+  const [indents, setIndents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshData, setRefreshData] = useState(false);
+  const [selectedRows, setSelectedRows] = useState({});
+  const [remarks, setRemarks] = useState({});
+  const [approvedQtys, setApprovedQtys] = useState({});
+  const [approvalStatuses, setApprovalStatuses] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState("approve");
+  const { user, allowedSteps, isSuperAdmin } = useAuth();
+  const [superAdminEditIndent, setSuperAdminEditIndent] = useState(null);
+  const { updateCount } = useNotification();
+
+  // --- Column Visibility States ---
+  const [visibleApproveColumns, setVisibleApproveColumns] = useState({});
+  const [visibleHistoryColumns, setVisibleHistoryColumns] = useState({});
+
+  // --- Filter States ---
+  const [filters, setFilters] = useState({
+    firmName: "all",
+    rawMaterialName: "all",
+    priority: "all",
+    typeOfIndent: "all",
+    generatedBy: "all",
+    deliveryOrderNo: "all",
+  });
+
+  // Dynamic column metadata derived from FRIENDLY_HEADER_TO_DATA_KEY_MAP
+  const [allColumnsMeta, setAllColumnsMeta] = useState([]);
+
+  // --- Fetch Data and Initialize Column Meta/Visibility ---
+  useEffect(() => {
+    const fetchIndentsData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [pendingRes, historyRes] = await Promise.all([
+          fetch(`${API_URL}/purchase/hod-approval/pending`),
+          fetch(`${API_URL}/purchase/hod-approval/history`),
+        ]);
+        if (!pendingRes.ok || !historyRes.ok) {
+          throw new Error("Failed to fetch indent data");
+        }
+        const { data: pendingIndentsRaw } = await pendingRes.json();
+        const { data: historyIndentsRaw } = await historyRes.json();
+
+        // Reshape into the same column keys the rest of this component expects,
+        // with Planned1/Actual1 synthesized from HOD-approval row presence
+        // (this table's mere existence is now what "Actual1 set" used to mean).
+        const toRow = (indent) => ({
+          id: indent.id,
+          "Indent Id.": indent.indentId,
+          "Timestamp": indent.timestamp,
+          "Firm Name": indent.firmName,
+          "Generated By": indent.generatedBy,
+          "Material": indent.material,
+          "Quantity": indent.quantity,
+          "Current Stock As Per factory": indent.currentStockAsPerFactory,
+          "Priority": indent.priority,
+          "Type Of Indent": indent.typeOfIndent,
+          "Delivery Order No.": indent.deliveryOrderNo,
+          "Notes": indent.notes,
+          "Planned1": indent.timestamp || indent.createdAt,
+          "Actual1": indent.hodApproval?.createdAt || null,
+          "Approved Qty": indent.hodApproval?.approvedQty ?? null,
+          "Approval Status": indent.hodApproval?.approvalStatus ?? null,
+          "Remarks": indent.hodApproval?.remarks ?? null,
+          canRevert: indent.canRevert ?? false,
+        });
+
+        const data = [
+          ...pendingIndentsRaw.map(toRow),
+          ...historyIndentsRaw.map(toRow),
+        ];
+
+        // Initialize column metadata if needed (simplified compared to GVIZ)
+        const approveUiColumns = [
+          {
+            header: "Select",
+            dataKey: "selectRow",
+            alwaysVisible: true,
+            isApproveUI: true,
+          },
+          {
+            header: "What is To Be Done",
+            dataKey: "statusDropdown",
+            isApproveUI: true,
+          },
+          { header: "Remark", dataKey: "remarkInput", isApproveUI: true },
+          {
+            header: "Appr. Qty",
+            dataKey: "approvedQtyInput",
+            isApproveUI: true,
+          },
+        ];
+
+        const generatedAllColumnsMeta = Object.keys(
+          FRIENDLY_HEADER_TO_DATA_KEY_MAP,
+        ).map((header) => ({
+          header: header,
+          dataKey: FRIENDLY_HEADER_TO_DATA_KEY_MAP[header],
+          toggleable: true,
+          alwaysVisible:
+            FRIENDLY_HEADER_TO_DATA_KEY_MAP[header] === "Indent Id.",
+          isApproveUI: false,
+          isHistoryUI: false,
+        }));
+
+        const combinedColumnsMeta = [
+          ...approveUiColumns,
+          ...generatedAllColumnsMeta,
+        ];
+        setAllColumnsMeta(combinedColumnsMeta);
+
+        // Initial Visibility
+        const initialApproveVisibility = {};
+        const initialHistoryVisibility = {};
+
+        combinedColumnsMeta.forEach((col) => {
+          initialApproveVisibility[col.dataKey] = true;
+        });
+
+        const historyCols = [
+          "Indent Id.",
+          "Approval Status",
+          "Remarks",
+          "Approved Qty",
+          "Actual1",
+          "Delivery Order No.",
+          "Generated By",
+          "firmName",
+          "Material",
+          "Quantity",
+          "Priority",
+          "Type Of Indent",
+          "Current Stock As Per factory",
+          "Notes",
+          "Planned1",
+        ];
+        historyCols.forEach((col) => {
+          initialHistoryVisibility[col] = true;
+        });
+
+        setVisibleApproveColumns(initialApproveVisibility);
+        setVisibleHistoryColumns(initialHistoryVisibility);
+
+        let processedIndents = data.map((row) => ({
+          ...row,
+          id: row["Indent Id."],
+          supabaseId: row.id,
+          timestampOriginal: row["Timestamp"],
+          firmName: row["Firm Name"] || "",
+          generatedBy: row["Generated By"] || "",
+          rawMaterialName: row["Material"] || "",
+          quantity: row["Quantity"] || 0,
+          currentStock: row["Current Stock As Per factory"] || 0,
+          priority: row["Priority"] || "",
+          typeOfIndent: row["Type Of Indent"] || "",
+          deliveryOrderNo: row["Delivery Order No."] || "",
+          notes: row["Notes"] || "",
+          planned1: row["Planned1"],
+          actual1: row["Actual1"],
+          approvedQty_original: row["Approved Qty"] || "",
+          status_original: row["Approval Status"] || "",
+          remark_original: cleanRemark(row["Remarks"] || ""),
+        }));
+
+        if (user?.firmName) {
+          processedIndents = processedIndents.filter((indent) =>
+            canViewFirm(user.firmName, indent.firmName),
+          );
+        }
+
+        setIndents(processedIndents);
+
+        const initialQtys = {};
+        const initialStatuses = {};
+        const initialRemarks = {};
+
+        processedIndents.forEach((indent) => {
+          initialQtys[indent.id] =
+            indent.approvedQty_original || indent.quantity;
+          initialStatuses[indent.id] = indent.status_original || "Select";
+          initialRemarks[indent.id] = indent.remark_original || "";
+        });
+
+        setApprovedQtys(initialQtys);
+        setApprovalStatuses(initialStatuses);
+        setRemarks(initialRemarks);
+      } catch (err) {
+        console.error("Error fetching indents data:", err);
+        setError("Failed to load indent data: " + err.message);
+        toast.error("Failed to load indent data", { description: err.message });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIndentsData();
+  }, [refreshData, user]);
+
+  // Realtime: refresh data whenever INDENT-PO changes
+  useRealtime("INDENT-PO", () => {
+    setRefreshData((prev) => !prev);
+  });
+
+  // Get unique values for filters
+  const getUniqueValues = useCallback(
+    (field) => {
+      const values = indents
+        .map((indent) => indent[field])
+        .filter((value) => value && value.trim() !== "");
+      return [...new Set(values)].sort();
+    },
+    [indents],
+  );
+
+  const uniqueValues = useMemo(
+    () => ({
+      firmName: getUniqueValues("firmName"),
+      rawMaterialName: getUniqueValues("rawMaterialName"),
+      priority: getUniqueValues("priority"),
+      typeOfIndent: getUniqueValues("typeOfIndent"),
+      generatedBy: getUniqueValues("generatedBy"),
+      deliveryOrderNo: getUniqueValues("deliveryOrderNo"),
+    }),
+    [getUniqueValues],
+  );
+
+  const handleFilterChange = (field, value) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      firmName: "all",
+      rawMaterialName: "all",
+      priority: "all",
+      typeOfIndent: "all",
+      generatedBy: "all",
+      deliveryOrderNo: "all",
+    });
+  };
+
+  // Apply filters to data
+  const applyFilters = useCallback(
+    (data) => {
+      let filtered = [...data];
+      if (filters.firmName !== "all") {
+        filtered = filtered.filter(
+          (entry) => entry.firmName === filters.firmName,
+        );
+      }
+      if (filters.rawMaterialName !== "all") {
+        filtered = filtered.filter(
+          (entry) => entry.rawMaterialName === filters.rawMaterialName,
+        );
+      }
+      if (filters.priority !== "all") {
+        filtered = filtered.filter(
+          (entry) => entry.priority === filters.priority,
+        );
+      }
+      if (filters.typeOfIndent !== "all") {
+        filtered = filtered.filter(
+          (entry) => entry.typeOfIndent === filters.typeOfIndent,
+        );
+      }
+      if (filters.generatedBy !== "all") {
+        filtered = filtered.filter(
+          (entry) => entry.generatedBy === filters.generatedBy,
+        );
+      }
+      if (filters.deliveryOrderNo !== "all") {
+        filtered = filtered.filter(
+          (entry) => entry.deliveryOrderNo === filters.deliveryOrderNo,
+        );
+      }
+      return filtered;
+    },
+    [filters],
+  );
+
+  const handleSelectRow = (id, isSelected) => {
+    setSelectedRows((prev) => ({ ...prev, [id]: isSelected }));
+    if (isSelected) {
+      setApprovalStatuses((prev) => ({ ...prev, [id]: "Approved" }));
+    }
+  };
+
+  const handleApprovedQtyChange = (id, qty) => {
+    setApprovedQtys((prev) => ({ ...prev, [id]: qty }));
+  };
+
+  const handleApprovalStatusChange = (id, status) => {
+    setApprovalStatuses((prev) => ({ ...prev, [id]: status }));
+  };
+
+  const handleRemarkChange = (id, remark) => {
+    setRemarks((prev) => ({ ...prev, [id]: remark }));
+  };
+
+  // --- Column Visibility Handlers ---
+  const handleToggleColumn = (tab, dataKey, checked) => {
+    if (tab === "approve") {
+      setVisibleApproveColumns((prev) => ({ ...prev, [dataKey]: checked }));
+    } else {
+      setVisibleHistoryColumns((prev) => ({ ...prev, [dataKey]: checked }));
+    }
+  };
+
+  const handleSelectAllColumns = (tab, columnsToToggle, checked) => {
+    const newVisibility = {};
+    columnsToToggle.forEach((col) => {
+      newVisibility[col.dataKey] = checked;
+    });
+    if (tab === "approve") {
+      setVisibleApproveColumns((prev) => ({ ...prev, ...newVisibility }));
+    } else {
+      setVisibleHistoryColumns((prev) => ({ ...prev, ...newVisibility }));
+    }
+  };
+
+  const pendingIndents = useMemo(() => {
+    const filtered = indents.filter(
+      (indent) => indent.planned1 && !indent.actual1,
+    );
+    return applyFilters(filtered);
+  }, [indents, applyFilters]);
+
+  const processedIndents = useMemo(() => {
+    const filtered = indents.filter(
+      (indent) => indent.planned1 && indent.actual1,
+    );
+    return applyFilters(filtered).sort((a, b) => {
+      const dateA = a.actual1 ? new Date(a.actual1) : null;
+      const dateB = b.actual1 ? new Date(b.actual1) : null;
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+      return dateB.getTime() - dateA.getTime();
+    });
+  }, [indents, applyFilters]);
+
+  // Update global notification count
+  useEffect(() => {
+    const totalPendingForUser = indents.filter(
+      (indent) => indent.planned1 && !indent.actual1,
+    ).length;
+    updateCount("stock", totalPendingForUser);
+  }, [indents, updateCount]);
+
+  async function handleSubmitSelected(e) {
+    if (e) e.preventDefault();
+
+    const selectedIndentIds = Object.keys(selectedRows).filter(
+      (id) => selectedRows[id],
+    );
+    if (selectedIndentIds.length === 0) {
+      toast.error("Validation Error", {
+        description: "Please select at least one row to update.",
+      });
+      return;
+    }
+
+    const invalidRows = selectedIndentIds.filter(
+      (id) => !approvalStatuses[id] || approvalStatuses[id] === "Select",
+    );
+    if (invalidRows.length > 0) {
+      toast.error("Validation Error", {
+        description: "Please select an approval status for all selected rows.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    toast.loading(`Submitting ${selectedIndentIds.length} update(s)...`, {
+      id: "submission-toast",
+    });
+
+    let successCount = 0;
+    const errorMessages = [];
+
+    const selectedPendingIndents = pendingIndents.filter(
+      (indent) => selectedRows[indent.id],
+    );
+
+    for (const indent of selectedPendingIndents) {
+      try {
+        const userRemark = remarks[indent.id] || "";
+        const finalRemark = userRemark.trim() !== "" ? userRemark.trim() : "ok";
+
+        const res = await fetch(
+          `${API_URL}/purchase/hod-approval/${indent.supabaseId}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${getToken()}`,
+            },
+            body: JSON.stringify({
+              approvedQty: approvedQtys[indent.id] || indent.quantity,
+              approvalStatus: approvalStatuses[indent.id],
+              remarks: finalRemark,
+            }),
+          },
+        );
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.message || "Failed to update indent");
+
+        successCount++;
+      } catch (err) {
+        const errorMsg = `Failed to update ${indent.id}: ${err.message}`;
+        errorMessages.push(errorMsg);
+        console.error(errorMsg, err);
+      }
+    }
+
+    toast.dismiss("submission-toast");
+
+    if (errorMessages.length > 0) {
+      toast.error(
+        `Submission finished with ${errorMessages.length} error(s).`,
+        {
+          id: "submission-toast-error",
+          description: `${successCount} succeeded. ${errorMessages.length} failed.`,
+          duration: 5000,
+        },
+      );
+    } else {
+      toast.success("Submission Complete!", {
+        id: "submission-toast-success",
+        description: `${successCount} indent(s) were updated successfully.`,
+        duration: 3000,
+      });
+    }
+
+    setTimeout(() => {
+      setRefreshData((prev) => !prev);
+      setSelectedRows({});
+      setIsSubmitting(false);
+    }, 1500);
+  }
+
+  async function handleRevert(indent) {
+    if (
+      !window.confirm(
+        `Revert HOD Approval for ${indent["Indent Id."]}? It will go back to Pending.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        // `indent.id` on this row has been overwritten with the "Indent Id."
+        // string (RI-xxx) for selection-key purposes elsewhere in this
+        // component — the real numeric row id lives in `supabaseId`, same
+        // as the existing HOD Approval submit call above.
+        `${API_URL}/purchase/hod-approval/${indent.supabaseId}/revert`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${getToken()}` },
+        },
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || "Failed to revert.");
+
+      toast.success("Reverted", {
+        description: `${indent["Indent Id."]} is back in Pending.`,
+      });
+      setRefreshData((prev) => !prev);
+    } catch (err) {
+      toast.error("Revert failed", { description: err.message });
+    }
+  }
+
+  const getApproveTableColumns = useMemo(() => {
+    return allColumnsMeta
+      .filter(
+        (col) =>
+          (col.dataKey !== "selectRow" && visibleApproveColumns[col.dataKey]) ||
+          col.isApproveUI,
+      )
+      .sort((a, b) => {
+        const order = [
+          "selectRow",
+          "statusDropdown",
+          "remarkInput",
+          "approvedQtyInput",
+          "Indent Id.",
+          "Planned1",
+          "Delivery Order No.",
+          "Generated By",
+          "firmName",
+          "Material",
+          "Quantity",
+          "Priority",
+          "Type Of Indent",
+          "Current Stock As Per factory",
+          "Notes",
+        ];
+        const indexA = order.indexOf(a.dataKey);
+        const indexB = order.indexOf(b.dataKey);
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+  }, [allColumnsMeta, visibleApproveColumns]);
+
+  const getHistoryTableColumns = useMemo(() => {
+    const explicitHistoryColumns = [
+      { dataKey: "Indent Id.", header: "RI No." },
+      { dataKey: "Planned1", header: "Indent Date" },
+      { dataKey: "Approval Status", header: "Approval Status" },
+      { dataKey: "Remarks", header: "Remark" },
+      { dataKey: "Approved Qty", header: "Appr. Qty" },
+      { dataKey: "Actual1", header: "Approval Time" },
+      { dataKey: "Delivery Order No.", header: "Delivery Order No." },
+      { dataKey: "Generated By", header: "Generated By" },
+      { dataKey: "firmName", header: "Firm Name" },
+      { dataKey: "Material", header: "Raw Material Name" },
+      { dataKey: "Quantity", header: "Quantity" },
+      { dataKey: "Priority", header: "Priority" },
+      { dataKey: "Type Of Indent", header: "Type Of Indent" },
+      {
+        dataKey: "Current Stock As Per factory",
+        header: "Current Stock As Per factory",
+      },
+      { dataKey: "Notes", header: "Notes" },
+    ];
+    return explicitHistoryColumns
+      .filter((col) => visibleHistoryColumns[col.dataKey])
+      .sort((a, b) => {
+        const order = [
+          "Indent Id.",
+          "Planned1",
+          "Approval Status",
+          "Remarks",
+          "Approved Qty",
+          "Actual1",
+          "Delivery Order No.",
+          "Generated By",
+          "firmName",
+          "Material",
+          "Quantity",
+          "Priority",
+          "Type Of Indent",
+          "Current Stock As Per factory",
+          "Notes",
+        ];
+        const indexA = order.indexOf(a.dataKey);
+        const indexB = order.indexOf(b.dataKey);
+        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      });
+  }, [visibleHistoryColumns]);
+
+  return (
+    <>
+    {superAdminEditIndent && (
+      <SuperAdminEditModal
+        title={`Edit Indent — ${superAdminEditIndent.id}`}
+        tableName="INDENT-PO"
+        pkField="id"
+        pkValue={superAdminEditIndent.supabaseId}
+        fields={[
+          { label: "Indent Id.", dbKey: "Indent Id.", value: superAdminEditIndent.id, type: "text" },
+          { label: "Firm Name", dbKey: "Firm Name", value: superAdminEditIndent.firmName, type: "text" },
+          { label: "Raw Material", dbKey: "Material", value: superAdminEditIndent.rawMaterialName, type: "text" },
+          { label: "Quantity", dbKey: "Quantity", value: superAdminEditIndent.quantity, type: "number" },
+          { label: "Priority", dbKey: "Priority", value: superAdminEditIndent.priority, type: "text" },
+          { label: "Type Of Indent", dbKey: "Type Of Indent", value: superAdminEditIndent.typeOfIndent, type: "text" },
+          { label: "Notes", dbKey: "Notes", value: superAdminEditIndent.notes, type: "textarea" },
+          { label: "Approved Qty", dbKey: "Approved Qty", value: superAdminEditIndent.approvedQty_original, type: "number" },
+          { label: "Approval Status", dbKey: "Approval Status", value: superAdminEditIndent.status_original, type: "text" },
+          { label: "Remarks", dbKey: "Remarks", value: superAdminEditIndent.remark_original, type: "textarea" },
+        ]}
+        onClose={() => setSuperAdminEditIndent(null)}
+        onSaved={() => { setSuperAdminEditIndent(null); setRefreshData((p) => !p); }}
+      />
+    )}
+    <Card className="w-full max-w-full 2xl:max-w-screen-2xl mx-auto relative bg-white shadow-md rounded-lg border border-gray-200">
+      <CardHeader className="p-4 border-b border-gray-200">
+        <CardTitle className="flex items-center gap-2 text-gray-800 text-lg">
+            <Shield className="h-5 w-5 text-[#2fa36b]" />
+            HOD Approval
+          </CardTitle>
+        
+        {user?.firmName && (
+          <p className="text-[#2fa36b] text-xs mt-1">
+            Showing data for:{" "}
+            <span className="font-semibold">
+              {user.firmName === "all"
+                ? "All"
+                : Array.isArray(user.firmName)
+                  ? user.firmName.join(", ")
+                  : user.firmName}
+            </span>
+          </p>
+        )}
+      </CardHeader>
+
+      <CardContent className="p-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-2 max-w-sm mb-4">
+            <TabsTrigger value="approve" className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              Approve
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
+                {pendingIndents.length}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              History
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0.5 text-xs">
+                {processedIndents.length}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Filters Section */}
+          <div className="mb-4 p-4 border border-gray-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-3">
+              <Filter className="h-4 w-4 text-gray-500" />
+              <Label className="text-sm font-medium">Filters</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearAllFilters}
+                className="ml-auto bg-white"
+              >
+                Clear All
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div>
+                <Label className="text-xs mb-1 block">Firm Name</Label>
+                <SearchableSelect
+                  value={filters.firmName}
+                  onValueChange={(value) => handleFilterChange("firmName", value)}
+                  options={uniqueValues.firmName}
+                  placeholder="Firms"
+                  className="h-9"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs mb-1 block">Material Name</Label>
+                <SearchableSelect
+                  value={filters.rawMaterialName}
+                  onValueChange={(value) =>
+                    handleFilterChange("rawMaterialName", value)
+                  }
+                  options={uniqueValues.rawMaterialName}
+                  placeholder="Materials"
+                  className="h-9"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs mb-1 block">Priority</Label>
+                <SearchableSelect
+                  value={filters.priority}
+                  onValueChange={(value) =>
+                    handleFilterChange("priority", value)
+                  }
+                  options={uniqueValues.priority}
+                  placeholder="Priority"
+                  className="h-9"
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs mb-1 block">Generated By</Label>
+                <SearchableSelect
+                  value={filters.generatedBy}
+                  onValueChange={(value) =>
+                    handleFilterChange("generatedBy", value)
+                  }
+                  options={uniqueValues.generatedBy}
+                  placeholder="Users"
+                  className="h-9"
+                />
+              </div>
+            </div>
+          </div>
+
+          <TabsContent value="approve" className="mt-4">
+            <div className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-full">
+                      <CheckCircle2 className="h-4 w-4 text-[#2fa36b]" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-base text-gray-800">
+                        Pending Stock Approval
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        Review and approve/reject based on stock verification.
+                      </p>
+                    </div>
+                  </div>
+                  {pendingIndents.length > 0 && (
+                    <Button
+                      onClick={handleSubmitSelected}
+                      disabled={
+                        Object.values(selectedRows).filter(Boolean).length ===
+                          0 || isSubmitting
+                      }
+                      className="px-3 py-1 h-8 bg-[#2fa36b] text-white font-semibold rounded-md hover:bg-[#268a59] transition-colors disabled:opacity-50 text-sm"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        "Submit Selected"
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4">
+                {loading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <Loader2 className="h-8 w-8 text-green-500 animate-spin mr-3" />
+                    <p className="text-gray-700">Loading pending indents...</p>
+                  </div>
+                ) : error ? (
+                  <div className="text-center p-6 bg-red-50 rounded-md">
+                    <AlertTriangle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+                    <h3 className="text-red-700 font-semibold">
+                      Error Loading Data
+                    </h3>
+                    <p className="text-red-600 text-sm mb-3">{error}</p>
+                    <Button
+                      onClick={() => setRefreshData((p) => !p)}
+                      className="px-4 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4 flex justify-end">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="ml-auto bg-white h-8 px-3 text-sm"
+                          >
+                            <MixerHorizontalIcon className="mr-2 h-4 w-4" />
+                            View Columns
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-4">
+                          <div className="grid gap-2">
+                            <p className="text-sm font-medium leading-none">
+                              Toggle Columns
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Select columns to display.
+                            </p>
+                            <div className="relative flex items-center mb-2">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() =>
+                                  handleSelectAllColumns(
+                                    "approve",
+                                    allColumnsMeta.filter(
+                                      (col) =>
+                                        col.toggleable && !col.isApproveUI,
+                                    ),
+                                    true,
+                                  )
+                                }
+                                className="p-0 h-auto text-xs"
+                              >
+                                Select All
+                              </Button>
+                              <span className="text-gray-400 text-xs mx-1">
+                                |
+                              </span>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() =>
+                                  handleSelectAllColumns(
+                                    "approve",
+                                    allColumnsMeta.filter(
+                                      (col) =>
+                                        col.toggleable && !col.isApproveUI,
+                                    ),
+                                    false,
+                                  )
+                                }
+                                className="p-0 h-auto text-xs"
+                              >
+                                Deselect All
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              {allColumnsMeta
+                                .filter(
+                                  (col) => col.toggleable && !col.isApproveUI,
+                                )
+                                .map((col) => (
+                                  <div
+                                    key={col.dataKey}
+                                    className="flex items-center space-x-2"
+                                  >
+                                    <Checkbox
+                                      id={`toggle-approve-${col.dataKey}`}
+                                      checked={
+                                        visibleApproveColumns[col.dataKey]
+                                      }
+                                      onCheckedChange={(checked) =>
+                                        handleToggleColumn(
+                                          "approve",
+                                          col.dataKey,
+                                          checked,
+                                        )
+                                      }
+                                      disabled={col.alwaysVisible}
+                                    />
+                                    <Label
+                                      htmlFor={`toggle-approve-${col.dataKey}`}
+                                      className="text-sm font-normal cursor-pointer"
+                                    >
+                                      {col.header}
+                                      {col.alwaysVisible && (
+                                        <span className="text-gray-400 ml-1 text-xs">
+                                          (Fixed)
+                                        </span>
+                                      )}
+                                    </Label>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {pendingIndents.length === 0 ? (
+                      <div className="text-center py-10">
+                        <Info className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                        <p className="text-gray-600">
+                          No indents currently pending approval.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-auto rounded-lg border border-gray-200 max-h-[calc(100vh-500px)] relative custom-scrollbar">
+                        <table className="w-full text-sm border-collapse">
+                          <thead className="sticky top-0 z-30">
+                            <tr className="hover:bg-transparent border-b border-gray-200">
+                              {getApproveTableColumns.map((col) => (
+                                <th
+                                  key={col.dataKey}
+                                  className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap bg-gray-100/95 backdrop-blur-sm shadow-sm"
+                                >
+                                  {col.header}
+                                </th>
+                              ))}
+                              {isSuperAdmin && (
+                                <th className="px-4 py-3 text-left text-xs font-bold text-purple-700 uppercase tracking-wider whitespace-nowrap bg-purple-50/95 backdrop-blur-sm shadow-sm">SA Edit</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {pendingIndents.map((indent) => (
+                              <tr
+                                key={indent.id}
+                                className={`transition duration-150 border-b border-gray-100 ${
+                                  selectedRows[indent.id]
+                                    ? "bg-green-100 dark:bg-green-900/5"
+                                    : "hover:bg-gray-50 dark:hover:bg-white/5"
+                                }`}
+                              >
+                                {getApproveTableColumns.map((col) => {
+                                  if (col.dataKey === "selectRow") {
+                                    return (
+                                      <td
+                                        key={col.dataKey}
+                                        className="px-4 py-2"
+                                      >
+                                        <Checkbox
+                                          checked={!!selectedRows[indent.id]}
+                                          onCheckedChange={(checked) =>
+                                            handleSelectRow(indent.id, checked)
+                                          }
+                                          className="h-4 w-4"
+                                        />
+                                      </td>
+                                    );
+                                  }
+                                  if (col.dataKey === "approvedQtyInput") {
+                                    return (
+                                      <td
+                                        key={col.dataKey}
+                                        className="px-4 py-2"
+                                      >
+                                        <input
+                                          type="text"
+                                          placeholder="Qty"
+                                          value={approvedQtys[indent.id] || ""}
+                                          onChange={(e) =>
+                                            handleApprovedQtyChange(
+                                              indent.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          disabled={!selectedRows[indent.id]}
+                                          className="w-24 px-2 py-1 border border-gray-300 rounded-md focus:ring-[#268a59] focus:border-[#268a59] disabled:bg-gray-100 text-sm"
+                                        />
+                                      </td>
+                                    );
+                                  }
+                                  if (col.dataKey === "statusDropdown") {
+                                    return (
+                                      <td
+                                        key={col.dataKey}
+                                        className="px-4 py-2"
+                                      >
+                                        <select
+                                          value={
+                                            approvalStatuses[indent.id] ||
+                                            "Select"
+                                          }
+                                          onChange={(e) =>
+                                            handleApprovalStatusChange(
+                                              indent.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          disabled={!selectedRows[indent.id]}
+                                          className="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-[#268a59] focus:border-[#268a59] disabled:bg-gray-100 text-sm"
+                                        >
+                                          <option value="Select" disabled>
+                                            Select...
+                                          </option>
+                                          <option value="Approved">
+                                            Approved
+                                          </option>
+                                          <option value="Reject">Reject</option>
+                                        </select>
+                                      </td>
+                                    );
+                                  }
+                                  if (col.dataKey === "remarkInput") {
+                                    return (
+                                      <td
+                                        key={col.dataKey}
+                                        className="px-4 py-2"
+                                      >
+                                        <input
+                                          type="text"
+                                          placeholder="Remark"
+                                          value={remarks[indent.id] || ""}
+                                          onChange={(e) =>
+                                            handleRemarkChange(
+                                              indent.id,
+                                              e.target.value,
+                                            )
+                                          }
+                                          disabled={!selectedRows[indent.id]}
+                                          className="w-full px-2 py-1 border border-gray-300 rounded-md focus:ring-[#268a59] focus:border-[#268a59] disabled:bg-gray-100 text-sm"
+                                        />
+                                      </td>
+                                    );
+                                  }
+                                  return (
+                                    <td
+                                      key={col.dataKey}
+                                      className="px-4 py-2 text-gray-700 dark:text-gray-200"
+                                    >
+                                      {col.dataKey === "Planned1"
+                                        ? formatDateTime(indent.planned1)
+                                        : indent[col.dataKey]}
+                                    </td>
+                                  );
+                                })}
+                                {isSuperAdmin && (
+                                  <td className="px-4 py-2">
+                                    <button
+                                      onClick={() => setSuperAdminEditIndent(indent)}
+                                      className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-md hover:bg-purple-200 border border-purple-300"
+                                    >
+                                      <ShieldCheck className="h-3 w-3 mr-1" />
+                                      Edit
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-4">
+            <div className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-200">
+              <div className="p-4 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-full">
+                    <History className="h-4 w-4 text-[#2fa36b]" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base text-gray-800">
+                      Approval History
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      View past approvals and rejections.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4">
+                {loading ? (
+                  <div className="flex justify-center items-center h-40">
+                    <Loader2 className="h-8 w-8 text-green-500 animate-spin mr-3" />
+                    <p className="text-gray-700">Loading approval history...</p>
+                  </div>
+                ) : error ? (
+                  <div className="text-center p-6 bg-red-50 rounded-md">
+                    <AlertTriangle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+                    <h3 className="text-red-700 font-semibold">
+                      Error Loading Data
+                    </h3>
+                    <p className="text-red-600 text-sm mb-3">{error}</p>
+                    <Button
+                      onClick={() => setRefreshData((p) => !p)}
+                      className="px-4 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mb-4 flex justify-end">
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="ml-auto bg-white h-8 px-3 text-sm"
+                          >
+                            <MixerHorizontalIcon className="mr-2 h-4 w-4" />
+                            View Columns
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-4">
+                          <div className="grid gap-2">
+                            <p className="text-sm font-medium leading-none">
+                              Toggle Columns
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Select columns to display.
+                            </p>
+                            <div className="relative flex items-center mb-2">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() =>
+                                  handleSelectAllColumns(
+                                    "history",
+                                    allColumnsMeta.filter(
+                                      (col) =>
+                                        col.toggleable && !col.isHistoryUI,
+                                    ),
+                                    true,
+                                  )
+                                }
+                                className="p-0 h-auto text-xs"
+                              >
+                                Select All
+                              </Button>
+                              <span className="text-gray-400 text-xs mx-1">
+                                |
+                              </span>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() =>
+                                  handleSelectAllColumns(
+                                    "history",
+                                    allColumnsMeta.filter(
+                                      (col) =>
+                                        col.toggleable && !col.isHistoryUI,
+                                    ),
+                                    false,
+                                  )
+                                }
+                                className="p-0 h-auto text-xs"
+                              >
+                                Deselect All
+                              </Button>
+                            </div>
+                            <div className="space-y-2">
+                              {allColumnsMeta
+                                .filter(
+                                  (col) => col.toggleable && !col.isHistoryUI,
+                                )
+                                .map((col) => (
+                                  <div
+                                    key={col.dataKey}
+                                    className="flex items-center space-x-2"
+                                  >
+                                    <Checkbox
+                                      id={`toggle-history-${col.dataKey}`}
+                                      checked={
+                                        visibleHistoryColumns[col.dataKey]
+                                      }
+                                      onCheckedChange={(checked) =>
+                                        handleToggleColumn(
+                                          "history",
+                                          col.dataKey,
+                                          checked,
+                                        )
+                                      }
+                                      disabled={col.alwaysVisible}
+                                    />
+                                    <Label
+                                      htmlFor={`toggle-history-${col.dataKey}`}
+                                      className="text-sm font-normal cursor-pointer"
+                                    >
+                                      {col.header}
+                                      {col.alwaysVisible && (
+                                        <span className="text-gray-400 ml-1 text-xs">
+                                          (Fixed)
+                                        </span>
+                                      )}
+                                    </Label>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    {processedIndents.length === 0 ? (
+                      <div className="text-center py-10">
+                        <Info className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                        <p className="text-gray-600">
+                          No approval history available.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-auto rounded-lg border border-gray-200 max-h-[calc(100vh-500px)] relative custom-scrollbar">
+                        <table className="w-full text-sm border-collapse">
+                          <thead className="sticky top-0 z-30">
+                            <tr className="hover:bg-transparent border-b border-gray-200">
+                              {getHistoryTableColumns.map((col) => (
+                                <th
+                                  key={col.dataKey}
+                                  className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider whitespace-nowrap bg-gray-100/95 backdrop-blur-sm shadow-sm"
+                                >
+                                  {col.header}
+                                </th>
+                              ))}
+                              {isSuperAdmin && (
+                                <th className="px-4 py-3 text-left text-xs font-bold text-purple-700 uppercase tracking-wider whitespace-nowrap bg-purple-50/95 backdrop-blur-sm shadow-sm">SA Edit</th>
+                              )}
+                              <th className="px-4 py-3 text-left text-xs font-bold text-red-700 uppercase tracking-wider whitespace-nowrap bg-red-50/95 backdrop-blur-sm shadow-sm">Revert</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {processedIndents.map((indent) => (
+                              <tr
+                                key={indent.id}
+                                className="hover:bg-gray-50 border-b border-gray-100"
+                              >
+                                {getHistoryTableColumns.map((col) => (
+                                  <td
+                                    key={col.dataKey}
+                                    className="px-4 py-2 text-gray-700"
+                                  >
+                                    {col.dataKey === "Actual1"
+                                      ? formatDateTime(indent.actual1)
+                                      : col.dataKey === "Planned1"
+                                        ? formatDateTime(indent.planned1)
+                                        : col.dataKey === "Remarks"
+                                          ? cleanRemark(indent[col.dataKey])
+                                          : indent[col.dataKey]}
+                                  </td>
+                                ))}
+                                {isSuperAdmin && (
+                                  <td className="px-4 py-2">
+                                    <button
+                                      onClick={() => setSuperAdminEditIndent(indent)}
+                                      className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-md hover:bg-purple-200 border border-purple-300"
+                                    >
+                                      <ShieldCheck className="h-3 w-3 mr-1" />
+                                      Edit
+                                    </button>
+                                  </td>
+                                )}
+                                <td className="px-4 py-2">
+                                  {indent.canRevert ? (
+                                    <button
+                                      onClick={() => handleRevert(indent)}
+                                      className="inline-flex items-center px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-md hover:bg-red-200 border border-red-300"
+                                    >
+                                      Revert
+                                    </button>
+                                  ) : (
+                                    <span className="text-xs text-gray-400" title="This indent has already moved to a later stage">—</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+    </>
+  );
+}

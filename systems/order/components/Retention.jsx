@@ -1,0 +1,99 @@
+"use client";
+import React, { useState, useEffect, useCallback } from "react";
+import { API_URL, getToken } from "@/lib/auth";
+import { useAuth } from "@/systems/order/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
+
+export default function Retention() {
+  const { user } = useAuth();
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [form, setForm] = useState({ retentionReceivedDate: "", retentionAmount: "", utr: "", remarks: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const isAdmin = user?.role === "admin" || user?.page_access === "all" || user?.page_access === "super admin";
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/order/retention`);
+      const json = await res.json();
+      setRows(json.data || []);
+    } catch { } finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selected) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`${API_URL}/order/retention/${selected.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify(form),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message || "Failed");
+      toast.success("Retention recorded"); setSelected(null); setForm({ retentionReceivedDate: "", retentionAmount: "", utr: "", remarks: "" }); loadData();
+    } catch (err) { toast.error(err.message); } finally { setSubmitting(false); }
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="animate-spin w-6 h-6 text-emerald-500" /></div>;
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Retention</h2>
+      {selected && isAdmin && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Retention — {selected.doNumber}</CardTitle></CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[["retentionReceivedDate", "Received Date", "date"], ["retentionAmount", "Amount"], ["utr", "UTR"], ["remarks", "Remarks"]].map(([k, l, type = "text"]) => (
+                <div key={k}><Label className="text-xs text-zinc-500 mb-1 block">{l}</Label><Input type={type} value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} className="h-9" /></div>
+              ))}
+              <div className="sm:col-span-2 lg:col-span-4 flex gap-3">
+                <Button type="submit" disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                  {submitting ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />} Save
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-zinc-50 dark:bg-zinc-900/60">
+              {["DO No.", "Party", "Product", "Retention %", "Status", "Received Date"].map(h => <TableHead key={h} className="text-xs font-semibold whitespace-nowrap">{h}</TableHead>)}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow><TableCell colSpan={6} className="text-center py-10 text-zinc-400">No retention orders</TableCell></TableRow>
+            ) : rows.map(r => (
+              <TableRow key={r.id} className={`text-sm cursor-pointer ${selected?.id === r.id ? "bg-emerald-50 dark:bg-emerald-900/20" : ""}`}
+                onClick={() => isAdmin && setSelected(r)}>
+                <TableCell className="font-mono text-xs">{r.doNumber}</TableCell>
+                <TableCell>{r.partyName}</TableCell>
+                <TableCell>{r.productName}</TableCell>
+                <TableCell>{r.retentionPercentage}%</TableCell>
+                <TableCell><Badge className={`text-xs border-0 ${r.retentionReceived ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{r.retentionReceived ? "Received" : "Pending"}</Badge></TableCell>
+                <TableCell className="text-xs">{r.retentionReceivedDate ? new Date(r.retentionReceivedDate).toLocaleDateString() : "—"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
