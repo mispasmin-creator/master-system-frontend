@@ -845,11 +845,20 @@ export function FullKittingHistory({
     setProcessMessage(null);
 
     try {
-      await api.processKittingPayment(toSystemPayment(row));
+      // Use the entry's unique number as the lookup key; the backend
+      // patches the kitting stage record keyed on the FreightPaymentEntry id.
+      const entryRes = await freightPaymentApi.get("entry");
+      const entries: any[] = entryRes.data || [];
+      const match = entries.find(
+        (e: any) =>
+          (e.unique_number || `KIT-${e.id}`) === uniqueId ||
+          e.lift_id === row.liftId
+      );
+      if (!match) throw new Error(`Entry not found for ${row.liftId}`);
+      await freightPaymentApi.patch("kitting", match.id, "complete", { remark: row.fullkittingRemarks });
       setProcessedIds((prev) => new Set(prev).add(uniqueId));
       setProcessMessage(`Processed ${row.liftId} successfully`);
-      queryClient.invalidateQueries({ queryKey: ["check-kitting-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["freight-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["freight-entries"] });
     } catch (err) {
       setProcessMessage(
         err instanceof Error ? err.message : "Failed to process record",
@@ -864,19 +873,35 @@ export function FullKittingHistory({
     setIsBatchProcessing(true);
     setProcessMessage(null);
 
+    // Fetch current entry list once, then patch each matched entry
+    let entries: any[] = [];
+    try {
+      const entryRes = await freightPaymentApi.get("entry");
+      entries = entryRes.data || [];
+    } catch {
+      setProcessMessage("Failed to load entries from backend");
+      setIsBatchProcessing(false);
+      return;
+    }
+
     let successCount = 0;
     try {
       for (const row of selectedRows) {
         const uniqueId = getRowUniqueId(row);
         setProcessingId(uniqueId);
-        await api.processKittingPayment(toSystemPayment(row));
+        const match = entries.find(
+          (e: any) =>
+            (e.unique_number || `KIT-${e.id}`) === uniqueId ||
+            e.lift_id === row.liftId
+        );
+        if (!match) continue;
+        await freightPaymentApi.patch("kitting", match.id, "complete", { remark: row.fullkittingRemarks });
         setProcessedIds((prev) => new Set(prev).add(uniqueId));
         successCount += 1;
       }
       setSelectedIds(new Set());
       setProcessMessage(`Processed ${successCount} records successfully`);
-      queryClient.invalidateQueries({ queryKey: ["check-kitting-payments"] });
-      queryClient.invalidateQueries({ queryKey: ["freight-payments"] });
+      queryClient.invalidateQueries({ queryKey: ["freight-entries"] });
     } catch (err) {
       setProcessMessage(
         err instanceof Error ? err.message : "Failed to process selected records",
@@ -906,8 +931,7 @@ export function FullKittingHistory({
       <div className="w-full rounded-xl border border-rose-200 bg-rose-50 dark:bg-rose-950/10 p-6 text-center">
         <p className="text-[13px] font-semibold text-rose-700 dark:text-rose-400">{error}</p>
         <p className="text-[12px] text-rose-400 dark:text-rose-500 mt-1">
-          Check Purchase/ORDER Supabase connection, table names, and RLS
-          permissions.
+          Check your network connection and backend API status.
         </p>
       </div>
     );

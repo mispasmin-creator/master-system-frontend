@@ -60,6 +60,7 @@ import {
   Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { freightPaymentApi } from "../lib/api";
 
 interface ColumnDef {
   key: string;
@@ -1165,7 +1166,7 @@ export function FreightTable({
                                 if (file) {
                                   setIsUploading(true);
                                   try {
-                                    const url = await api.uploadBiltyImage(file);
+                                    const url = await freightPaymentApi.upload(file);
                                     setUpdateAuditImage(url);
                                   } catch {
                                     alert("Upload failed. Please check your storage settings.");

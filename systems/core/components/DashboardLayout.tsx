@@ -43,6 +43,8 @@ const FreightIcon = icon(<><rect x="1" y="3" width="15" height="13" rx="1" /><po
 const InventoryIcon = icon(<><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>);
 const PaymentIcon = icon(<><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></>);
 const ServicesIcon = icon(<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></>);
+const RepairIcon = icon(<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></>);
+
 
 const productionTabs = [
   { id: "dashboard", label: "Dashboard", stepName: "Overview", path: "/dashboard" },
@@ -196,6 +198,17 @@ const servicesTabs = [
   { id: "users", label: "User Management", path: "/users" }
 ];
 
+const repairTabs = [
+  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "indent", label: "Indent", path: "/indent" },
+  { id: "sent-to-vendor", label: "Sent to Vendor", path: "/sent-to-vendor" },
+  { id: "check-machine", label: "Check Machine", path: "/check-machine" },
+  { id: "store-in", label: "Store In", path: "/store-in" },
+  { id: "make-payment", label: "Make Payment", path: "/make-payment" },
+  { id: "accounts", label: "Accounts", path: "/accounts" },
+  { id: "users", label: "User Management", path: "/users" }
+];
+
 export default function DashboardLayout({
   children,
   hideRightSidebar = false,
@@ -203,7 +216,7 @@ export default function DashboardLayout({
 }: {
   children?: ReactNode;
   hideRightSidebar?: boolean;
-  basePath: '/dashboard' | '/purchase' | '/order' | '/production' | '/store' | '/rm-sales' | '/checklist' | '/freight-payment' | '/inventory' | '/payment' | '/services';
+  basePath: '/dashboard' | '/purchase' | '/order' | '/production' | '/store' | '/rm-sales' | '/checklist' | '/freight-payment' | '/inventory' | '/payment' | '/services' | '/repair';
 }) {
   const router = useRouter(); // Next.js Router — used for cross-system navigation
   const navigate = useNavigate(); // React Router — used for in-system navigation
@@ -228,8 +241,9 @@ export default function DashboardLayout({
   const [inventoryExpanded, setInventoryExpanded] = useState(basePath === '/inventory');
   const [paymentExpanded, setPaymentExpanded] = useState(basePath === '/payment');
   const [servicesExpanded, setServicesExpanded] = useState(basePath === '/services');
+  const [repairExpanded, setRepairExpanded] = useState(basePath === '/repair');
 
-  const selectedSystem: 'overview' | 'purchase' | 'order' | 'production' | 'store' | 'rm-sales' | 'checklist' | 'freight-payment' | 'inventory' | 'payment' | 'services' =
+  const selectedSystem: 'overview' | 'purchase' | 'order' | 'production' | 'store' | 'rm-sales' | 'checklist' | 'freight-payment' | 'inventory' | 'payment' | 'services' | 'repair' =
     basePath === '/purchase'
       ? 'purchase'
       : basePath === '/order'
@@ -250,6 +264,8 @@ export default function DashboardLayout({
       ? 'payment'
       : basePath === '/services'
       ? 'services'
+      : basePath === '/repair'
+      ? 'repair'
       : 'overview';
 
   // Hydration-safe localStorage reading
@@ -287,6 +303,9 @@ export default function DashboardLayout({
 
       const savedSrv = localStorage.getItem('servicesExpanded');
       if (savedSrv !== null) setServicesExpanded(savedSrv === 'true');
+
+      const savedRep = localStorage.getItem('repairExpanded');
+      if (savedRep !== null) setRepairExpanded(savedRep === 'true');
     }
   }, []);
 
@@ -370,6 +389,14 @@ export default function DashboardLayout({
   const goToServices = (hashPath: string) => {
     if (basePath !== '/services') {
       router.push(`/services#${hashPath}`);
+    } else {
+      navigate(hashPath);
+    }
+  };
+
+  const goToRepair = (hashPath: string) => {
+    if (basePath !== '/repair') {
+      router.push(`/repair#${hashPath}`);
     } else {
       navigate(hashPath);
     }
@@ -522,6 +549,13 @@ export default function DashboardLayout({
       pageTitle = activeTab.label;
     } else {
       pageTitle = 'Services';
+    }
+  } else if (basePath === '/repair') {
+    const activeTab = repairTabs.find((tab) => tab.path === location.pathname);
+    if (activeTab) {
+      pageTitle = activeTab.label;
+    } else {
+      pageTitle = 'Repair FMS';
     }
   }
 
@@ -1356,6 +1390,80 @@ export default function DashboardLayout({
                           key={tab.id}
                           onClick={() => {
                             goToServices(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Repair FMS System */}
+          <div className="mt-2">
+            <button
+              onClick={() => {
+                setRepairExpanded((v) => {
+                  const next = !v;
+                  if (typeof window !== 'undefined') localStorage.setItem('repairExpanded', String(next));
+                  if (next) {
+                    setPurchaseExpanded(false);
+                    setOrderExpanded(false);
+                    setProductionExpanded(false);
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    setPaymentExpanded(false);
+                    setServicesExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                      localStorage.setItem('paymentExpanded', 'false');
+                      localStorage.setItem('servicesExpanded', 'false');
+                    }
+                  }
+                  return next;
+                });
+              }}
+              className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                selectedSystem === 'repair'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <RepairIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Repair FMS</span>
+              <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${repairExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${repairExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {repairTabs.map((tab) => {
+                      const isActive = isTabActive('/repair', tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToRepair(tab.path);
                             setMobileNavOpen(false);
                           }}
                           className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${

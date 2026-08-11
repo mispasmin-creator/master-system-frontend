@@ -10,9 +10,9 @@ export const PAGE_KEY_MAP: Record<string, string> = {
 };
 
 export function getUserAllowedTabs(user: LoginUser): string[] {
-  const isAdmin = user.Role?.toLowerCase() === "admin";
+  const isAdmin = user.role?.toLowerCase() === "admin";
   if (isAdmin) return Object.keys(PAGE_KEY_MAP);
-  const userPages = (user.Page || "")
+  const userPages = (user.page_access || "")
     .split(",")
     .map((p) => p.trim().toLowerCase())
     .filter(Boolean);
@@ -22,8 +22,8 @@ export function getUserAllowedTabs(user: LoginUser): string[] {
 }
 
 export function hasAccess(user: LoginUser, tabKey: string): boolean {
-  if (user.Role?.toLowerCase() === "admin") return true;
-  const userPages = (user.Page || "")
+  if (user.role?.toLowerCase() === "admin") return true;
+  const userPages = (user.page_access || "")
     .split(",")
     .map((p) => p.trim().toLowerCase())
     .filter(Boolean);

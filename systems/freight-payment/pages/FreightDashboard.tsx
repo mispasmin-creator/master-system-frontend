@@ -73,6 +73,7 @@ export function FreightDashboard({ user, onLogout }: FreightDashboardProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState<FreightPayment | undefined>();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
     const saved = localStorage.getItem("sidebar_collapsed");
     return saved === "true";
   });
@@ -87,6 +88,7 @@ export function FreightDashboard({ user, onLogout }: FreightDashboardProps) {
 
   // Dark mode state — persisted in localStorage
   const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === "undefined") return false;
     return localStorage.getItem("dark_mode") === "true";
   });
 
@@ -99,8 +101,8 @@ export function FreightDashboard({ user, onLogout }: FreightDashboardProps) {
     localStorage.setItem("dark_mode", String(darkMode));
   }, [darkMode]);
 
-  const isAdmin = user.Role?.toLowerCase() === "admin";
-  const userFirm = user["Firm Name"] || "";
+  const isAdmin = user.role?.toLowerCase() === "admin";
+  const userFirm = user.firm_name || "";
   const allowedTabs = useMemo(() => getUserAllowedTabs(user), [user]);
 
   const [activeTab, setActiveTab] = useState(() => {

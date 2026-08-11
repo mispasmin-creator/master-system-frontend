@@ -337,10 +337,10 @@ export function UserManagement() {
                     </TableCell>
                     <TableCell className="py-3.5">
                       <div className="flex flex-wrap gap-1 max-w-[300px]">
-                        {(u.Page || "")
+                        {((u as any)["Page Access"] || "")
                           .split(",")
                           .filter(Boolean)
-                          .map((page, i) => (
+                          .map((page: string, i: number) => (
                             <span
                               key={i}
                               className="text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md"
@@ -348,7 +348,7 @@ export function UserManagement() {
                               {page.trim()}
                             </span>
                           ))}
-                        {!u.Page && <span className="text-[10px] text-slate-300">No access</span>}
+                        {!(u as any)["Page Access"] && <span className="text-[10px] text-slate-300">No access</span>}
                       </div>
                     </TableCell>
                     <TableCell className="text-right py-3.5 pr-6">
@@ -462,7 +462,7 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
     if (open) {
       if (user) {
         setFormData(user);
-        setSelectedPages((user.Page || "").split(",").map((s) => s.trim()).filter(Boolean));
+        setSelectedPages(((user as any)["Page Access"] || "").split(",").map((s: string) => s.trim()).filter(Boolean));
       } else {
         setFormData({ Role: "User" });
         setSelectedPages([]);
@@ -474,7 +474,22 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
   }, [open, user]);
 
   const createMutation = useMutation({
-    mutationFn: (data: Partial<LoginUser>) => api.createUser(data),
+    mutationFn: async (data: Partial<LoginUser>) => {
+      const res = await fetch(`${API_URL}/users/manage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({
+          username: (data as any).Username,
+          password: (data as any).Password,
+          role: (data as any).Role || 'User',
+          firm_name: (data as any)["Firm Name"] || '',
+          page_access: (data as any).Page || '',
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Failed to create user');
+      return json.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["login-users"] });
       onSuccess("User created successfully");
@@ -485,7 +500,22 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<LoginUser>) => api.updateUser(user!.id!, data),
+    mutationFn: async (data: Partial<LoginUser>) => {
+      const res = await fetch(`${API_URL}/users/manage/${user!.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({
+          username: (data as any).Username,
+          ...(((data as any).Password) && { password: (data as any).Password }),
+          role: (data as any).Role || 'User',
+          firm_name: (data as any)["Firm Name"] || '',
+          page_access: (data as any).Page || '',
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.message || 'Failed to update user');
+      return json.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["login-users"] });
       onSuccess("User updated successfully");
