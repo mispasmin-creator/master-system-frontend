@@ -13,6 +13,7 @@ const SYSTEM_VIEWS = [
   { value: 'overview', label: 'Overview' },
   { value: 'purchase', label: 'Purchase' },
   { value: 'rm-sales', label: 'RM Sales' },
+  { value: 'freight-payment', label: 'Freight Payment' },
 ] as const;
 type SystemView = (typeof SYSTEM_VIEWS)[number]['value'];
 
@@ -371,6 +372,15 @@ export default function Overview() {
             className="px-6 py-3 bg-[#2fa36b] text-white font-bold rounded-2xl shadow-md hover:bg-[#268a59] transition-all"
           >
             Launch RM Sales Portal →
+          </button>
+        </div>
+      ) : systemView === 'freight-payment' ? (
+        <div className="p-4">
+          <button
+            onClick={() => window.location.assign('/freight-payment')}
+            className="px-6 py-3 bg-blue-600 text-white font-bold rounded-2xl shadow-md hover:bg-blue-700 transition-all"
+          >
+            Launch Freight Payment Portal →
           </button>
         </div>
       ) : (

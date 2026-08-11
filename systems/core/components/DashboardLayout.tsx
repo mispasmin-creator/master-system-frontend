@@ -15,14 +15,14 @@ const icon = (paths: React.ReactNode) =>
     );
   };
 
-const SunIcon = icon(<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />);
-const MoonIcon = icon(
+const SunIcon = icon(
   <>
     <circle cx="12" cy="12" r="4" />
     <path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" />
     <path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
   </>
 );
+const MoonIcon = icon(<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />);
 const BuildingIcon = icon(<><rect x="4" y="2" width="16" height="20" rx="1" /><path d="M9 22v-4h6v4" /><path d="M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01" /></>);
 const LogOutIcon = icon(<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></>);
 const SearchIcon = icon(<><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>);
@@ -35,6 +35,14 @@ const PurchaseIcon = icon(<><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V
 const OrderIcon = icon(<><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="m9 12 2 2 4-4" /></>);
 const DownloadIcon = icon(<><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></>);
 const ProductionIcon = icon(<><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" /></>);
+const ChecklistIcon = icon(<><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><rect x="8" y="2" width="8" height="4" rx="1" /><path d="m9 14 2 2 4-4" /></>);
+const BellIcon = icon(<><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></>);
+const StoreIcon = icon(<><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></>);
+const RmSalesIcon = icon(<><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="M7 21h10" /><path d="M12 3v18" /><path d="M3 7h18" /></>);
+const FreightIcon = icon(<><rect x="1" y="3" width="15" height="13" rx="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></>);
+const InventoryIcon = icon(<><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></>);
+const PaymentIcon = icon(<><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></>);
+const ServicesIcon = icon(<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></>);
 
 const productionTabs = [
   { id: "dashboard", label: "Dashboard", stepName: "Overview", path: "/dashboard" },
@@ -97,10 +105,6 @@ const purchaseTabs = [
   { id: "vendor-payment", label: "Vendor Payment", stepName: "accounts", path: "/vendor-payment", hidden: true }
 ];
 
-const BellIcon = icon(<><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></>);
-
-const StoreIcon = icon(<><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></>);
-
 const storeTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },
   { id: "procurement-tracker", label: "Procurement Tracker", path: "/procurement-tracker" },
@@ -128,8 +132,6 @@ const storeTabs = [
   { id: "administration", label: "Adminstration", path: "/administration" }
 ];
 
-const RmSalesIcon = icon(<><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><path d="M7 21h10" /><path d="M12 3v18" /><path d="M3 7h18" /></>);
-
 const rmSalesTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },
   { id: "sale-orders", label: "Sale Orders", path: "/sale-orders" },
@@ -142,9 +144,69 @@ const rmSalesTabs = [
   { id: "settings", label: "Settings", path: "/settings" }
 ];
 
-export default function DashboardLayout({ children, hideRightSidebar = false, basePath }: { children?: ReactNode, hideRightSidebar?: boolean, basePath: '/dashboard' | '/purchase' | '/order' | '/production' | '/store' | '/rm-sales' }) {
-  const router = useRouter(); // Next.js Router — used for cross-system navigation (changes the actual URL path)
-  const navigate = useNavigate(); // React Router — used for in-system navigation (hash-only, within the current Next.js page)
+const checklistTabs = [
+  { id: 'dashboard', label: 'Dashboard', stepName: 'Dashboard', path: '/dashboard' },
+  { id: 'assign-task', label: 'Assign Task', stepName: 'Assign Task', path: '/assign-task' },
+  { id: 'pc-dashboard', label: 'PC Dashboard', stepName: 'PC Dashboard', path: '/pc-dashboard' },
+  { id: 'delegation', label: 'Delegation', stepName: 'Delegation', path: '/delegation' },
+  { id: 'verification', label: 'Verification', stepName: 'Verification', path: '/verification' },
+  { id: 'companies', label: 'Companies', stepName: 'Companies', path: '/companies' },
+  { id: 'license', label: 'License', stepName: 'License', path: '/license' },
+  { id: 'training-video', label: 'Training Video', stepName: 'Training Video', path: '/training-video' },
+  { id: 'checklist-master', label: 'Checklist Master', stepName: 'Checklist Master', path: '/checklist-master' }
+];
+
+const freightPaymentTabs = [
+  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "checkkitting", label: "Account Checking", path: "/checkkitting" },
+  { id: "posting", label: "Account Audit", path: "/posting" },
+  { id: "makepayment", label: "Posting", path: "/makepayment" },
+  { id: "freight", label: "Freight", path: "/freight" },
+  { id: "users", label: "Users", path: "/users" }
+];
+
+const inventoryTabs = [
+  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "raw-material", label: "Raw Material", path: "/raw-material" },
+  { id: "finished-good", label: "Finished Good", path: "/finished-good" },
+  { id: "trading-material", label: "Trading Material", path: "/trading-material" },
+  { id: "stock-adjustment", label: "Stock Adjustment", path: "/stock-adjustment" },
+  { id: "history", label: "History", path: "/history" },
+  { id: "settings", label: "Settings", path: "/settings" }
+];
+
+const paymentTabs = [
+  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "payment-creation", label: "Payment Creation", path: "/payment-creation" },
+  { id: "channel-funding", label: "Channel Funding", path: "/channel-funding" },
+  { id: "payment-approval", label: "Payment Approval", path: "/payment-approval" },
+  { id: "posting", label: "Posting", path: "/posting" },
+  { id: "make-payment", label: "Make Payment", path: "/make-payment" },
+  { id: "user-management", label: "User Management", path: "/user-management" }
+];
+
+const servicesTabs = [
+  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "offers", label: "Offers", path: "/offers" },
+  { id: "services", label: "Services", path: "/services" },
+  { id: "bills", label: "Bills", path: "/bills" },
+  { id: "tally", label: "Tally", path: "/tally" },
+  { id: "utility", label: "Utility", path: "/utility" },
+  { id: "reports", label: "Reports", path: "/reports" },
+  { id: "users", label: "User Management", path: "/users" }
+];
+
+export default function DashboardLayout({
+  children,
+  hideRightSidebar = false,
+  basePath
+}: {
+  children?: ReactNode;
+  hideRightSidebar?: boolean;
+  basePath: '/dashboard' | '/purchase' | '/order' | '/production' | '/store' | '/rm-sales' | '/checklist' | '/freight-payment' | '/inventory' | '/payment' | '/services';
+}) {
+  const router = useRouter(); // Next.js Router — used for cross-system navigation
+  const navigate = useNavigate(); // React Router — used for in-system navigation
   const location = useLocation(); // React Router
 
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -152,57 +214,86 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
   const [checking, setChecking] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [systemDropdownOpen, setSystemDropdownOpen] = useState(false);
-  const [sfExpanded, setSfExpanded] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('sfExpanded');
-      if (saved !== null) return saved === 'true';
-    }
-    return false;
-  });
-  const selectedSystem: 'overview' | 'purchase' | 'order' | 'production' | 'store' | 'rm-sales' = basePath === '/purchase' ? 'purchase' : basePath === '/order' ? 'order' : basePath === '/production' ? 'production' : basePath === '/store' ? 'store' : basePath === '/rm-sales' ? 'rm-sales' : 'overview';
-
-  const [purchaseExpanded, setPurchaseExpanded] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('purchaseExpanded');
-      if (saved !== null) return saved === 'true';
-    }
-    return basePath === '/purchase';
-  });
-  const [orderExpanded, setOrderExpanded] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('orderExpanded');
-      if (saved !== null) return saved === 'true';
-    }
-    return basePath === '/order';
-  });
-  const [productionExpanded, setProductionExpanded] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('productionExpanded');
-      if (saved !== null) return saved === 'true';
-    }
-    return basePath === '/production';
-  });
-  const [storeExpanded, setStoreExpanded] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('storeExpanded');
-      if (saved !== null) return saved === 'true';
-    }
-    return basePath === '/store';
-  });
-  const [rmSalesExpanded, setRmSalesExpanded] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('rmSalesExpanded');
-      if (saved !== null) return saved === 'true';
-    }
-    return basePath === '/rm-sales';
-  });
   const [searchQuery, setSearchQuery] = useState('');
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
 
-  const [poRows, setPoRows] = useState([]);
-  const [poLoading, setPoLoading] = useState(true);
-  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [sfExpanded, setSfExpanded] = useState(false);
+  const [purchaseExpanded, setPurchaseExpanded] = useState(basePath === '/purchase');
+  const [orderExpanded, setOrderExpanded] = useState(basePath === '/order');
+  const [productionExpanded, setProductionExpanded] = useState(basePath === '/production');
+  const [storeExpanded, setStoreExpanded] = useState(basePath === '/store');
+  const [rmSalesExpanded, setRmSalesExpanded] = useState(basePath === '/rm-sales');
+  const [checklistExpanded, setChecklistExpanded] = useState(basePath === '/checklist');
+  const [freightPaymentExpanded, setFreightPaymentExpanded] = useState(basePath === '/freight-payment');
+  const [inventoryExpanded, setInventoryExpanded] = useState(basePath === '/inventory');
+  const [paymentExpanded, setPaymentExpanded] = useState(basePath === '/payment');
+  const [servicesExpanded, setServicesExpanded] = useState(basePath === '/services');
+
+  const selectedSystem: 'overview' | 'purchase' | 'order' | 'production' | 'store' | 'rm-sales' | 'checklist' | 'freight-payment' | 'inventory' | 'payment' | 'services' =
+    basePath === '/purchase'
+      ? 'purchase'
+      : basePath === '/order'
+      ? 'order'
+      : basePath === '/production'
+      ? 'production'
+      : basePath === '/store'
+      ? 'store'
+      : basePath === '/rm-sales'
+      ? 'rm-sales'
+      : basePath === '/checklist'
+      ? 'checklist'
+      : basePath === '/freight-payment'
+      ? 'freight-payment'
+      : basePath === '/inventory'
+      ? 'inventory'
+      : basePath === '/payment'
+      ? 'payment'
+      : basePath === '/services'
+      ? 'services'
+      : 'overview';
+
+  // Hydration-safe localStorage reading
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedSf = localStorage.getItem('sfExpanded');
+      if (savedSf !== null) setSfExpanded(savedSf === 'true');
+
+      const savedPur = localStorage.getItem('purchaseExpanded');
+      if (savedPur !== null) setPurchaseExpanded(savedPur === 'true');
+
+      const savedOrd = localStorage.getItem('orderExpanded');
+      if (savedOrd !== null) setOrderExpanded(savedOrd === 'true');
+
+      const savedProd = localStorage.getItem('productionExpanded');
+      if (savedProd !== null) setProductionExpanded(savedProd === 'true');
+
+      const savedStore = localStorage.getItem('storeExpanded');
+      if (savedStore !== null) setStoreExpanded(savedStore === 'true');
+
+      const savedRm = localStorage.getItem('rmSalesExpanded');
+      if (savedRm !== null) setRmSalesExpanded(savedRm === 'true');
+
+      const savedChk = localStorage.getItem('checklistExpanded');
+      if (savedChk !== null) setChecklistExpanded(savedChk === 'true');
+
+      const savedFp = localStorage.getItem('freightPaymentExpanded');
+      if (savedFp !== null) setFreightPaymentExpanded(savedFp === 'true');
+
+      const savedInv = localStorage.getItem('inventoryExpanded');
+      if (savedInv !== null) setInventoryExpanded(savedInv === 'true');
+
+      const savedPay = localStorage.getItem('paymentExpanded');
+      if (savedPay !== null) setPaymentExpanded(savedPay === 'true');
+
+      const savedSrv = localStorage.getItem('servicesExpanded');
+      if (savedSrv !== null) setServicesExpanded(savedSrv === 'true');
+    }
+  }, []);
+
+  // Context properties defaults
+  const poRows: any[] = [];
+  const poLoading = false;
+  const pendingApprovals = 0;
 
   const goToPurchase = (hashPath: string) => {
     if (basePath !== '/purchase') {
@@ -219,6 +310,7 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
       navigate(hashPath);
     }
   };
+
   const goToProduction = (hashPath: string) => {
     if (basePath !== '/production') {
       router.push(`/production#${hashPath}`);
@@ -226,6 +318,7 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
       navigate(hashPath);
     }
   };
+
   const goToStore = (hashPath: string) => {
     if (basePath !== '/store') {
       router.push(`/store#${hashPath}`);
@@ -233,9 +326,50 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
       navigate(hashPath);
     }
   };
+
   const goToRmSales = (hashPath: string) => {
     if (basePath !== '/rm-sales') {
       router.push(`/rm-sales#${hashPath}`);
+    } else {
+      navigate(hashPath);
+    }
+  };
+
+  const goToChecklist = (hashPath: string) => {
+    if (basePath !== '/checklist') {
+      router.push(`/checklist#${hashPath}`);
+    } else {
+      navigate(hashPath);
+    }
+  };
+
+  const goToFreightPayment = (hashPath: string) => {
+    if (basePath !== '/freight-payment') {
+      router.push(`/freight-payment#${hashPath}`);
+    } else {
+      navigate(hashPath);
+    }
+  };
+
+  const goToInventory = (hashPath: string) => {
+    if (basePath !== '/inventory') {
+      router.push(`/inventory#${hashPath}`);
+    } else {
+      navigate(hashPath);
+    }
+  };
+
+  const goToPayment = (hashPath: string) => {
+    if (basePath !== '/payment') {
+      router.push(`/payment#${hashPath}`);
+    } else {
+      navigate(hashPath);
+    }
+  };
+
+  const goToServices = (hashPath: string) => {
+    if (basePath !== '/services') {
+      router.push(`/services#${hashPath}`);
     } else {
       navigate(hashPath);
     }
@@ -257,23 +391,6 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
         setTheme('light');
       }
     }
-  }, []);
-
-  useEffect(() => {
-    fetch('https://script.google.com/macros/s/AKfycbylQZLstOi0LyDisD6Z6KKC97pU5YJY2dDYVw2gtnW1fxZq9kz7wHBei4aZ8Ed-XKhKEA/exec')
-      .then((res) => res.json())
-      .then((data) => {
-        const rows = data.data || [];
-        setPoRows(rows);
-        const approvals = rows.filter((r: any) => 
-          (!r['Actual1']) || 
-          (r['Actual1'] && !r['Actual7']) || 
-          (r['Actual7'] && !r['Actual8'])
-        ).length;
-        setPendingApprovals(approvals);
-      })
-      .catch((err) => console.error('Error fetching data:', err))
-      .finally(() => setPoLoading(false));
   }, []);
 
   useEffect(() => {
@@ -336,9 +453,9 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
     );
   }
 
-  const initial = user.username.charAt(0).toUpperCase();
+  const initial = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
-  let pageTitle = `Welcome back, ${user.username}!`;
+  let pageTitle = `Welcome back, ${user.username || 'User'}!`;
   if (basePath === '/dashboard') {
     if (location.pathname === '/master') {
       pageTitle = 'Setting';
@@ -346,14 +463,9 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
   } else if (basePath === '/purchase') {
     const activeTab = purchaseTabs.find((tab) => tab.path === location.pathname);
     if (activeTab) {
-      if (activeTab.id === 'dashboard') {
-        pageTitle = 'Dashboard';
-      } else {
-        pageTitle = activeTab.label;
-      }
+      pageTitle = activeTab.id === 'dashboard' ? 'Dashboard' : activeTab.label;
     }
   } else if (basePath === '/order') {
-    // orderTabs is defined in /app/order/page.tsx, so we derive the label from the path here
     const orderPathToLabel: Record<string, string> = {
       '/order': 'Order', '/check-po': 'Check PO', '/received-accounts': 'Received Accounts',
       '/check-delivery': 'Check Delivery', '/arrange-logistics': 'Arrange Logistics',
@@ -372,17 +484,54 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
     const activeTab = productionTabs.find((tab) => tab.path === location.pathname);
     if (activeTab) {
       pageTitle = activeTab.label;
-    } else {
-      pageTitle = `Welcome back, ${user.username}!`;
     }
   } else if (basePath === '/store') {
     const activeTab = storeTabs.find((tab) => tab.path === location.pathname);
     if (activeTab) {
       pageTitle = activeTab.label;
+    }
+  } else if (basePath === '/checklist') {
+    const activeTab = checklistTabs.find((tab) => tab.path === location.pathname);
+    if (activeTab) {
+      pageTitle = activeTab.label;
+    }
+  } else if (basePath === '/freight-payment') {
+    const activeTab = freightPaymentTabs.find((tab) => tab.path === location.pathname);
+    if (activeTab) {
+      pageTitle = activeTab.label;
     } else {
-      pageTitle = `Welcome back, ${user.username}!`;
+      pageTitle = 'Freight Payment';
+    }
+  } else if (basePath === '/inventory') {
+    const activeTab = inventoryTabs.find((tab) => tab.path === location.pathname);
+    if (activeTab) {
+      pageTitle = activeTab.label;
+    } else {
+      pageTitle = 'Inventory';
+    }
+  } else if (basePath === '/payment') {
+    const activeTab = paymentTabs.find((tab) => tab.path === location.pathname);
+    if (activeTab) {
+      pageTitle = activeTab.label;
+    } else {
+      pageTitle = 'Payment';
+    }
+  } else if (basePath === '/services') {
+    const activeTab = servicesTabs.find((tab) => tab.path === location.pathname);
+    if (activeTab) {
+      pageTitle = activeTab.label;
+    } else {
+      pageTitle = 'Services';
     }
   }
+
+  // Active Tab Highlight Helper
+  const isTabActive = (sysPath: string, tabPath: string) => {
+    if (basePath !== sysPath) return false;
+    if (location.pathname === tabPath) return true;
+    if ((location.pathname === '/' || location.pathname === '') && tabPath === '/dashboard') return true;
+    return false;
+  };
 
   // Calculate accessible Purchase steps for the user
   const allowedSteps = user ? (
@@ -407,7 +556,6 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
   });
 
   const accessibleProductionTabs = productionTabs.filter(tab => !tab.hidden);
-
 
   return (
     <div className="fixed inset-0 overflow-hidden w-full flex bg-[#eef3ef] dark:bg-zinc-950 transition-colors duration-500 font-sans">
@@ -445,7 +593,6 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
         </div>
 
         <div className={`px-4 flex-1 overflow-y-auto scrollbar-none relative pb-4 ${collapsed ? 'md:px-3' : ''}`}>
-
           <p className={`text-[11px] font-bold uppercase tracking-wider text-zinc-400 px-3 mb-2 ${collapsed ? 'md:hidden' : ''}`}>Menu</p>
 
           {/* Dashboard Link */}
@@ -472,59 +619,72 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
           {/* Systems */}
           <div className="mt-5">
             <p className={`text-[11px] font-bold uppercase tracking-wider text-zinc-400 px-3 mb-2 ${collapsed ? 'md:hidden' : ''}`}>Systems</p>
-              <button
-                onClick={() => {
-                  setPurchaseExpanded((v) => {
-                    const next = !v;
-                    localStorage.setItem('purchaseExpanded', String(next));
-                    if (next) {
-                      setOrderExpanded(false);
+            
+            {/* Purchase System */}
+            <button
+              onClick={() => {
+                setPurchaseExpanded((v) => {
+                  const next = !v;
+                  if (typeof window !== 'undefined') localStorage.setItem('purchaseExpanded', String(next));
+                  if (next) {
+                    setOrderExpanded(false);
+                    setProductionExpanded(false);
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    if (typeof window !== 'undefined') {
                       localStorage.setItem('orderExpanded', 'false');
-                      setProductionExpanded(false);
                       localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
                     }
-                    return next;
-                  });
-                }}
-                className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  selectedSystem === 'purchase'
-                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
-                    : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
-                }`}
-              >
-                <PurchaseIcon className="w-4 h-4 shrink-0" />
-                <span className="flex-1 text-left">Purchase</span>
-                <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${purchaseExpanded ? 'rotate-180' : ''}`} />
-              </button>
+                  }
+                  return next;
+                });
+              }}
+              className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                selectedSystem === 'purchase'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <PurchaseIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Purchase</span>
+              <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${purchaseExpanded ? 'rotate-180' : ''}`} />
+            </button>
 
-            {/* List steps directly under the dropdown if Purchase is selected */}
-          {!collapsed && (
-            <div className={`grid transition-all duration-300 ease-in-out ${purchaseExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
-              <div className="overflow-hidden">
-                <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
-                  {accessiblePurchaseTabs.map((tab) => {
-                const isActive = (basePath === '/purchase' && location.pathname === tab.path);
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      goToPurchase(tab.path);
-                      setMobileNavOpen(false);
-                    }}
-                    className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40'
-                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                    }`}
-                  >
-                    <span className="truncate">{tab.label}</span>
-                  </button>
-                );
-              })}
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${purchaseExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {accessiblePurchaseTabs.map((tab) => {
+                      const isActive = isTabActive('/purchase', tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToPurchase(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
 
           {/* Order System */}
@@ -533,10 +693,24 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
               onClick={() => {
                 setOrderExpanded((v) => {
                   const next = !v;
-                  localStorage.setItem('orderExpanded', String(next));
+                  if (typeof window !== 'undefined') localStorage.setItem('orderExpanded', String(next));
                   if (next) {
                     setPurchaseExpanded(false);
-                    localStorage.setItem('purchaseExpanded', 'false');
+                    setProductionExpanded(false);
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                    }
                   }
                   return next;
                 });
@@ -552,58 +726,58 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
               <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${orderExpanded ? 'rotate-180' : ''}`} />
             </button>
 
-          {!collapsed && (
-            <div className={`grid transition-all duration-300 ease-in-out ${orderExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
-              <div className="overflow-hidden">
-                <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
-                  {[
-                { id: 'order', label: 'Order', path: '/order' },
-                { id: 'check-po', label: 'Check PO', path: '/check-po' },
-                { id: 'received-accounts', label: 'Received Accounts', path: '/received-accounts' },
-                { id: 'check-delivery', label: 'Check Delivery', path: '/check-delivery' },
-                { id: 'arrange-logistics', label: 'Arrange Logistics', path: '/arrange-logistics' },
-                { id: 'logistics-approval', label: 'Logistics App.', path: '/logistics-approval' },
-                { id: 'dispatch-planning', label: 'Dispatch Planning', path: '/dispatch-planning' },
-                { id: 'accounts-approval', label: 'Accounts App.', path: '/accounts-approval' },
-                { id: 'logistic', label: 'Logistic', path: '/logistic' },
-                { id: 'load-material', label: 'Load Material', path: '/load-material' },
-                { id: 'wetman-entry', label: 'Wetman Entry', path: '/wetman-entry' },
-                { id: 'invoice', label: 'Invoice', path: '/invoice' },
-                { id: 'fullkitting', label: 'Fullkitting', path: '/fullkitting' },
-                { id: 'tc', label: 'TC', path: '/tc' },
-                { id: 'bilty-update', label: 'Bilty Update', path: '/bilty-update' },
-                { id: 'crm', label: 'CRM', path: '/crm' },
-                { id: 'make-pi', label: 'Make PI', path: '/make-pi' },
-                { id: 'received-pi', label: 'Received PI Payment', path: '/received-pi-payment' },
-                { id: 'retention', label: 'Retention', path: '/retention' },
-                { id: 'material-return', label: 'Material Return', path: '/material-return' },
-                { id: 'mgmt-approval', label: 'Mgmt Approval', path: '/mgmt-approval' },
-                { id: 'debit-note', label: 'Debit Note', path: '/debit-note' },
-                { id: 'return-material', label: 'Return of Material', path: '/return-of-material' },
-                { id: 'order-dashboard', label: 'Dashboard', path: '/dashboard' },
-              ].map((tab) => {
-                const isActive = (basePath === '/order' && location.pathname === tab.path);
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      goToOrder(tab.path);
-                      setMobileNavOpen(false);
-                    }}
-                    className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40'
-                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                    }`}
-                  >
-                    <span className="truncate">{tab.label}</span>
-                  </button>
-                );
-              })}
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${orderExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {[
+                      { id: 'order', label: 'Order', path: '/order' },
+                      { id: 'check-po', label: 'Check PO', path: '/check-po' },
+                      { id: 'received-accounts', label: 'Received Accounts', path: '/received-accounts' },
+                      { id: 'check-delivery', label: 'Check Delivery', path: '/check-delivery' },
+                      { id: 'arrange-logistics', label: 'Arrange Logistics', path: '/arrange-logistics' },
+                      { id: 'logistics-approval', label: 'Logistics App.', path: '/logistics-approval' },
+                      { id: 'dispatch-planning', label: 'Dispatch Planning', path: '/dispatch-planning' },
+                      { id: 'accounts-approval', label: 'Accounts App.', path: '/accounts-approval' },
+                      { id: 'logistic', label: 'Logistic', path: '/logistic' },
+                      { id: 'load-material', label: 'Load Material', path: '/load-material' },
+                      { id: 'wetman-entry', label: 'Wetman Entry', path: '/wetman-entry' },
+                      { id: 'invoice', label: 'Invoice', path: '/invoice' },
+                      { id: 'fullkitting', label: 'Fullkitting', path: '/fullkitting' },
+                      { id: 'tc', label: 'TC', path: '/tc' },
+                      { id: 'bilty-update', label: 'Bilty Update', path: '/bilty-update' },
+                      { id: 'crm', label: 'CRM', path: '/crm' },
+                      { id: 'make-pi', label: 'Make PI', path: '/make-pi' },
+                      { id: 'received-pi', label: 'Received PI Payment', path: '/received-pi-payment' },
+                      { id: 'retention', label: 'Retention', path: '/retention' },
+                      { id: 'material-return', label: 'Material Return', path: '/material-return' },
+                      { id: 'mgmt-approval', label: 'Mgmt Approval', path: '/mgmt-approval' },
+                      { id: 'debit-note', label: 'Debit Note', path: '/debit-note' },
+                      { id: 'return-material', label: 'Return of Material', path: '/return-of-material' },
+                      { id: 'order-dashboard', label: 'Dashboard', path: '/dashboard' },
+                    ].map((tab) => {
+                      const isActive = isTabActive('/order', tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToOrder(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
 
           {/* Production System */}
@@ -612,12 +786,24 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
               onClick={() => {
                 setProductionExpanded((v) => {
                   const next = !v;
-                  localStorage.setItem('productionExpanded', String(next));
+                  if (typeof window !== 'undefined') localStorage.setItem('productionExpanded', String(next));
                   if (next) {
                     setPurchaseExpanded(false);
-                    localStorage.setItem('purchaseExpanded', 'false');
                     setOrderExpanded(false);
-                    localStorage.setItem('orderExpanded', 'false');
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                    }
                   }
                   return next;
                 });
@@ -633,74 +819,75 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
               <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${productionExpanded ? 'rotate-180' : ''}`} />
             </button>
 
-          {!collapsed && (
-            <div className={`grid transition-all duration-300 ease-in-out ${productionExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
-              <div className="overflow-hidden">
-                <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
-                  {(() => {
-                    const sfTabs = accessibleProductionTabs.filter(t => t.isSf);
-                    const regularTabs = accessibleProductionTabs.filter(t => !t.isSf);
-                    
-                    const beforeSf = regularTabs.slice(0, regularTabs.findIndex(t => t.id === 'tally'));
-                    const afterSf = regularTabs.slice(regularTabs.findIndex(t => t.id === 'tally'));
-                    
-                    const renderTab = (tab, isSub = false) => {
-                      const isActive = (basePath === '/production' && location.pathname === tab.path);
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => {
-                            goToProduction(tab.path);
-                            setMobileNavOpen(false);
-                          }}
-                          className={`w-full flex items-center ${isSub ? 'pl-14' : 'pl-10'} pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
-                            isActive
-                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40'
-                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
-                          }`}
-                        >
-                          <span className="truncate">{tab.label}</span>
-                        </button>
-                      );
-                    };
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${productionExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {(() => {
+                      const sfTabs = accessibleProductionTabs.filter(t => t.isSf);
+                      const regularTabs = accessibleProductionTabs.filter(t => !t.isSf);
+                      
+                      const tallyIdx = regularTabs.findIndex(t => t.id === 'tally');
+                      const beforeSf = tallyIdx !== -1 ? regularTabs.slice(0, tallyIdx) : regularTabs;
+                      const afterSf = tallyIdx !== -1 ? regularTabs.slice(tallyIdx) : [];
 
-                    return (
-                      <>
-                        {beforeSf.map(tab => renderTab(tab))}
-                        
-                        {sfTabs.length > 0 && (
-                          <div className="flex flex-col">
-                            <button
-                              onClick={() => {
-                                setSfExpanded(v => {
-                                  const next = !v;
-                                  localStorage.setItem('sfExpanded', String(next));
-                                  return next;
-                                });
-                              }}
-                              className="w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors"
-                            >
-                              <span className="flex-1 text-left truncate">Semi Finished</span>
-                              <ChevronDownIcon className={`w-4 h-4 shrink-0 transition-transform ${sfExpanded ? 'rotate-180' : ''}`} />
-                            </button>
-                            <div className={`grid transition-all duration-300 ease-in-out ${sfExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
-                              <div className="overflow-hidden">
-                                <div className="space-y-1">
-                                  {sfTabs.map(tab => renderTab(tab, true))}
+                      const renderTab = (tab: { id: string; label: string; path: string }, isSub = false) => {
+                        const isActive = isTabActive('/production', tab.path);
+                        return (
+                          <button
+                            key={tab.id}
+                            onClick={() => {
+                              goToProduction(tab.path);
+                              setMobileNavOpen(false);
+                            }}
+                            className={`w-full flex items-center ${isSub ? 'pl-14' : 'pl-10'} pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                              isActive
+                                ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                            }`}
+                          >
+                            <span className="truncate">{tab.label}</span>
+                          </button>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {beforeSf.map(tab => renderTab(tab))}
+                          
+                          {sfTabs.length > 0 && (
+                            <div className="flex flex-col">
+                              <button
+                                onClick={() => {
+                                  setSfExpanded(v => {
+                                    const next = !v;
+                                    if (typeof window !== 'undefined') localStorage.setItem('sfExpanded', String(next));
+                                    return next;
+                                  });
+                                }}
+                                className="w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors"
+                              >
+                                <span className="flex-1 text-left truncate">Semi Finished</span>
+                                <ChevronDownIcon className={`w-4 h-4 shrink-0 transition-transform ${sfExpanded ? 'rotate-180' : ''}`} />
+                              </button>
+                              <div className={`grid transition-all duration-300 ease-in-out ${sfExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+                                <div className="overflow-hidden">
+                                  <div className="space-y-1">
+                                    {sfTabs.map(tab => renderTab(tab, true))}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                        
-                        {afterSf.map(tab => renderTab(tab))}
-                      </>
-                    );
-                  })()}
+                          )}
+                          
+                          {afterSf.map(tab => renderTab(tab))}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
           </div>
 
           {/* Store System */}
@@ -709,16 +896,24 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
               onClick={() => {
                 setStoreExpanded((v) => {
                   const next = !v;
-                  localStorage.setItem('storeExpanded', String(next));
+                  if (typeof window !== 'undefined') localStorage.setItem('storeExpanded', String(next));
                   if (next) {
                     setPurchaseExpanded(false);
-                    localStorage.setItem('purchaseExpanded', 'false');
                     setOrderExpanded(false);
-                    localStorage.setItem('orderExpanded', 'false');
                     setProductionExpanded(false);
-                    localStorage.setItem('productionExpanded', 'false');
                     setRmSalesExpanded(false);
-                    localStorage.setItem('rmSalesExpanded', 'false');
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                    }
                   }
                   return next;
                 });
@@ -739,7 +934,7 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
                 <div className="overflow-hidden">
                   <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
                     {storeTabs.map((tab) => {
-                      const isActive = (basePath === '/store' && location.pathname === tab.path);
+                      const isActive = isTabActive('/store', tab.path);
                       return (
                         <button
                           key={tab.id}
@@ -749,7 +944,7 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
                           }}
                           className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
                             isActive
-                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40'
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
                               : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
                           }`}
                         >
@@ -769,16 +964,24 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
               onClick={() => {
                 setRmSalesExpanded((v) => {
                   const next = !v;
-                  localStorage.setItem('rmSalesExpanded', String(next));
+                  if (typeof window !== 'undefined') localStorage.setItem('rmSalesExpanded', String(next));
                   if (next) {
                     setPurchaseExpanded(false);
-                    localStorage.setItem('purchaseExpanded', 'false');
                     setOrderExpanded(false);
-                    localStorage.setItem('orderExpanded', 'false');
                     setProductionExpanded(false);
-                    localStorage.setItem('productionExpanded', 'false');
                     setStoreExpanded(false);
-                    localStorage.setItem('storeExpanded', 'false');
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                    }
                   }
                   return next;
                 });
@@ -799,7 +1002,7 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
                 <div className="overflow-hidden">
                   <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
                     {rmSalesTabs.map((tab) => {
-                      const isActive = (basePath === '/rm-sales' && location.pathname === tab.path);
+                      const isActive = isTabActive('/rm-sales', tab.path);
                       return (
                         <button
                           key={tab.id}
@@ -809,7 +1012,355 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
                           }}
                           className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
                             isActive
-                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40'
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Checklist & Delegation System */}
+          <div className="mt-2">
+            <button
+              onClick={() => {
+                setChecklistExpanded((v) => {
+                  const next = !v;
+                  if (typeof window !== 'undefined') localStorage.setItem('checklistExpanded', String(next));
+                  if (next) {
+                    setPurchaseExpanded(false);
+                    setOrderExpanded(false);
+                    setProductionExpanded(false);
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                    }
+                  }
+                  return next;
+                });
+              }}
+              className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                selectedSystem === 'checklist'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <ChecklistIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Checklist &amp; Delegation</span>
+              <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${checklistExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${checklistExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {checklistTabs.map((tab) => {
+                      const isActive = isTabActive('/checklist', tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToChecklist(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Freight Payment System */}
+          <div className="mt-2">
+            <button
+              onClick={() => {
+                setFreightPaymentExpanded((v) => {
+                  const next = !v;
+                  if (typeof window !== 'undefined') localStorage.setItem('freightPaymentExpanded', String(next));
+                  if (next) {
+                    setPurchaseExpanded(false);
+                    setOrderExpanded(false);
+                    setProductionExpanded(false);
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setChecklistExpanded(false);
+                    setInventoryExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                    }
+                  }
+                  return next;
+                });
+              }}
+              className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                selectedSystem === 'freight-payment'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <FreightIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Freight Payment</span>
+              <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${freightPaymentExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${freightPaymentExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {freightPaymentTabs.map((tab) => {
+                      const isActive = isTabActive('/freight-payment', tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToFreightPayment(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Inventory System */}
+          <div className="mt-2">
+            <button
+              onClick={() => {
+                setInventoryExpanded((v) => {
+                  const next = !v;
+                  if (typeof window !== 'undefined') localStorage.setItem('inventoryExpanded', String(next));
+                  if (next) {
+                    setPurchaseExpanded(false);
+                    setOrderExpanded(false);
+                    setProductionExpanded(false);
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setPaymentExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('paymentExpanded', 'false');
+                    }
+                  }
+                  return next;
+                });
+              }}
+              className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                selectedSystem === 'inventory'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <InventoryIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Inventory</span>
+              <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${inventoryExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${inventoryExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {inventoryTabs.map((tab) => {
+                      const isActive = isTabActive('/inventory', tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToInventory(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Payment System */}
+          <div className="mt-2">
+            <button
+              onClick={() => {
+                setPaymentExpanded((v) => {
+                  const next = !v;
+                  if (typeof window !== 'undefined') localStorage.setItem('paymentExpanded', String(next));
+                  if (next) {
+                    setPurchaseExpanded(false);
+                    setOrderExpanded(false);
+                    setProductionExpanded(false);
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                    }
+                  }
+                  return next;
+                });
+              }}
+              className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                selectedSystem === 'payment'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <PaymentIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Payment</span>
+              <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${paymentExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${paymentExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {paymentTabs.map((tab) => {
+                      const isActive = isTabActive('/payment', tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToPayment(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                          }`}
+                        >
+                          <span className="truncate">{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Services System */}
+          <div className="mt-2">
+            <button
+              onClick={() => {
+                setServicesExpanded((v) => {
+                  const next = !v;
+                  if (typeof window !== 'undefined') localStorage.setItem('servicesExpanded', String(next));
+                  if (next) {
+                    setPurchaseExpanded(false);
+                    setOrderExpanded(false);
+                    setProductionExpanded(false);
+                    setStoreExpanded(false);
+                    setRmSalesExpanded(false);
+                    setChecklistExpanded(false);
+                    setFreightPaymentExpanded(false);
+                    setInventoryExpanded(false);
+                    setPaymentExpanded(false);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('purchaseExpanded', 'false');
+                      localStorage.setItem('orderExpanded', 'false');
+                      localStorage.setItem('productionExpanded', 'false');
+                      localStorage.setItem('storeExpanded', 'false');
+                      localStorage.setItem('rmSalesExpanded', 'false');
+                      localStorage.setItem('checklistExpanded', 'false');
+                      localStorage.setItem('freightPaymentExpanded', 'false');
+                      localStorage.setItem('inventoryExpanded', 'false');
+                      localStorage.setItem('paymentExpanded', 'false');
+                    }
+                  }
+                  return next;
+                });
+              }}
+              className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
+                selectedSystem === 'services'
+                  ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <ServicesIcon className="w-4 h-4 shrink-0" />
+              <span className="flex-1 text-left">Services</span>
+              <ChevronDownIcon className={`w-4 h-4 text-zinc-400 shrink-0 transition-transform ${servicesExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {!collapsed && (
+              <div className={`grid transition-all duration-300 ease-in-out ${servicesExpanded ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
+                    {servicesTabs.map((tab) => {
+                      const isActive = isTabActive('/services', tab.path);
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            goToServices(tab.path);
+                            setMobileNavOpen(false);
+                          }}
+                          className={`w-full flex items-center pl-10 pr-3 h-9 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-50/80 dark:bg-zinc-800/40 font-semibold'
                               : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
                           }`}
                         >
@@ -886,8 +1437,16 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
                     className="w-[220px] h-[42px] pl-10 pr-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full text-xs font-medium outline-none shadow-sm focus:ring-1 focus:ring-[#2fa36b] dark:focus:ring-[#5ec792] transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-white"
                   />
                 </div>
-                
-                
+
+                {/* Theme Toggle Button */}
+                <button
+                  onClick={toggleTheme}
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                >
+                  {theme === 'light' ? <MoonIcon className="w-4 h-4" /> : <SunIcon className="w-4 h-4" />}
+                </button>
+
                 <div className="relative shrink-0">
                   <button
                     onClick={() => setAvatarMenuOpen((o) => !o)}
@@ -929,7 +1488,6 @@ export default function DashboardLayout({ children, hideRightSidebar = false, ba
               }
             `}</style>
           </div>
-
         </div>
       </div>
     </div>
