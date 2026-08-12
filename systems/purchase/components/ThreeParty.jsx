@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -50,11 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+// Popover replaced by custom dropdown
 import {
   Sheet,
   SheetContent,
@@ -127,11 +123,24 @@ export default function ThreeParty() {
   const [vendorMasterOptions, setVendorMasterOptions] = useState([]);
   const [selectedVendorIndex, setSelectedVendorIndex] = useState(0);
   const [vendorSearchTerms, setVendorSearchTerms] = useState(["", "", ""]);
-  const [vendorPopoverOpen, setVendorPopoverOpen] = useState([
-    false,
-    false,
-    false,
-  ]);
+  const [vendorDropdownOpen, setVendorDropdownOpen] = useState([false, false, false]);
+  const vendorRef0 = useRef(null);
+  const vendorRef1 = useRef(null);
+  const vendorRef2 = useRef(null);
+  const vendorDropdownRefs = [vendorRef0, vendorRef1, vendorRef2];
+
+  // Close vendor dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      vendorDropdownRefs.forEach((ref, i) => {
+        if (ref.current && !ref.current.contains(e.target)) {
+          setVendorDropdownOpen((prev) => prev.map((v, idx) => idx === i ? false : v));
+        }
+      });
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const fetchVendorMasterOptions = useCallback(async () => {
     try {
@@ -541,7 +550,7 @@ export default function ThreeParty() {
         createEmptyVendorForm(),
       ]);
       setVendorSearchTerms(["", "", ""]);
-      setVendorPopoverOpen([false, false, false]);
+      setVendorDropdownOpen([false, false, false]);
       setSelectedVendorIndex(0);
       setTimeout(() => setRefreshData((prev) => !prev), 1000);
     } catch (error) {
@@ -805,7 +814,7 @@ export default function ThreeParty() {
                               indent.vendors.map(normalizeVendorForm),
                             );
                             setVendorSearchTerms(["", "", ""]);
-                            setVendorPopoverOpen([false, false, false]);
+                            setVendorDropdownOpen([false, false, false]);
                             setSelectedVendorIndex(0);
                           }}
                         >
@@ -821,7 +830,7 @@ export default function ThreeParty() {
                                     indent.vendors.map(normalizeVendorForm),
                                   );
                                   setVendorSearchTerms(["", "", ""]);
-                                  setVendorPopoverOpen([false, false, false]);
+                                  setVendorDropdownOpen([false, false, false]);
                                   setSelectedVendorIndex(0);
                                 }}
                                 className="h-8 px-3 text-xs bg-[#2fa36b] hover:bg-[#268a59] text-white shadow-none"
@@ -1142,82 +1151,84 @@ export default function ThreeParty() {
                         <Label className="block mb-1 text-xs font-medium text-gray-600">
                           Vendor Name
                         </Label>
-                        <Popover
-                          open={vendorPopoverOpen[idx]}
-                          onOpenChange={(open) =>
-                            setVendorPopoverOpen((prev) =>
-                              prev.map((value, index) =>
-                                index === idx ? open : value,
-                              ),
-                            )
-                          }
+                        {/* Custom dropdown — avoids Radix Popover focus-close bug */}
+                        <div
+                          ref={vendorDropdownRefs[idx]}
+                          className="relative"
                         >
-                          <PopoverTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={vendorPopoverOpen[idx]}
-                              className="w-full justify-between text-sm border-gray-200 h-9 bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 font-normal"
-                            >
-                              <span className="truncate">
-                                {currentVendor.name || "Select vendor"}
-                              </span>
-                              <ChevronsUpDown className="w-4 h-4 ml-2 opacity-50 shrink-0" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="z-[60] w-[var(--radix-popover-trigger-width)] p-2">
-                            <Input
-                              value={vendorSearchTerms[idx] || ""}
-                              onChange={(e) =>
-                                setVendorSearchTerms((prev) =>
-                                  prev.map((term, index) =>
-                                    index === idx ? e.target.value : term,
-                                  ),
-                                )
-                              }
-                              placeholder="Search vendor..."
-                              className="mb-2 h-8 text-xs"
-                            />
-                            <div className="max-h-60 overflow-y-auto">
-                              {vendorMasterOptions
-                                .filter((vendor) =>
-                                  vendor
-                                    .toLowerCase()
-                                    .includes(
-                                      (vendorSearchTerms[idx] || "")
-                                        .trim()
-                                        .toLowerCase(),
-                                    ),
-                                )
-                                .map((vendor, vendorIndex) => (
-                                  <button
-                                    key={`vendor-${idx}-${vendorIndex}`}
-                                    type="button"
-                                    onClick={() => {
-                                      updateVendorForm(idx, "name", vendor);
-                                      setVendorSearchTerms((prev) =>
-                                        prev.map((term, index) =>
-                                          index === idx ? "" : term,
-                                        ),
-                                      );
-                                      setVendorPopoverOpen((prev) =>
-                                        prev.map((value, index) =>
-                                          index === idx ? false : value,
-                                        ),
-                                      );
-                                    }}
-                                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
-                                  >
-                                    <span>{vendor}</span>
-                                    {currentVendor.name === vendor && (
-                                      <Check className="w-4 h-4 text-primary" />
-                                    )}
-                                  </button>
-                                ))}
+                          <button
+                            type="button"
+                            className="w-full flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 h-9 text-sm font-normal text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+                            onClick={() =>
+                              setVendorDropdownOpen((prev) =>
+                                prev.map((v, i) => i === idx ? !v : v)
+                              )
+                            }
+                          >
+                            <span className="truncate">{currentVendor.name || "Select vendor"}</span>
+                            <ChevronsUpDown className="w-4 h-4 ml-2 opacity-50 shrink-0" />
+                          </button>
+                          {vendorDropdownOpen[idx] && (
+                            <div className="absolute z-[200] left-0 right-0 top-full mt-1 rounded-md border border-gray-200 bg-white shadow-lg dark:bg-gray-800 dark:border-gray-700">
+                              <div className="p-2">
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={vendorSearchTerms[idx] || ""}
+                                  onChange={(e) =>
+                                    setVendorSearchTerms((prev) =>
+                                      prev.map((term, index) =>
+                                        index === idx ? e.target.value : term,
+                                      )
+                                    )
+                                  }
+                                  placeholder="Search vendor..."
+                                  className="w-full rounded-md border border-gray-200 px-3 py-1.5 text-xs outline-none focus:border-gray-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                                />
+                              </div>
+                              <div className="max-h-60 overflow-y-auto px-2 pb-2">
+                                {vendorMasterOptions
+                                  .filter((vendor) =>
+                                    vendor
+                                      .toLowerCase()
+                                      .includes(
+                                        (vendorSearchTerms[idx] || "")
+                                          .trim()
+                                          .toLowerCase(),
+                                      )
+                                  )
+                                  .map((vendor, vendorIndex) => (
+                                    <button
+                                      key={`vendor-${idx}-${vendorIndex}`}
+                                      type="button"
+                                      onClick={() => {
+                                        updateVendorForm(idx, "name", vendor);
+                                        setVendorSearchTerms((prev) =>
+                                          prev.map((term, index) =>
+                                            index === idx ? "" : term,
+                                          )
+                                        );
+                                        setVendorDropdownOpen((prev) =>
+                                          prev.map((v, i) => i === idx ? false : v)
+                                        );
+                                      }}
+                                      className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-gray-700"
+                                    >
+                                      <span>{vendor}</span>
+                                      {currentVendor.name === vendor && (
+                                        <Check className="w-4 h-4 text-primary" />
+                                      )}
+                                    </button>
+                                  ))}
+                                {vendorMasterOptions.filter((vendor) =>
+                                  vendor.toLowerCase().includes((vendorSearchTerms[idx] || "").trim().toLowerCase())
+                                ).length === 0 && (
+                                  <p className="px-3 py-2 text-xs text-gray-400">No vendors found</p>
+                                )}
+                              </div>
                             </div>
-                          </PopoverContent>
-                        </Popover>
+                          )}
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>

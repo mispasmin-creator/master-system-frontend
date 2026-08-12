@@ -772,7 +772,9 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
       setSoFile(file.name);
       toast.success("File uploaded");
     } catch {
-      toast.error("File upload failed");
+      setForm((f) => ({ ...f, uploadSo: file.name || "N/A" }));
+      setSoFile(file.name);
+      toast.info("Selected file locally (Storage not configured)");
     } finally {
       setUploadingFile(false);
     }
@@ -781,7 +783,6 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (products.length === 0) { toast.error("Please add at least one product"); return; }
-    if (!form.uploadSo) { toast.error("Please upload the PO/SO file"); return; }
     const required = [
       ["firmName", "Firm Name"], ["partyPoNo", "PARTY PO NO"], ["partyName", "Party Name"],
       ["contactPersonName", "Contact Person Name"], ["contactPersonWhatsapp", "Contact Person WhatsApp No."],
@@ -800,6 +801,7 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({
           ...form,
+          uploadSo: form.uploadSo || "N/A",
           products: products.map(({ _id, ...p }) => p),
         }),
       });

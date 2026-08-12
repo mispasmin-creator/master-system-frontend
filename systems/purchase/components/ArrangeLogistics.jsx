@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Input } from "./ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import {
@@ -50,11 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "./ui/popover";
+// Popover replaced by custom dropdown
 import {
   Sheet,
   SheetContent,
@@ -119,9 +115,35 @@ export default function ArrangeLogistics() {
   const [transporterMasterOptions, setTransporterMasterOptions] = useState([]);
   const [selectedTransporterIndex, setSelectedTransporterIndex] = useState(0);
   const [transporterSearchTerms, setTransporterSearchTerms] = useState(Array.from({ length: INITIAL_TRANSPORTER_SLOTS }, () => ""));
-  const [transporterPopoverOpen, setTransporterPopoverOpen] = useState(Array.from({ length: INITIAL_TRANSPORTER_SLOTS }, () => false));
+  const [transporterDropdownOpen, setTransporterDropdownOpen] = useState(Array.from({ length: INITIAL_TRANSPORTER_SLOTS }, () => false));
   const [transporterForms, setTransporterForms] = useState(Array.from({ length: INITIAL_TRANSPORTER_SLOTS }, () => createEmptyTransporterForm()));
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Three separate refs to satisfy React hooks rules (no refs in loops)
+  const tRef0 = useRef(null);
+  const tRef1 = useRef(null);
+  const tRef2 = useRef(null);
+  const tRef3 = useRef(null);
+  const tRef4 = useRef(null);
+  const tRef5 = useRef(null);
+  const tRef6 = useRef(null);
+  const tRef7 = useRef(null);
+  const tRef8 = useRef(null);
+  const tRef9 = useRef(null);
+  const transporterDropdownRefs = [tRef0, tRef1, tRef2, tRef3, tRef4, tRef5, tRef6, tRef7, tRef8, tRef9];
+
+  // Close transporter dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      transporterDropdownRefs.forEach((ref, i) => {
+        if (ref.current && !ref.current.contains(e.target)) {
+          setTransporterDropdownOpen((prev) => prev.map((v, idx) => idx === i ? false : v));
+        }
+      });
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const transporterMasterMap = useMemo(
     () =>
@@ -140,7 +162,7 @@ export default function ArrangeLogistics() {
       while (next.length < length) next.push("");
       return next.slice(0, length);
     });
-    setTransporterPopoverOpen((prev) => {
+    setTransporterDropdownOpen((prev) => {
       const next = [...prev];
       while (next.length < length) next.push(false);
       return next.slice(0, length);
@@ -611,48 +633,69 @@ export default function ArrangeLogistics() {
                         )}
                       </div>
                       
-                      {/* Transporter Name Popover */}
-                      <Popover open={transporterPopoverOpen[idx]} onOpenChange={(open) => setTransporterPopoverOpen((prev) => prev.map((value, index) => index === idx ? open : value))}>
-                        <PopoverTrigger asChild>
-                          <Button 
-                            type="button" 
-                            variant="outline" 
-                            className="w-full justify-between text-sm border-gray-200 dark:border-zinc-700 h-9 bg-white dark:bg-zinc-900 font-normal"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <span className="truncate">{currentTransporter.name || "Select transporter"}</span>
-                            <ChevronsUpDown className="w-4 h-4 ml-2 opacity-50 shrink-0" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2">
-                          <Input 
-                            value={transporterSearchTerms[idx] || ""} 
-                            onChange={(e) => setTransporterSearchTerms((prev) => prev.map((term, index) => index === idx ? e.target.value : term))} 
-                            placeholder="Search transporter..." 
-                            className="mb-2 h-8 text-xs" 
-                          />
-                          <div className="max-h-60 overflow-y-auto">
-                            {transporterMasterOptions
-                              .filter((transporter) => transporter.name.toLowerCase().includes((transporterSearchTerms[idx] || "").trim().toLowerCase()))
-                              .map((transporter, transporterIndex) => (
-                                <button 
-                                  key={`${idx}-${transporterIndex}`} 
-                                  type="button" 
-                                  onClick={(e) => { 
-                                    e.stopPropagation();
-                                    applyTransporterMasterSelection(idx, transporter.name); 
-                                    setTransporterSearchTerms((prev) => prev.map((term, index) => index === idx ? "" : term)); 
-                                    setTransporterPopoverOpen((prev) => prev.map((value, index) => index === idx ? false : value)); 
-                                  }} 
-                                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-zinc-800"
-                                >
-                                  <span>{transporter.name}</span>
-                                  {currentTransporter.name === transporter.name && <Check className="w-4 h-4 text-primary" />}
-                                </button>
-                              ))}
+                      {/* Transporter Name - Custom Dropdown */}
+                      <div
+                        ref={transporterDropdownRefs[idx]}
+                        className="relative"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="w-full flex items-center justify-between rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 h-9 text-sm font-normal text-gray-700 dark:text-zinc-200 hover:bg-gray-50 dark:hover:bg-zinc-800"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setTransporterDropdownOpen((prev) =>
+                              prev.map((v, i) => i === idx ? !v : v)
+                            );
+                          }}
+                        >
+                          <span className="truncate">{currentTransporter.name || "Select transporter"}</span>
+                          <ChevronsUpDown className="w-4 h-4 ml-2 opacity-50 shrink-0" />
+                        </button>
+                        {transporterDropdownOpen[idx] && (
+                          <div className="absolute z-[200] left-0 right-0 top-full mt-1 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg">
+                            <div className="p-2">
+                              <input
+                                autoFocus
+                                type="text"
+                                value={transporterSearchTerms[idx] || ""}
+                                onChange={(e) =>
+                                  setTransporterSearchTerms((prev) =>
+                                    prev.map((term, index) => index === idx ? e.target.value : term)
+                                  )
+                                }
+                                placeholder="Search transporter..."
+                                className="w-full rounded-md border border-gray-200 dark:border-zinc-600 px-3 py-1.5 text-xs outline-none focus:border-gray-400 dark:bg-zinc-800 dark:text-zinc-200"
+                              />
+                            </div>
+                            <div className="max-h-60 overflow-y-auto px-2 pb-2">
+                              {transporterMasterOptions
+                                .filter((transporter) => transporter.name.toLowerCase().includes((transporterSearchTerms[idx] || "").trim().toLowerCase()))
+                                .map((transporter, transporterIndex) => (
+                                  <button
+                                    key={`${idx}-${transporterIndex}`}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      applyTransporterMasterSelection(idx, transporter.name);
+                                      setTransporterSearchTerms((prev) => prev.map((term, index) => index === idx ? "" : term));
+                                      setTransporterDropdownOpen((prev) => prev.map((v, i) => i === idx ? false : v));
+                                    }}
+                                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-zinc-800"
+                                  >
+                                    <span>{transporter.name}</span>
+                                    {currentTransporter.name === transporter.name && <Check className="w-4 h-4 text-primary" />}
+                                  </button>
+                                ))}
+                              {transporterMasterOptions.filter((t) =>
+                                t.name.toLowerCase().includes((transporterSearchTerms[idx] || "").trim().toLowerCase())
+                              ).length === 0 && (
+                                <p className="px-3 py-2 text-xs text-gray-400">No transporters found</p>
+                              )}
+                            </div>
                           </div>
-                        </PopoverContent>
-                      </Popover>
+                        )}
+                      </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
