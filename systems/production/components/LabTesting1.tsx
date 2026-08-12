@@ -643,13 +643,13 @@ export default function LabTesting1Page() {
 
       setHistoryTests(filterByFirm(historyFiltered))
 
-      setFlowOfMaterialOptions([...new Set((masterData || []).map((row: any) => String(row["Flow Of Material"] || "")).filter(Boolean))] as string[])
-      const statuses = [...new Set((masterData || []).map((row: any) => String(row["Test Status"] || "")).filter(Boolean))] as string[]
+      setFlowOfMaterialOptions([...new Set((masterData || []).map((row: any) => String(row.flowOfMaterial || row["Flow Of Material"] || "")).filter(Boolean))] as string[])
+      const statuses = [...new Set((masterData || []).map((row: any) => String(row.testStatus || row["Test Status"] || "")).filter(Boolean))] as string[]
       if (!statuses.includes("Tested")) statuses.push("Tested")
       if (!statuses.includes("Non Tested")) statuses.push("Non Tested")
       if (!statuses.includes("Direct supply")) statuses.push("Direct supply")
       setStatusOptions(statuses)
-      setTestedByOptions([...new Set((masterData || []).map((row: any) => String(row["Tested by"] || "")).filter(Boolean))] as string[])
+      setTestedByOptions([...new Set((masterData || []).map((row: any) => String(row.testedBy || row["Tested by"] || "")).filter(Boolean))] as string[])
 
     } catch (err: any) {
       console.error("Error in loadAllData:", err)

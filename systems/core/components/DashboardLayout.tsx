@@ -49,26 +49,26 @@ const RepairIcon = icon(<><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1
 const productionTabs = [
   { id: "dashboard", label: "Dashboard", stepName: "Overview", path: "/dashboard" },
   { id: "orders", label: "Orders", stepName: "Orders", path: "/orders" },
+  { id: "full-kitting", label: "Composition By Lab", stepName: "Full Kitting", path: "/full-kitting" },
   { id: "pi-approval", label: "PI Approval", stepName: "PI Approval", path: "/pi-approval" },
-  { id: "costing", label: "Costing", stepName: "Costing", path: "/costing" },
+  { id: "management-app", label: "Management App", stepName: "Management App", path: "/management-app" },
   { id: "sample-test", label: "Sample Test", stepName: "Sample Test", path: "/sample-test" },
+  { id: "job-cards", label: "Job Cards", stepName: "Job Cards", path: "/job-cards" },
+  { id: "production-tracking", label: "Production", stepName: "Production", path: "/production-tracking" },
+  { id: "composition-qc", label: "Composition QC", stepName: "Composition QC", path: "/composition-qc" },
   { id: "lab-testing1", label: "Lab Testing 1", stepName: "Lab Testing 1", path: "/lab-testing1" },
   { id: "lab-testing2", label: "Lab Testing 2", stepName: "Lab Testing 2", path: "/lab-testing2" },
-  { id: "chemical-test", label: "Chemical Test", stepName: "Chemical Test", path: "/chemical-test" },
-  { id: "composition-qc", label: "Composition QC", stepName: "Composition QC", path: "/composition-qc" },
-  { id: "job-cards", label: "Job Cards", stepName: "Job Cards", path: "/job-cards" },
+  { id: "costing", label: "Costing", stepName: "Costing", path: "/costing" },
+  { id: "tally", label: "Tally", stepName: "Tally", path: "/tally" },
+  { id: "kyc", label: "KYC", stepName: "KYC", path: "/kyc" },
   { id: "sf-production", label: "SF Production", stepName: "SF Production", path: "/sf-production", isSf: true },
   { id: "sfjob-card", label: "Job Card Planning", stepName: "SF Job Card", path: "/sfjob-card", isSf: true },
   { id: "sfproduction-entry", label: "Production Entry", stepName: "SF Production Entry", path: "/sfproduction-entry", isSf: true },
   { id: "crushing", label: "Crushing", stepName: "Crushing", path: "/crushing", isSf: true },
   { id: "tally-entry", label: "Tally Entry", stepName: "Tally Entry", path: "/tally-entry", isSf: true },
-  { id: "tally", label: "Tally", stepName: "Tally", path: "/tally" },
-  { id: "full-kitting", label: "Composition By Lab", stepName: "Full Kitting", path: "/full-kitting" },
-  { id: "management", label: "Management Approval", stepName: "Management", path: "/management" },
-  { id: "management-app", label: "Management App", stepName: "Management App", path: "/management-app" },
   { id: "settings", label: "Settings", stepName: "Settings", path: "/settings" },
-  { id: "kyc", label: "KYC", stepName: "KYC", path: "/kyc" },
-  { id: "production-tracking", label: "Production", stepName: "Production", path: "/production-tracking" },
+  { id: "chemical-test", label: "Chemical Test", stepName: "Chemical Test", path: "/chemical-test", hidden: true },
+  { id: "management", label: "Management Approval", stepName: "Management", path: "/management", hidden: true },
   { id: "check", label: "Check", stepName: "Check", path: "/check", hidden: true }
 ];
 
@@ -861,9 +861,9 @@ export default function DashboardLayout({
                       const sfTabs = accessibleProductionTabs.filter(t => t.isSf);
                       const regularTabs = accessibleProductionTabs.filter(t => !t.isSf);
                       
-                      const tallyIdx = regularTabs.findIndex(t => t.id === 'tally');
-                      const beforeSf = tallyIdx !== -1 ? regularTabs.slice(0, tallyIdx) : regularTabs;
-                      const afterSf = tallyIdx !== -1 ? regularTabs.slice(tallyIdx) : [];
+                      const kycIdx = regularTabs.findIndex(t => t.id === 'kyc');
+                      const beforeSf = kycIdx !== -1 ? regularTabs.slice(0, kycIdx + 1) : regularTabs;
+                      const afterSf = kycIdx !== -1 ? regularTabs.slice(kycIdx + 1) : [];
 
                       const renderTab = (tab: { id: string; label: string; path: string }, isSub = false) => {
                         const isActive = isTabActive('/production', tab.path);

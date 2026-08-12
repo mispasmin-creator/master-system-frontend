@@ -88,26 +88,22 @@ export default function KycProductTable() {
     setLoading(true);
     try {
       const [
-        { data: rawData, error },
+        { data: rawData },
         { data: semiActualData },
         { data: crushingActualData },
         { data: sjcData },
         { data: sfProdData },
         invHistoryRes
       ] = await Promise.all([
-        productionApi.get('LIFT-ACCOUNTS'),
-        productionApi.get('semi_actual'),
-        productionApi.get('crushing_actual'),
-        productionApi.get('semi_job_card'),
-        productionApi.get('semi_production'),
+        Promise.resolve(productionApi.get('LIFT-ACCOUNTS')).catch(() => ({ data: [], error: null })),
+        productionApi.get('semi_actual').catch(() => ({ data: [] })),
+        productionApi.get('crushing_actual').catch(() => ({ data: [] })),
+        productionApi.get('semi_job_card').catch(() => ({ data: [] })),
+        productionApi.get('semi_production').catch(() => ({ data: [] })),
         Promise.resolve(
           productionApi.get('inventory_master_history')
         ).catch(() => ({ data: [], error: null }))
       ]);
-
-      const inventoryHistoryData = (invHistoryRes as any)?.data || [];
-
-      if (error) throw error;
 
       const sfFirmMap = new Map<string, string>();
       (sfProdData || []).forEach((row: any) => {

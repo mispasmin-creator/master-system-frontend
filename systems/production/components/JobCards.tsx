@@ -316,9 +316,9 @@ export default function JobCardsPage() {
 
       // Load supervisors and shifts from master table
       const supervisorsList: string[] = [
-        ...new Set(allMasterData.map((row: any) => String(row["Supervisor Name"] || "")).filter(Boolean)),
+        ...new Set(allMasterData.map((row: any) => String(row.supervisorName || row["Supervisor Name"] || "")).filter(Boolean)),
       ] as string[]
-      const shiftsList: string[] = [...new Set(allMasterData.map((row: any) => String(row["Shift"] || "")).filter(Boolean))] as string[]
+      const shiftsList: string[] = [...new Set(allMasterData.map((row: any) => String(row.shift || row["Shift"] || "")).filter(Boolean))] as string[]
 
       setSupervisors(supervisorsList.length > 0 ? supervisorsList : ["Morning", "Evening", "Night"])
       setShifts(shiftsList.length > 0 ? shiftsList : ["Day", "Evening", "Night"])

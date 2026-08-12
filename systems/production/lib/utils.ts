@@ -124,10 +124,23 @@ export const mapSemiActual = (row: any) => ({
   finalQty: toNumber(row["Final Qty"]),
 });
 
+const toCamelCaseKey = (str: string) => {
+  return str
+    .replace(/(?:^\w|[A-Z]|\b\w)/g, (letter, index) =>
+      index === 0 ? letter.toLowerCase() : letter.toUpperCase()
+    )
+    .replace(/\s+/g, "");
+};
+
 export const getMasterValue = (row: any, keys: string[]): string => {
+  if (!row) return "";
   for (const key of keys) {
-    const value = row[key];
-    if (value !== null && value !== undefined && String(value).trim()) return String(value).trim();
+    const val1 = row[key];
+    if (val1 !== null && val1 !== undefined && String(val1).trim()) return String(val1).trim();
+
+    const camelKey = toCamelCaseKey(key);
+    const val2 = row[camelKey];
+    if (val2 !== null && val2 !== undefined && String(val2).trim()) return String(val2).trim();
   }
   return "";
 };

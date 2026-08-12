@@ -427,7 +427,7 @@ export default function ProductionPage() {
       // First populate from Supabase master table "Name Of Raw Material" column
       ;(masterData || []).forEach((m: any) => {
         const matName = String(
-          m["Name Of Raw Material"] || m["Raw Material Name"] || m["Material Name"] || m["Product name"] || ""
+          m.nameOfRawMaterial || m.materialName || m["Name Of Raw Material"] || m["Raw Material Name"] || m["Material Name"] || m["Product name"] || ""
         ).trim()
         if (matName) rawMaterialsSet.add(matName)
       })

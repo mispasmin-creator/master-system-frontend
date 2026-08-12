@@ -129,7 +129,7 @@ export default function SettingsPage() {
           const uniqueFirms = [
             ...new Set(
               data
-                .map((m: any) => String(m["Firm Name"] || "").trim())
+                .map((m: any) => String(m.firmName || m["Firm Name"] || "").trim())
                 .filter(Boolean),
             ),
           ] as string[];

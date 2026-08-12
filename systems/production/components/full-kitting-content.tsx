@@ -403,20 +403,24 @@ export default function CheckPage() {
         { data: kycMasterData },
         invHistoryRes
       ] = await Promise.all([
-        productionApi.get('ORDER RECEIPT').then(async res => {
-          if (res.data) {
-            res.data = res.data.filter((r: any) => r.check_delivery_in_stock_or_not === "For Production Planning");
+        fetch(`${API_URL}/order/receipt`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        }).then(async res => {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            const filtered = json.data.filter((r: any) => r.checkDelivery?.inStockOrNot === "For Production Planning");
+            return { data: filtered, error: null };
           }
-          return res;
-        }),
-        productionApi.get('LIFT-ACCOUNTS'),
-        await productionApi.get(COSTING_RESPONSE_TABLE),
-        await productionApi.get(PRODUCTION_TABLE),
-        productionApi.get('semi_actual'),
-        productionApi.get('crushing_actual'),
-        productionApi.get('semi_job_card'),
-        productionApi.get('semi_production'),
-        productionApi.get('kyc'),
+          return { data: [], error: null };
+        }).catch(err => ({ data: [], error: err })),
+        Promise.resolve(productionApi.get('LIFT-ACCOUNTS')).catch(() => ({ data: [], error: null })),
+        productionApi.get(COSTING_RESPONSE_TABLE),
+        productionApi.get(PRODUCTION_TABLE),
+        productionApi.get('semi_actual').catch(() => ({ data: [] })),
+        productionApi.get('crushing_actual').catch(() => ({ data: [] })),
+        productionApi.get('semi_job_card').catch(() => ({ data: [] })),
+        productionApi.get('semi_production').catch(() => ({ data: [] })),
+        productionApi.get('kyc').catch(() => ({ data: [] })),
         Promise.resolve(
           productionApi.get('inventory_master_history')
         ).catch(() => ({ data: [], error: null }))
@@ -425,7 +429,6 @@ export default function CheckPage() {
       const inventoryHistoryData = (invHistoryRes as any)?.data || [];
 
       if (orderReceiptErr) throw orderReceiptErr;
-      if (kycErr) throw kycErr;
       if (costErr) throw costErr;
       if (allProdErr) throw allProdErr;
 
@@ -458,48 +461,48 @@ export default function CheckPage() {
         return "";
       };
       const buildOrderMeta = (row: any) => ({
-        firmName: String(pick(row, ["Firm Name"])),
-        partyName: String(pick(row, ["Party Names", "Party Name"])),
-        productName: String(pick(row, ["Product Name"])).trim(),
-        orderQuantity: Number(pick(row, ["Quantity", "Order Quantity"]) || 0),
-        expectedDeliveryDate: pick(row, ["Expected Delivery Date"]),
-        note: String(pick(row, ["Specific Concern", "Note"])),
-        plannedDate: pick(row, ["check_delivery_actual", "Planned 1"]),
-        status: String(pick(row, ["Status"])),
-        crmName: String(pick(row, ["Crm For The Customer", "CRM Name"])),
+        firmName: String(pick(row, ["firmName", "Firm Name"])),
+        partyName: String(pick(row, ["partyName", "Party Names", "Party Name"])),
+        productName: String(pick(row, ["productName", "Product Name"])).trim(),
+        orderQuantity: Number(pick(row, ["quantity", "Quantity", "Order Quantity"]) || 0),
+        expectedDeliveryDate: pick(row, ["expectedDeliveryDate", "Expected Delivery Date"]) || row.checkPo?.expectedDeliveryDate,
+        note: String(pick(row, ["specificConcern", "Specific Concern", "Note"])),
+        plannedDate: pick(row, ["checkDeliveryActual", "check_delivery_actual", "Planned 1"]),
+        status: String(pick(row, ["status", "Status"])),
+        crmName: String(pick(row, ["crmForCustomer", "Crm For The Customer", "CRM Name"])),
         quantityDelivered: String(
-          pick(row, ["Delivered", "Quantity Delivered"]),
+          pick(row, ["delivered", "Delivered", "Quantity Delivered"]),
         ),
         productionPending: String(
-          pick(row, ["Pending Qty", "Production Pending"]),
+          pick(row, ["pendingQty", "Pending Qty", "Production Pending"]),
         ),
         productRate: String(
-          pick(row, ["Rate Of Material", "Product Rate", "Selling Price"]),
+          pick(row, ["rateOfMaterial", "Rate Of Material", "Product Rate", "Selling Price"]),
         ),
-        uploadSo: String(pick(row, ["Upload SO"]) || ""),
+        uploadSo: String(pick(row, ["uploadSo", "Upload SO"]) || ""),
       });
 
       const prodMap = new Map<string, any>();
       const productionKeys = new Set<string>();
       (allProdData || []).forEach((row: any) => {
-        const doNo = String(row["Delivery Order No."] || "").trim();
-        const productName = String(row["Product Name"] || "").trim();
-        const partyName = String(row["Party Name"] || "").trim();
+        const doNo = String(row["Delivery Order No."] || row["deliveryOrderNo"] || "").trim();
+        const productName = String(row["Product Name"] || row["productName"] || "").trim();
+        const partyName = String(row["Party Name"] || row["partyName"] || "").trim();
         if (doNo) {
           const prodInfo = {
             plannedDate: row["Planned 1"] || "",
-            expectedDeliveryDate: row["Expected Delivery Date"] || "",
-            priority: row["Priority"] || "",
-            firmName: row["Firm Name"] || "",
+            expectedDeliveryDate: row["Expected Delivery Date"] || row["expectedDeliveryDate"] || "",
+            priority: row["Priority"] || row["priority"] || "",
+            firmName: row["Firm Name"] || row["firmName"] || "",
             productionId: row.id,
-            uploadSo: row["Upload SO"] || "",
+            uploadSo: row["Upload SO"] || row["uploadSo"] || "",
             productName: productName,
-            partyName: row["Party Name"] || "",
-            orderQuantity: Number(row["Order Quantity"] || 0),
-            note: row["Note"] || "",
-            status: row["Status"] || "",
-            crmName: row["Crm Name"] || "",
-            quantityDelivered: String(row["Quantity Delivered"] || ""),
+            partyName: partyName,
+            orderQuantity: Number(row["Order Quantity"] || row["orderQuantity"] || 0),
+            note: row["Note"] || row["reason"] || "",
+            status: row["Status"] || row["status"] || "",
+            crmName: row["Crm Name"] || row["crmName"] || "",
+            quantityDelivered: String(row["Quantity Delivered"] || row["quantityDelivered"] || ""),
             productionPending: String(row["Production Pending"] || ""),
             productRate: String(row["product_rate"] || ""),
           };
@@ -513,7 +516,7 @@ export default function CheckPage() {
       // Build metadata map from orderReceiptData
       const orderMetaMap = new Map<string, ReturnType<typeof buildOrderMeta>>();
       (orderReceiptData || []).forEach((row: any) => {
-        const doNo = String(row["DO-Delivery Order No."] || "").trim();
+        const doNo = String(row["doNumber"] || row["DO-Delivery Order No."] || "").trim();
         const meta = buildOrderMeta(row);
         const productName = meta.productName;
         if (doNo) {
@@ -628,10 +631,10 @@ export default function CheckPage() {
       // available for a DO+party+product key, so surplus lines stay pending.
       const consumedVerifiedByKey = new Map<string, number>();
       (orderReceiptData || []).forEach((row: any) => {
-        const doNo = String(row["DO-Delivery Order No."] || "").trim();
-        const productName = String(row["Product Name"] || "").trim();
-        const firmName = String(row["Firm Name"] || "").trim();
-        const partyName = String(row["Party Names"] || "").trim();
+        const doNo = String(row["doNumber"] || row["DO-Delivery Order No."] || "").trim();
+        const productName = String(row["productName"] || row["Product Name"] || "").trim();
+        const firmName = String(row["firmName"] || row["Firm Name"] || "").trim();
+        const partyName = String(row["partyName"] || row["Party Names"] || row["Party Name"] || "").trim();
         if (!doNo) return;
 
         // Count-aware verification: consume one composition per matching line;
@@ -656,13 +659,13 @@ export default function CheckPage() {
         // straight to pending without stealing another line's production row.
         const matchingProd = isSurplusLine ? undefined : (allProdData || []).find((p: any) => {
           if (matchedProdIds.has(p.id)) return false;
-          const pDO = normalize(p["Delivery Order No."]);
+          const pDO = normalize(p["deliveryOrderNo"] || p["Delivery Order No."]);
           const oDO = normalize(doNo);
-          const pProduct = normalize(p["Product Name"]);
+          const pProduct = normalize(p["productName"] || p["Product Name"]);
           const oProduct = normalize(productName);
-          const pFirm = normalize(p["Firm Name"]);
+          const pFirm = normalize(p["firmName"] || p["Firm Name"]);
           const oFirm = normalize(firmName);
-          const pParty = normalize(p["Party Name"]);
+          const pParty = normalize(p["partyName"] || p["Party Name"]);
           const oParty = normalize(partyName);
           return (
             pDO === oDO &&
@@ -709,26 +712,26 @@ export default function CheckPage() {
         pendingList.push({
           id: row.id,
           productionId: "",
-          timestamp: row["Timestamp"] || "",
-          firmName: row["Firm Name"] || enriched.firmName || "",
+          timestamp: row["createdAt"] || row["Timestamp"] || "",
+          firmName: row["firmName"] || row["Firm Name"] || enriched.firmName || "",
           deliveryOrderNo: doNo,
-          partyName: row["Party Names"] || "",
+          partyName: row["partyName"] || row["Party Names"] || row["Party Name"] || "",
           productName,
-          orderQuantity: Number(row["Quantity"] || 0),
+          orderQuantity: Number(row["quantity"] ?? row["Quantity"] ?? 0),
           expectedDeliveryDate: formatDate(
-            enriched.expectedDeliveryDate || row["Expected Delivery Date"],
+            enriched.expectedDeliveryDate || row.checkPo?.expectedDeliveryDate || row["expectedDeliveryDate"] || row["Expected Delivery Date"],
           ),
           priority: enriched.priority || "",
-          note: row["Specific Concern"] || "",
+          note: row["specificConcern"] || row["Specific Concern"] || row["note"] || "",
           plannedDate: formatDate(
-            row["check_delivery_actual"] || enriched.plannedDate,
+            row.checkDelivery?.actualPlannedDate || row["check_delivery_actual"] || enriched.plannedDate,
           ),
-          status: row["Status"] || "",
-          crmName: String(row["Crm For The Customer"] || ""),
-          quantityDelivered: String(row["Delivered"] ?? ""),
-          productionPending: String(row["Pending Qty"] ?? ""),
-          productRate: String(row["Rate Of Material"] ?? ""),
-          uploadSo: row["Upload SO"] || enriched.uploadSo || "",
+          status: row["status"] || row["Status"] || "",
+          crmName: String(row["crmForCustomer"] || row["Crm For The Customer"] || row["crmName"] || ""),
+          quantityDelivered: String(row["quantityDelivered"] ?? row["Delivered"] ?? ""),
+          productionPending: String(row["pendingQty"] ?? row["Pending Qty"] ?? ""),
+          productRate: String(row["rateOfMaterial"] ?? row["Rate Of Material"] ?? ""),
+          uploadSo: row["uploadSo"] || row["Upload SO"] || enriched.uploadSo || "",
         });
       });
 

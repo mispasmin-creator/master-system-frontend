@@ -554,12 +554,12 @@ export default function LabTesting2Page() {
       setHistoryTests(filterByFirm(historyData))
 
       // Set options from master data
-      const statuses = [...new Set((masterData || []).map((row: any) => String(row["Test Status"] || "")).filter(Boolean))] as string[]
+      const statuses = [...new Set((masterData || []).map((row: any) => String(row.testStatus || row["Test Status"] || "")).filter(Boolean))] as string[]
       if (!statuses.includes("Tested")) statuses.push("Tested")
       if (!statuses.includes("Non Tested")) statuses.push("Non Tested")
       setStatusOptions(statuses)
 
-      const testedByOpts = [...new Set((masterData || []).map((row: any) => String(row["Tested by"] || "")).filter(Boolean))] as string[]
+      const testedByOpts = [...new Set((masterData || []).map((row: any) => String(row.testedBy || row["Tested by"] || "")).filter(Boolean))] as string[]
       setTestedByOptions(testedByOpts)
     } catch (err: any) {
       console.error("Error in loadAllData:", err)

@@ -126,6 +126,7 @@ const JOBCARD_COLUMNS_META = [
   },
   { header: "Notes", dataKey: "note", toggleable: true },
   { header: "Selling Price", dataKey: "product_rate", toggleable: true },
+  { header: "Action", dataKey: "action", toggleable: true },
 ];
 
 export default function OrdersPage() {
@@ -218,100 +219,110 @@ export default function OrdersPage() {
     setVisibleColumns(visibility);
   }, []);
 
+  const fetchOrderReceiptsForDropdown = async () => {
+    try {
+      const res = await fetch(`${API_URL}/order/receipt`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const pendingReceipts = json.data.filter(
+          (r: any) => r.checkDelivery?.inStockOrNot === "For Production Planning",
+        );
+
+        const userFirms = user?.firm
+          ? user.firm
+              .split(",")
+              .map((f: string) => f.trim().toLowerCase())
+              .filter(Boolean)
+          : [];
+        const isAdmin = !user?.firm || user?.role?.toLowerCase() === "admin";
+
+        const filteredReceipts = pendingReceipts.filter((r: any) => {
+          if (isAdmin || userFirms.length === 0) return true;
+          const f = String(r.firmName || "").toLowerCase();
+          return userFirms.some((uf: string) => f.includes(uf));
+        });
+
+        const uniqueFirms = [
+          ...new Set(
+            filteredReceipts
+              .map((r: any) => String(r.firmName || "").trim())
+              .filter(Boolean),
+          ),
+        ] as string[];
+        setFirmOptions((prev) => [...new Set([...prev, ...uniqueFirms])]);
+
+        const orderRows = filteredReceipts.map((r: any) => ({
+          firmName: r.firmName,
+          partyName: r.partyName,
+          orderNo: r.doNumber,
+          productName: r.productName,
+          quantity: r.quantity,
+          rate: r.rateOfMaterial,
+          expectedDeliveryDate: r.checkPo?.expectedDeliveryDate || r.expectedDeliveryDate,
+          gpPercentage: r.checkDelivery?.gpPercent || "",
+        }));
+        setAllOrdersData(orderRows);
+      }
+    } catch (err) {
+      console.error("Error fetching order receipts for dropdown:", err);
+    }
+  };
+
   // Unified Fetch Data
   const fetchProductionData = async () => {
     setFetchingData(true);
     try {
-      // 1. Fetch from ORDER RECEIPT
-      const rawRes = await productionApi.get('ORDER RECEIPT');
-      const allOrders = (rawRes.data || []).filter((r: any) => r.check_delivery_in_stock_or_not === "For Production Planning");
-      const ordersError = rawRes.error;
+      // 1. Fetch real ProductionOrder rows
+      const res = await productionApi.get(PRODUCTION_TABLE);
+      const allProduction = res.data || (Array.isArray(res) ? res : []);
 
-      if (ordersError) throw ordersError;
+      const userFirms = user?.firm
+        ? user.firm
+            .split(",")
+            .map((f: string) => f.trim().toLowerCase())
+            .filter(Boolean)
+        : [];
+      const isAdmin = !user?.firm || user?.role?.toLowerCase() === "admin";
 
-      // 2. Fetch from production
-      const { data: allProduction, error: prodError } = await productionApi.get(PRODUCTION_TABLE);
+      const filteredProduction = allProduction.filter((row: any) => {
+        if (isAdmin || userFirms.length === 0) return true;
+        const f = String(row.firmName || "").toLowerCase();
+        return userFirms.some((uf: string) => f.includes(uf));
+      });
 
-      if (prodError) throw prodError;
+      const productionRows: ProductionItem[] = filteredProduction.map((row: any) => ({
+        id: row.id,
+        productionId: row.id,
+        timestamp: row.createdAt || "",
+        deliveryOrderNo: row.deliveryOrderNo || "",
+        firmName: row.firmName || "",
+        partyName: row.partyName || "",
+        productName: row.productName || "",
+        orderQuantity: String(row.orderQuantity ?? ""),
+        expectedDeliveryDate: row.expectedDeliveryDate || "",
+        priority: row.priority || "",
+        note: row.reason || "",
+        crmName: row.crmName || "",
+        orderCancel: !!row.orderCancelled,
+        actualProductionPlanned: "",
+        actualProductionDone: "",
+        stockTransferred: "",
+        quantityDelivered: String(row.quantityDelivered ?? ""),
+        quantityInStock: String(row.quantityInStock ?? ""),
+        planningPending: "",
+        productionPending: "",
+        status: row.orderCancelled ? "Cancelled" : (row.status || "Pending"),
+        dateOfCompletePlanning: "",
+        cancelReason: row.reason || "",
+        product_rate: "",
+      }));
 
-      if (allOrders) {
-        const userFirms = user?.firm ? user.firm.split(',').map((f: string) => f.trim().toLowerCase()).filter(Boolean) : [];
-        const isAdmin = user?.role?.toLowerCase() === 'admin';
-        
-        // 3. Process firm options and order dropdown data
-        const uniqueFirms = [
-          ...new Set(
-            allOrders
-              .map((m: any) => String(m["Firm Name"] || "").trim())
-              .filter((f: any) => !f || isAdmin || userFirms.length === 0 || userFirms.some((uf: string) => f.toLowerCase().includes(uf))),
-          ),
-        ] as string[];
-        setFirmOptions(uniqueFirms);
+      setProductionData(productionRows);
 
-        const orderRows = allOrders
-          .filter((m: any) => !String(m["Firm Name"]) || isAdmin || userFirms.length === 0 || userFirms.some((uf: string) => String(m["Firm Name"]).toLowerCase().includes(uf)))
-          .map((row: any) => ({
-            firmName: row["Firm Name"],
-            partyName: row["Party Names"],
-            orderNo: row["DO-Delivery Order No."],
-            productName: row["Product Name"],
-            quantity: row["Quantity"],
-            rate: row["Rate Of Material"],
-            expectedDeliveryDate: row["Expected Delivery Date"],
-            gpPercentage: row["GP%"],
-          }));
-        setAllOrdersData(orderRows);
-
-        // 4. Map ORDER RECEIPT rows using production status
-        const productionRows: ProductionItem[] = allOrders
-          .filter((m: any) => isAdmin || userFirms.length === 0 || userFirms.some((uf: string) => String(m["Firm Name"] || "").toLowerCase().includes(uf)))
-          .map((row: any) => {
-            // Find match in production table
-            const matchingProd = allProduction?.find((p: any) => {
-              const pDO = String(p["Delivery Order No."] || "").trim().toLowerCase();
-              const oDO = String(row["DO-Delivery Order No."] || "").trim().toLowerCase();
-              const pProduct = String(p["Product Name"] || "").trim().toLowerCase();
-              const oProduct = String(row["Product Name"] || "").trim().toLowerCase();
-              const pFirm = String(p["Firm Name"] || "").trim().toLowerCase();
-              const oFirm = String(row["Firm Name"] || "").trim().toLowerCase();
-              return pDO === oDO && pProduct === oProduct && (!oFirm || pFirm === oFirm);
-            });
-
-            const isCancel = matchingProd ? !!matchingProd["Order Cancel"] : false;
-            const isComplete = matchingProd 
-              ? ["completed", "complete", "done"].includes(String(matchingProd["Status"] || "").toLowerCase())
-              : false;
-
-            return {
-              id: matchingProd ? matchingProd.id : row.id,
-              productionId: matchingProd?.id ?? "",
-              timestamp: row["Timestamp"] || "",
-              deliveryOrderNo: row["DO-Delivery Order No."] || "",
-              firmName: row["Firm Name"] || "",
-              partyName: row["Party Names"] || "",
-              productName: row["Product Name"] || "",
-              orderQuantity: String(row["Quantity"] ?? ""),
-              expectedDeliveryDate: row["Expected Delivery Date"] || "",
-              priority: matchingProd ? (matchingProd["Priority"] || "") : "",
-              note: row["Specific Concern"] || "",
-              crmName: row["Crm For The Customer"] || "",
-              orderCancel: isCancel,
-              actualProductionPlanned: matchingProd ? String(matchingProd["Actual Production Planned"] ?? "") : "",
-              actualProductionDone: matchingProd ? String(matchingProd["Actual Production Done"] ?? "") : "",
-              stockTransferred: String(row["Qty Transferred"] ?? ""),
-              quantityDelivered: String(row["Delivered"] ?? ""),
-              quantityInStock: row["In Stock Or Not"] || "",
-              planningPending: matchingProd ? String(matchingProd["Planning Pending"] ?? "") : "",
-              productionPending: String(row["Pending Qty"] ?? ""),
-              status: isCancel ? "Cancelled" : (isComplete ? "Completed" : "Pending"),
-              dateOfCompletePlanning: row["Complete Date"] || "",
-              cancelReason: matchingProd ? (matchingProd["Reason"] || "") : "",
-              product_rate: String(row["Rate Of Material"] ?? ""),
-            };
-          });
-
-        setProductionData(productionRows);
-      }
+      // 2. Fetch pending receipts for "New Order" form dropdown
+      await fetchOrderReceiptsForDropdown();
     } catch (error: any) {
       console.error("Failed to fetch data:", error.message || error);
     } finally {
@@ -434,20 +445,19 @@ export default function OrdersPage() {
     }
     setLoading(true);
     try {
-      const insertData = filteredProducts.map((product, idx) => {
+      const insertData = filteredProducts.map((product) => {
         return {
-          "Delivery Order No.": formData.deliveryOrderNo.trim(),
-          "Firm Name": formData.firmName.trim(),
-          "Party Name": (product.partyName || "").trim(),
-          "Product Name": (product.productName || "").trim(),
-          "Order Quantity": Number(product.quantity) || 0,
-          "Expected Delivery Date": product.expectedDeliveryDate
-            ? format(new Date(product.expectedDeliveryDate), "yyyy-MM-dd")
+          deliveryOrderNo: formData.deliveryOrderNo.trim(),
+          firmName: formData.firmName.trim(),
+          partyName: (product.partyName || "").trim(),
+          productName: (product.productName || "").trim(),
+          orderQuantity: Number(product.quantity) || 0,
+          expectedDeliveryDate: product.expectedDeliveryDate
+            ? new Date(product.expectedDeliveryDate).toISOString()
             : null,
-          Priority: priority,
-          Note: formData.note.trim(),
-          Status: "pending",
-          product_rate: product.rate ? Number(product.rate) : null,
+          priority: priority || null,
+          reason: formData.note.trim() || null,
+          status: "Pending",
         };
       });
 
@@ -457,9 +467,9 @@ export default function OrdersPage() {
         return;
       }
 
-      const { error: insertError } = await productionApi.post(PRODUCTION_TABLE, insertData);
+      const res = await productionApi.post(PRODUCTION_TABLE, insertData);
+      if (res.error) throw res.error;
 
-      if (insertError) throw insertError;
       alert(`${insertData.length} Job Card(s) created successfully!`);
       setFormData({
         firmName: "",
@@ -505,12 +515,13 @@ export default function OrdersPage() {
     }
     setIsSubmittingCancel(true);
     try {
-      const { error: updateError } = await productionApi.patch(PRODUCTION_TABLE, selectedItem.id, {
-          "Order Cancel": true,
-          Reason: `Qty: ${cancelQuantity} - ${cancelReason}`,
-        });
+      const res = await productionApi.patch(PRODUCTION_TABLE, selectedItem.id, {
+        orderCancelled: true,
+        status: "Cancelled",
+        reason: `Qty: ${cancelQuantity} - ${cancelReason}`,
+      });
 
-      if (updateError) throw updateError;
+      if (res.error) throw res.error;
       alert("Order cancelled successfully!");
       setIsCancelDialogOpen(false);
       setCancelQuantity("");
