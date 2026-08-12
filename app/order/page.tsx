@@ -5,6 +5,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/systems/order/context/AuthContext';
 import { NotificationProvider } from '@/systems/order/context/NotificationContext';
 import DashboardLayout from '@/systems/core/components/DashboardLayout';
+import { Toaster } from '@/components/ui/sonner';
 
 // Dynamic imports of Order components (ssr:false — all use browser APIs)
 const OrderForm          = dynamic(() => import('@/systems/order/components/Order'),            { ssr: false });
@@ -135,6 +136,7 @@ export default function Order() {
   return (
     <HashRouter>
       <RouterApp />
+      <Toaster expand richColors theme="light" closeButton />
     </HashRouter>
   );
 }

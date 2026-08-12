@@ -3,8 +3,6 @@ import React, { useState, useEffect, useCallback } from "react";
 import { API_URL, getToken } from "@/lib/auth";
 import { useAuth } from "@/systems/order/context/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +16,6 @@ export default function CRM() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("pending");
   const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState({ crmForCustomer: "", mail: "", remarks: "" });
   const [submitting, setSubmitting] = useState(false);
   const isAdmin = user?.role === "admin" || user?.page_access === "all" || user?.page_access === "super admin";
 
@@ -35,19 +32,21 @@ export default function CRM() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Backend contract (crm.controller.js markDone) only accepts { deliveryId }
+  // — CRM has no extra fields to fill in, it's a one-click "done" stamp.
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selected) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/order/crm/${selected.id}`, {
+      const res = await fetch(`${API_URL}/order/crm`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ deliveryId: selected.id }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed");
-      toast.success("CRM entry saved"); setSelected(null); setForm({ crmForCustomer: "", mail: "", remarks: "" }); loadData();
+      toast.success("CRM marked done"); setSelected(null); loadData();
     } catch (err) { toast.error(err.message); } finally { setSubmitting(false); }
   };
 
@@ -67,16 +66,12 @@ export default function CRM() {
         <Card>
           <CardHeader><CardTitle className="text-base">CRM — {selected.doNumber}</CardTitle></CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[["crmForCustomer", "CRM for Customer"], ["mail", "Mail"], ["remarks", "Remarks"]].map(([k, l]) => (
-                <div key={k}><Label className="text-xs text-zinc-500 mb-1 block">{l}</Label><Input value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} className="h-9" /></div>
-              ))}
-              <div className="sm:col-span-3 flex gap-3">
-                <Button type="submit" disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
-                  {submitting ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />} Save
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
-              </div>
+            <form onSubmit={handleSubmit} className="flex items-center gap-3">
+              <p className="text-sm text-zinc-500 flex-1">Mark this delivery's CRM step as complete for {selected.partyName || "this party"}.</p>
+              <Button type="submit" disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                {submitting ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />} Mark Done
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
             </form>
           </CardContent>
         </Card>

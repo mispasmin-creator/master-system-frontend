@@ -7,9 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+
+const EMPTY_FORM = { tcRequired: "Yes", tcFileUrl: "" };
 
 export default function TC() {
   const { user } = useAuth();
@@ -18,7 +21,7 @@ export default function TC() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("pending");
   const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState({ tcNumber: "", tcDate: "", tcCopy: "" });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const isAdmin = user?.role === "admin" || user?.page_access === "all" || user?.page_access === "super admin";
@@ -39,23 +42,24 @@ export default function TC() {
   const handleFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     setUploading(true);
-    try { const url = await uploadFileToStorage(file, "order-tc"); setForm(f => ({ ...f, tcCopy: url })); toast.success("Uploaded"); }
+    try { const { url } = await uploadFileToStorage(file, "order-tc"); setForm(f => ({ ...f, tcFileUrl: url })); toast.success("Uploaded"); }
     catch { toast.error("Upload failed"); } finally { setUploading(false); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selected) return;
+    if (form.tcRequired === "Yes" && !form.tcFileUrl) { toast.error("Test Certificate file is required."); return; }
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/order/tc/${selected.id}`, {
+      const res = await fetch(`${API_URL}/order/tc`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, dispatchId: selected.id }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed");
-      toast.success("TC saved"); setSelected(null); setForm({ tcNumber: "", tcDate: "", tcCopy: "" }); loadData();
+      toast.success("TC saved"); setSelected(null); setForm(EMPTY_FORM); loadData();
     } catch (err) { toast.error(err.message); } finally { setSubmitting(false); }
   };
 
@@ -76,12 +80,18 @@ export default function TC() {
           <CardHeader><CardTitle className="text-base">TC Details — {selected.dSrNumber}</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div><Label className="text-xs text-zinc-500 mb-1 block">TC Number</Label><Input value={form.tcNumber} onChange={e => setForm(f => ({ ...f, tcNumber: e.target.value }))} className="h-9" /></div>
-              <div><Label className="text-xs text-zinc-500 mb-1 block">TC Date</Label><Input type="date" value={form.tcDate} onChange={e => setForm(f => ({ ...f, tcDate: e.target.value }))} className="h-9" /></div>
-              <div>
-                <Label className="text-xs text-zinc-500 mb-1 block">TC Copy</Label>
-                <div className="flex items-center gap-2"><Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFile} className="h-9" />{uploading && <Loader2 className="animate-spin w-4 h-4 text-emerald-500 shrink-0" />}</div>
+              <div><Label className="text-xs text-zinc-500 mb-1 block">TC Required</Label>
+                <Select value={form.tcRequired} onValueChange={v => setForm(f => ({ ...f, tcRequired: v }))}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>{["Yes", "No"].map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
+              {form.tcRequired === "Yes" && (
+                <div>
+                  <Label className="text-xs text-zinc-500 mb-1 block">Test Certificate File *</Label>
+                  <div className="flex items-center gap-2"><Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={handleFile} className="h-9" />{uploading && <Loader2 className="animate-spin w-4 h-4 text-emerald-500 shrink-0" />}</div>
+                </div>
+              )}
               <div className="sm:col-span-3 flex gap-3">
                 <Button type="submit" disabled={submitting || uploading} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
                   {submitting ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />} Save

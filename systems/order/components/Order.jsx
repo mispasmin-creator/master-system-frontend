@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetBody, SheetFooter } from "@/components/ui/sheet";
 import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -818,10 +818,11 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-        <SheetHeader><SheetTitle>Order Receipt Form</SheetTitle></SheetHeader>
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Information */}
+      <SheetContent className="sm:max-w-4xl flex flex-col p-0">
+        <SheetHeader className="px-6 py-4 border-b shrink-0"><SheetTitle>Order Receipt Form</SheetTitle></SheetHeader>
+        <SheetBody>
+          <form id="order-receipt-form" onSubmit={handleSubmit} className="space-y-8 pb-4">
+            {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">1. Basic Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1046,20 +1047,21 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
               </div>
             )}
           </div>
-
-          <div className="flex gap-3 justify-end pt-4 border-t border-zinc-200 dark:border-zinc-800">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={submitting || uploadingFile || products.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
-              {submitting ? <><Loader2 className="animate-spin w-4 h-4" /> Submitting...</> : "Submit Order"}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </SheetBody>
+        <SheetFooter>
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="submit" form="order-receipt-form" disabled={submitting || uploadingFile || products.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+            {submitting ? <><Loader2 className="animate-spin w-4 h-4" /> Submitting...</> : "Submit Order"}
+          </Button>
+        </SheetFooter>
 
         {/* Add Product sub-dialog */}
         <Sheet open={showProductForm} onOpenChange={setShowProductForm}>
-          <SheetContent className="sm:max-w-2xl">
-            <SheetHeader><SheetTitle>Add Product</SheetTitle></SheetHeader>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <SheetContent className="sm:max-w-2xl flex flex-col p-0">
+            <SheetHeader className="px-6 py-4 border-b shrink-0"><SheetTitle>Add Product</SheetTitle></SheetHeader>
+            <SheetBody>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">Product Name *</Label>
                 <SearchableSelect value={currentProduct.productName} onValueChange={(v) => handleProductChange("productName", v)} options={masterData.productNameOptions} placeholder="Select Product" />
@@ -1099,7 +1101,8 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
                 </div>
               )}
             </div>
-            <div className="flex gap-3 justify-end pt-2">
+            </SheetBody>
+            <SheetFooter>
               <Button type="button" variant="outline" onClick={() => setShowProductForm(false)}>Cancel</Button>
               <Button
                 type="button" onClick={addProduct}
@@ -1108,7 +1111,7 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
               >
                 Add Product
               </Button>
-            </div>
+            </SheetFooter>
           </SheetContent>
         </Sheet>
       </SheetContent>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { API_URL, getToken } from "@/lib/auth";
 import { useAuth } from "@/systems/order/context/AuthContext";
+import { uploadFileToStorage } from "@/systems/order/utils/storageUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
+const EMPTY_FORM = { biltyNo: "", biltyCopy: "", receiptDate: "", grnNumber: "", arrivalProofUrl: "", totalBillAmount: "" };
+
 export default function BiltyUpdate() {
   const { user } = useAuth();
   const [pending, setPending] = useState([]);
@@ -18,7 +21,8 @@ export default function BiltyUpdate() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("pending");
   const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState({ biltyNumber: "", biltyDate: "", quantityDelivered: "", remarks: "" });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [uploading, setUploading] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const isAdmin = user?.role === "admin" || user?.page_access === "all" || user?.page_access === "super admin";
 
@@ -35,19 +39,28 @@ export default function BiltyUpdate() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const handleFile = async (e, key) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setUploading(key);
+    try { const { url } = await uploadFileToStorage(file, "order-stage", "delivery"); setForm(f => ({ ...f, [key]: url })); toast.success("Uploaded"); }
+    catch { toast.error("Upload failed"); } finally { setUploading(null); }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selected) return;
+    if (!form.receiptDate || !form.grnNumber) { toast.error("Receipt Date and GRN Number are required."); return; }
+    if (!form.biltyNo || !form.biltyCopy) { toast.error("Bilty No. and Bilty Copy are required."); return; }
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/order/delivery/${selected.id}`, {
+      const res = await fetch(`${API_URL}/order/delivery`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, deliveryId: selected.id }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed");
-      toast.success("Bilty / Material Receipt saved"); setSelected(null); setForm({ biltyNumber: "", biltyDate: "", quantityDelivered: "", remarks: "" }); loadData();
+      toast.success("Bilty / Material Receipt saved"); setSelected(null); setForm(EMPTY_FORM); loadData();
     } catch (err) { toast.error(err.message); } finally { setSubmitting(false); }
   };
 
@@ -68,11 +81,19 @@ export default function BiltyUpdate() {
           <CardHeader><CardTitle className="text-base">Bilty Details — {selected.doNumber}</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[["biltyNumber", "Bilty Number"], ["biltyDate", "Bilty Date", "date"], ["quantityDelivered", "Qty Delivered"], ["remarks", "Remarks"]].map(([k, l, type = "text"]) => (
+              {[["biltyNo", "Bilty No. *"], ["receiptDate", "Receipt Date *", "date"], ["grnNumber", "GRN Number *"], ["totalBillAmount", "Total Bill Amount", "number"]].map(([k, l, type = "text"]) => (
                 <div key={k}><Label className="text-xs text-zinc-500 mb-1 block">{l}</Label><Input type={type} value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} className="h-9" /></div>
               ))}
+              <div>
+                <Label className="text-xs text-zinc-500 mb-1 block">Bilty Copy *</Label>
+                <div className="flex items-center gap-2"><Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => handleFile(e, "biltyCopy")} className="h-9" />{uploading === "biltyCopy" && <Loader2 className="animate-spin w-4 h-4 text-emerald-500 shrink-0" />}</div>
+              </div>
+              <div>
+                <Label className="text-xs text-zinc-500 mb-1 block">Arrival Proof</Label>
+                <div className="flex items-center gap-2"><Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => handleFile(e, "arrivalProofUrl")} className="h-9" />{uploading === "arrivalProofUrl" && <Loader2 className="animate-spin w-4 h-4 text-emerald-500 shrink-0" />}</div>
+              </div>
               <div className="sm:col-span-2 lg:col-span-4 flex gap-3">
-                <Button type="submit" disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                <Button type="submit" disabled={submitting || !!uploading} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
                   {submitting ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />} Save
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setSelected(null)}>Cancel</Button>
@@ -100,7 +121,7 @@ export default function BiltyUpdate() {
                 <TableCell>{r.quantityDelivered}</TableCell>
                 <TableCell>{r.billNo}</TableCell>
                 <TableCell className="text-xs">{r.billDate ? new Date(r.billDate).toLocaleDateString() : "—"}</TableCell>
-                <TableCell>{tab === "history" ? (r.materialReceipt?.biltyNumber || "—") : <Badge variant="outline" className="text-xs">Pending</Badge>}</TableCell>
+                <TableCell>{tab === "history" ? (r.bilty?.biltyNo || "—") : <Badge variant="outline" className="text-xs">Pending</Badge>}</TableCell>
               </TableRow>
             ))}
           </TableBody>
