@@ -13,15 +13,18 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, PackageX, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
+const VALID_REASONS = ["Damage Done", "Quality Issue", "Material Shortage", "Wrong Product", "Material Return", "Other"];
+
 export default function MaterialReturn() {
   const { user } = useAuth();
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [lookupInvoice, setLookupInvoice] = useState("");
-  const [lookupResult, setLookupResult] = useState(null);
+  const [lookupBillNumber, setLookupBillNumber] = useState("");
+  const [lookupResults, setLookupResults] = useState([]);
   const [looking, setLooking] = useState(false);
-  const [form, setForm] = useState({ doNumber: "", partyName: "", productName: "", returnQty: "", reason: "", transporterName: "", vehicleNo: "", returnDate: "", dcNumber: "", dcPhoto: "" });
+  const [selectedDispatch, setSelectedDispatch] = useState(null);
+  const [form, setForm] = useState({ returnQty: "", reason: "", debitNoteCopy: "" });
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const isAdmin = user?.role === "admin" || user?.page_access === "all" || user?.page_access === "super admin";
@@ -37,39 +40,61 @@ export default function MaterialReturn() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const resetForm = () => {
+    setForm({ returnQty: "", reason: "", debitNoteCopy: "" });
+    setSelectedDispatch(null);
+    setLookupResults([]);
+    setLookupBillNumber("");
+  };
+
   const handleLookup = async () => {
-    if (!lookupInvoice) return;
+    if (!lookupBillNumber) return;
     setLooking(true);
     try {
-      const res = await fetch(`${API_URL}/order/material-return/lookup?invoiceNo=${encodeURIComponent(lookupInvoice)}`);
+      const res = await fetch(`${API_URL}/order/material-return/lookup?billNumber=${encodeURIComponent(lookupBillNumber)}`);
       const json = await res.json();
-      if (!json.success || !json.data) { toast.error("Invoice not found"); return; }
-      setLookupResult(json.data);
-      setForm(f => ({ ...f, doNumber: json.data.doNumber || "", partyName: json.data.partyName || "", productName: json.data.productName || "" }));
+      if (!json.success || !json.data?.length) { toast.error("No returnable dispatches found for this bill number"); setLookupResults([]); return; }
+      setLookupResults(json.data);
     } catch { toast.error("Lookup failed"); } finally { setLooking(false); }
+  };
+
+  const pickDispatch = (d) => {
+    setSelectedDispatch(d);
+    setForm(f => ({ ...f, returnQty: "" }));
   };
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     setUploading(true);
-    try { const url = await uploadFileToStorage(file, "order-return-dc"); setForm(f => ({ ...f, dcPhoto: url })); toast.success("Uploaded"); }
+    try { const { url } = await uploadFileToStorage(file, "order-stage", "return-dc"); setForm(f => ({ ...f, debitNoteCopy: url })); toast.success("Uploaded"); }
     catch { toast.error("Upload failed"); } finally { setUploading(false); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.returnQty || !form.reason) { toast.error("Return qty and reason required"); return; }
+    if (!selectedDispatch) { toast.error("Look up an invoice and select a dispatch line first"); return; }
+    if (!form.returnQty || !form.reason || !form.debitNoteCopy) { toast.error("Return Qty, Reason and Debit Note Copy are required"); return; }
     setSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/order/material-return`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ ...form, invoiceNo: lookupInvoice }),
+        body: JSON.stringify({
+          lines: [{
+            dispatchId: selectedDispatch.id,
+            doNumber: selectedDispatch.doNumber,
+            partyName: selectedDispatch.partyName,
+            productName: selectedDispatch.productName,
+            returnQty: form.returnQty,
+            reason: form.reason,
+            debitNoteCopy: form.debitNoteCopy,
+          }],
+        }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed");
-      toast.success(`Material return created — Return No: ${json.data?.returnNo}`);
-      setShowForm(false); setForm({ doNumber: "", partyName: "", productName: "", returnQty: "", reason: "", transporterName: "", vehicleNo: "", returnDate: "", dcNumber: "", dcPhoto: "" }); setLookupResult(null); setLookupInvoice("");
+      toast.success(`Material return created — Return No: ${json.data?.[0]?.returnNo}`);
+      setShowForm(false); resetForm();
       loadData();
     } catch (err) { toast.error(err.message); } finally { setSubmitting(false); }
   };
@@ -89,30 +114,54 @@ export default function MaterialReturn() {
           <CardContent className="space-y-4">
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <Label className="text-xs text-zinc-500 mb-1 block">Lookup by Invoice No.</Label>
-                <Input value={lookupInvoice} onChange={e => setLookupInvoice(e.target.value)} className="h-9" placeholder="Enter invoice number..." />
+                <Label className="text-xs text-zinc-500 mb-1 block">Lookup by Bill Number</Label>
+                <Input value={lookupBillNumber} onChange={e => setLookupBillNumber(e.target.value)} className="h-9" placeholder="Enter invoice bill number..." />
               </div>
               <Button type="button" onClick={handleLookup} disabled={looking} variant="outline" className="h-9 gap-2">
                 {looking ? <Loader2 className="animate-spin w-4 h-4" /> : "Lookup"}
               </Button>
             </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[["doNumber", "DO No."], ["partyName", "Party Name"], ["productName", "Product Name"], ["returnQty", "Return Qty *"], ["reason", "Reason *"], ["transporterName", "Transporter Name"], ["vehicleNo", "Vehicle No."], ["returnDate", "Return Date", "date"], ["dcNumber", "DC Number"]].map(([k, l, type = "text"]) => (
-                  <div key={k}><Label className="text-xs text-zinc-500 mb-1 block">{l}</Label><Input type={type} value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} className="h-9" /></div>
+
+            {lookupResults.length > 0 && !selectedDispatch && (
+              <div className="border rounded-md overflow-hidden">
+                <div className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">Select a dispatch line</div>
+                {lookupResults.map(d => (
+                  <button type="button" key={d.id} onClick={() => pickDispatch(d)} className="w-full text-left px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900 border-t flex items-center justify-between gap-3">
+                    <span>{d.doNumber} · {d.partyName} · {d.productName}</span>
+                    <span className="text-xs text-zinc-500 whitespace-nowrap">Available: {d.availableQty}</span>
+                  </button>
                 ))}
-                <div>
-                  <Label className="text-xs text-zinc-500 mb-1 block">DC Photo</Label>
-                  <div className="flex items-center gap-2"><Input type="file" accept="image/*,.pdf" onChange={handleFile} className="h-9" />{uploading && <Loader2 className="animate-spin w-4 h-4 text-emerald-500 shrink-0" />}</div>
+              </div>
+            )}
+
+            {selectedDispatch && (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg border text-sm flex items-center justify-between">
+                  <span>{selectedDispatch.doNumber} · {selectedDispatch.partyName} · {selectedDispatch.productName} (Available: {selectedDispatch.availableQty})</span>
+                  <button type="button" onClick={() => setSelectedDispatch(null)} className="text-xs text-zinc-500 underline">Change</button>
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <Button type="submit" disabled={submitting || uploading} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
-                  {submitting ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />} Submit Return
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-              </div>
-            </form>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div><Label className="text-xs text-zinc-500 mb-1 block">Return Qty *</Label><Input type="number" step="0.01" max={selectedDispatch.availableQty} value={form.returnQty} onChange={e => setForm(f => ({ ...f, returnQty: e.target.value }))} className="h-9" /></div>
+                  <div>
+                    <Label className="text-xs text-zinc-500 mb-1 block">Reason *</Label>
+                    <Select value={form.reason} onValueChange={v => setForm(f => ({ ...f, reason: v }))}>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Select reason" /></SelectTrigger>
+                      <SelectContent>{VALID_REASONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-zinc-500 mb-1 block">Debit Note Copy *</Label>
+                    <div className="flex items-center gap-2"><Input type="file" accept="image/*,.pdf" onChange={handleFile} className="h-9" />{uploading && <Loader2 className="animate-spin w-4 h-4 text-emerald-500 shrink-0" />}</div>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <Button type="submit" disabled={submitting || uploading} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                    {submitting ? <Loader2 className="animate-spin w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />} Submit Return
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => { setShowForm(false); resetForm(); }}>Cancel</Button>
+                </div>
+              </form>
+            )}
           </CardContent>
         </Card>
       )}
@@ -127,17 +176,20 @@ export default function MaterialReturn() {
           <TableBody>
             {returns.length === 0 ? (
               <TableRow><TableCell colSpan={7} className="text-center py-10 text-zinc-400">No material returns</TableCell></TableRow>
-            ) : returns.map(r => (
-              <TableRow key={r.id} className="text-sm">
-                <TableCell className="font-mono text-xs">{r.returnNo}</TableCell>
-                <TableCell className="font-mono text-xs">{r.doNumber}</TableCell>
-                <TableCell>{r.partyName}</TableCell>
-                <TableCell>{r.productName}</TableCell>
-                <TableCell>{r.returnQty}</TableCell>
-                <TableCell className="text-xs">{r.returnDate ? new Date(r.returnDate).toLocaleDateString() : "—"}</TableCell>
-                <TableCell><Badge className="text-xs border-0 bg-amber-100 text-amber-700">{r.status || "Pending"}</Badge></TableCell>
-              </TableRow>
-            ))}
+            ) : returns.map(r => {
+              const status = r.returnDispatch ? "Dispatched" : r.debitNote ? "Debit Note Issued" : r.managementApproval ? "Approved" : "Pending";
+              return (
+                <TableRow key={r.id} className="text-sm">
+                  <TableCell className="font-mono text-xs">{r.returnNo}</TableCell>
+                  <TableCell className="font-mono text-xs">{r.doNumber}</TableCell>
+                  <TableCell>{r.partyName}</TableCell>
+                  <TableCell>{r.productName}</TableCell>
+                  <TableCell>{r.qty}</TableCell>
+                  <TableCell className="text-xs">{r.timeStamp ? new Date(r.timeStamp).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell><Badge className="text-xs border-0 bg-amber-100 text-amber-700">{status}</Badge></TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

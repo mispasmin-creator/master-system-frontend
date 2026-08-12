@@ -1,10 +1,13 @@
-import { supabase } from '../supabase';
+import { API_URL } from '@/lib/auth';
 
 /**
- * Upload a file to Supabase Storage
+ * Upload a file to the backend's local /uploads folder (master-system-backend/uploads).
+ * Signature/return shape matches the previous Supabase-backed version so callers
+ * (Order.jsx, TC.jsx, MaterialReturn.jsx, DebitNote.jsx, Invoice.jsx, LoadMaterial.jsx,
+ * Logistic.jsx) do not need to change.
  * @param {File} file - The file to upload
- * @param {string} bucket - Bucket name (default: 'images')
- * @param {string} path - Optional folder path within bucket
+ * @param {string} bucket - Unused, kept for call-site compatibility
+ * @param {string} path - Unused, kept for call-site compatibility
  * @returns {Promise<{url: string, path: string}>} Public URL and storage path
  */
 export async function uploadFileToStorage(file, bucket = 'images', path = '') {
@@ -13,33 +16,23 @@ export async function uploadFileToStorage(file, bucket = 'images', path = '') {
             throw new Error('No file provided for upload');
         }
 
-        const timestamp = Date.now();
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${timestamp}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = path ? `${path}/${fileName}` : fileName;
+        const formData = new FormData();
+        formData.append('file', file);
 
-        // Convert File to ArrayBuffer to avoid HTTP2 protocol errors in some environments
-        const fileBuffer = await file.arrayBuffer();
+        const res = await fetch(`${API_URL}/upload`, {
+            method: 'POST',
+            body: formData,
+        });
 
-        const { data, error } = await supabase.storage
-            .from(bucket)
-            .upload(filePath, fileBuffer, {
-                contentType: file.type,
-                cacheControl: '3600',
-                upsert: false
-            });
+        const result = await res.json().catch(() => null);
 
-        if (error) {
-            throw error;
+        if (!res.ok || !result?.success) {
+            throw new Error(result?.message || `Upload failed (${res.status})`);
         }
 
-        const { data: { publicUrl } } = supabase.storage
-            .from(bucket)
-            .getPublicUrl(filePath);
-
         return {
-            url: publicUrl,
-            path: filePath
+            url: result.data.url,
+            path: result.data.path,
         };
     } catch (error) {
         throw new Error(`Failed to upload file: ${error.message}`);
@@ -47,27 +40,12 @@ export async function uploadFileToStorage(file, bucket = 'images', path = '') {
 }
 
 /**
- * Delete a file from Supabase Storage
+ * No-op: the backend has no delete-by-path endpoint for uploaded files (unused
+ * by any order component today). Kept so the export doesn't break existing imports.
  * @param {string} filePath - Path to the file in storage
- * @param {string} bucket - Bucket name (default: 'images')
- * @returns {Promise<boolean>} Success status
+ * @param {string} bucket - Unused, kept for call-site compatibility
+ * @returns {Promise<boolean>} Always true
  */
 export async function deleteFileFromStorage(filePath, bucket = 'images') {
-    try {
-        if (!filePath) {
-            throw new Error('No file path provided for deletion');
-        }
-
-        const { error } = await supabase.storage
-            .from(bucket)
-            .remove([filePath]);
-
-        if (error) {
-            throw error;
-        }
-
-        return true;
-    } catch (error) {
-        throw new Error(`Failed to delete file: ${error.message}`);
-    }
+    return true;
 }

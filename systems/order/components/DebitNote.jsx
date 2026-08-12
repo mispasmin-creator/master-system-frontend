@@ -19,7 +19,7 @@ export default function DebitNote() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("pending");
   const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState({ debitNoteNumber: "", debitNoteDate: "", debitNoteAmount: "", debitNoteCopy: "" });
+  const [form, setForm] = useState({ noteNumber: "", amount: "", fileUrl: "" });
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const isAdmin = user?.role === "admin" || user?.page_access === "all" || user?.page_access === "super admin";
@@ -40,23 +40,24 @@ export default function DebitNote() {
   const handleFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     setUploading(true);
-    try { const url = await uploadFileToStorage(file, "order-debit-note"); setForm(f => ({ ...f, debitNoteCopy: url })); toast.success("Uploaded"); }
+    try { const { url } = await uploadFileToStorage(file, "order-stage", "debit-note"); setForm(f => ({ ...f, fileUrl: url })); toast.success("Uploaded"); }
     catch { toast.error("Upload failed"); } finally { setUploading(false); }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selected) return;
+    if (!form.noteNumber || !form.amount) { toast.error("Note Number and Amount are required"); return; }
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/order/material-return/debit-note/${selected.returnId || selected.id}`, {
+      const res = await fetch(`${API_URL}/order/material-return/debit-note/${selected.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(form),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed");
-      toast.success("Debit Note saved"); setSelected(null); setForm({ debitNoteNumber: "", debitNoteDate: "", debitNoteAmount: "", debitNoteCopy: "" }); loadData();
+      toast.success("Debit Note saved"); setSelected(null); setForm({ noteNumber: "", amount: "", fileUrl: "" }); loadData();
     } catch (err) { toast.error(err.message); } finally { setSubmitting(false); }
   };
 
@@ -75,10 +76,10 @@ export default function DebitNote() {
       </div>
       {tab === "pending" && selected && isAdmin && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Debit Note — Return No: {selected.materialReturn?.returnNo}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Debit Note — Return No: {selected.returnNo}</CardTitle></CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[["debitNoteNumber", "Debit Note No."], ["debitNoteDate", "Date", "date"], ["debitNoteAmount", "Amount"]].map(([k, l, type = "text"]) => (
+              {[["noteNumber", "Debit Note No. *"], ["amount", "Amount *", "number"]].map(([k, l, type = "text"]) => (
                 <div key={k}><Label className="text-xs text-zinc-500 mb-1 block">{l}</Label><Input type={type} value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} className="h-9" /></div>
               ))}
               <div>
@@ -105,20 +106,17 @@ export default function DebitNote() {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center py-10 text-zinc-400">No records</TableCell></TableRow>
-            ) : rows.map(r => {
-              const mr = r.materialReturn || r;
-              return (
-                <TableRow key={r.id} className={`text-sm cursor-pointer ${selected?.id === r.id ? "bg-emerald-50 dark:bg-emerald-900/20" : ""}`}
-                  onClick={() => tab === "pending" && isAdmin && setSelected(r)}>
-                  <TableCell className="font-mono text-xs">{mr.returnNo}</TableCell>
-                  <TableCell className="font-mono text-xs">{mr.doNumber}</TableCell>
-                  <TableCell>{mr.partyName}</TableCell>
-                  <TableCell>{mr.productName}</TableCell>
-                  <TableCell>{mr.returnQty}</TableCell>
-                  <TableCell>{tab === "history" ? (r.debitNoteNumber || "—") : <Badge variant="outline" className="text-xs">Pending</Badge>}</TableCell>
-                </TableRow>
-              );
-            })}
+            ) : rows.map(r => (
+              <TableRow key={r.id} className={`text-sm cursor-pointer ${selected?.id === r.id ? "bg-emerald-50 dark:bg-emerald-900/20" : ""}`}
+                onClick={() => tab === "pending" && isAdmin && setSelected(r)}>
+                <TableCell className="font-mono text-xs">{r.returnNo}</TableCell>
+                <TableCell className="font-mono text-xs">{r.doNumber}</TableCell>
+                <TableCell>{r.partyName}</TableCell>
+                <TableCell>{r.productName}</TableCell>
+                <TableCell>{r.qty}</TableCell>
+                <TableCell>{tab === "history" ? (r.debitNote?.debitNoteNumber || "—") : <Badge variant="outline" className="text-xs">Pending</Badge>}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>

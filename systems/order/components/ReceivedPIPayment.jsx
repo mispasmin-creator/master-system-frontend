@@ -33,15 +33,24 @@ export default function ReceivedPIPayment() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Backend has three distinct sub-routes (pi.routes.js) instead of one
+  // action-in-body endpoint: mark-received/partial-payment expect
+  // { amount, date, remarks }; reschedule expects { newDueDate, note }.
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selected) return;
+    const path = action === "mark-paid" ? "mark-received" : action === "partial" ? "partial-payment" : "reschedule";
+    const body = action === "reschedule"
+      ? { newDueDate: form.rescheduleDate, note: form.remarks }
+      : { amount: form.amount, date: form.paymentDate, remarks: form.remarks };
+    if (action === "reschedule" && !form.rescheduleDate) { toast.error("Reschedule date is required"); return; }
+    if (action !== "reschedule" && (!form.amount || !form.paymentDate)) { toast.error("Amount and Payment Date are required"); return; }
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/order/pi/${selected.id}/payment`, {
+      const res = await fetch(`${API_URL}/order/pi/${selected.id}/${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ action, ...form }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed");
@@ -86,22 +95,23 @@ export default function ReceivedPIPayment() {
         <Table>
           <TableHeader>
             <TableRow className="bg-zinc-50 dark:bg-zinc-900/60">
-              {["PI Number", "DO No.", "Party", "Product", "Amount", "PI Date", "Status"].map(h => <TableHead key={h} className="text-xs font-semibold whitespace-nowrap">{h}</TableHead>)}
+              {["PI Number", "PO Number", "Party", "Product", "Expected", "Received", "Due Date", "Status"].map(h => <TableHead key={h} className="text-xs font-semibold whitespace-nowrap">{h}</TableHead>)}
             </TableRow>
           </TableHeader>
           <TableBody>
             {piList.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-10 text-zinc-400">No PI records</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-10 text-zinc-400">No PI records</TableCell></TableRow>
             ) : piList.map(r => (
               <TableRow key={r.id} className={`text-sm cursor-pointer ${selected?.id === r.id ? "bg-emerald-50 dark:bg-emerald-900/20" : ""}`}
                 onClick={() => isAdmin && setSelected(r)}>
                 <TableCell className="font-mono text-xs">{r.piNumber}</TableCell>
-                <TableCell className="font-mono text-xs">{r.doNumber || r.receipt?.doNumber}</TableCell>
-                <TableCell>{r.partyName || r.receipt?.partyName}</TableCell>
-                <TableCell>{r.productName || r.receipt?.productName}</TableCell>
-                <TableCell>₹{r.piAmount}</TableCell>
-                <TableCell className="text-xs">{r.piDate ? new Date(r.piDate).toLocaleDateString() : "—"}</TableCell>
-                <TableCell><Badge className={`text-xs border-0 ${r.paymentStatus === "Paid" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{r.paymentStatus || "Pending"}</Badge></TableCell>
+                <TableCell className="font-mono text-xs">{r.poNumber}</TableCell>
+                <TableCell>{r.partyName}</TableCell>
+                <TableCell>{(r.productNames || []).join(", ") || "—"}</TableCell>
+                <TableCell>₹{r.expectedAmount ?? 0}</TableCell>
+                <TableCell>₹{r.actualAmount ?? 0}</TableCell>
+                <TableCell className="text-xs">{r.dueDate ? new Date(r.dueDate).toLocaleDateString() : "—"}</TableCell>
+                <TableCell><Badge className={`text-xs border-0 ${r.status === "Received" ? "bg-emerald-100 text-emerald-700" : r.status === "Partial" ? "bg-amber-100 text-amber-700" : "bg-zinc-100 text-zinc-700"}`}>{r.status || "Pending"}</Badge></TableCell>
               </TableRow>
             ))}
           </TableBody>
