@@ -103,6 +103,24 @@ export default function Services() {
     }
   };
 
+  const handleTogglePaymentFormDone = async (jobId, checked) => {
+    setJobs((prevJobs) =>
+      prevJobs.map((j) => (j.id === jobId ? { ...j, paymentFormDone: checked } : j))
+    );
+    try {
+      const res = await servicesApi.put(`/jobs/${jobId}`, { paymentFormDone: checked });
+      if (!res?.success) {
+        throw new Error(res?.error || 'Failed to update status');
+      }
+    } catch (err) {
+      console.error('Failed to update paymentFormDone:', err);
+      alert(`Failed to update status: ${err.message}`);
+      setJobs((prevJobs) =>
+        prevJobs.map((j) => (j.id === jobId ? { ...j, paymentFormDone: !checked } : j))
+      );
+    }
+  };
+
   const filteredJobs = jobs.filter((j) => {
     if (activeTab === 'active') return j.status !== 'Completed';
     return j.status === 'Completed';
@@ -197,6 +215,7 @@ export default function Services() {
         <table className="w-full text-left text-xs">
           <thead className="bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 font-semibold border-b border-zinc-200 dark:border-zinc-800">
             <tr>
+              <th className="p-3 w-12 text-center">Done</th>
               <th className="p-3">Service No</th>
               <th className="p-3">Firm</th>
               <th className="p-3">Vendor</th>
@@ -211,15 +230,23 @@ export default function Services() {
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-800 dark:text-zinc-200">
             {loading ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-zinc-500">Loading service jobs...</td>
+                <td colSpan={10} className="p-8 text-center text-zinc-500">Loading service jobs...</td>
               </tr>
             ) : filteredJobs.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-zinc-500">No service jobs found.</td>
+                <td colSpan={10} className="p-8 text-center text-zinc-500">No service jobs found.</td>
               </tr>
             ) : (
               filteredJobs.map((j) => (
                 <tr key={j.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                  <td className="p-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={!!j.paymentFormDone}
+                      onChange={(e) => handleTogglePaymentFormDone(j.id, e.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                  </td>
                   <td className="p-3 font-semibold text-zinc-900 dark:text-white">{j.serviceNo}</td>
                   <td className="p-3">{j.firmName}</td>
                   <td className="p-3 font-medium">{j.vendor}</td>
@@ -238,12 +265,14 @@ export default function Services() {
                     </span>
                   </td>
                   <td className="p-3">
-                    <button
-                      onClick={() => handleEditOpen(j)}
-                      className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold transition-colors"
+                    <a
+                      href="https://docs.google.com/forms/d/e/1FAIpQLScn8tHEUldlOM_8DKpHUfHHiRImDVjkpkhhfduaZUIxpxlJrA/viewform"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-semibold transition-colors inline-block"
                     >
-                      Edit Stage
-                    </button>
+                      Payment Form
+                    </a>
                   </td>
                 </tr>
               ))

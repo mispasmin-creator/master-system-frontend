@@ -171,9 +171,9 @@ export default function Utility() {
   };
 
   const filteredUtilities = utilities.filter((u) => {
-    if (activeTab === 'create') return u.status === 'Pending Approval';
-    if (activeTab === 'approval') return u.status === 'Approved';
-    if (activeTab === 'payment') return u.status === 'Tally Entry' || u.status === 'Payment In Progress';
+    if (activeTab === 'create') return u.status === 'Pending Approval' || u.status === 'Utility Created';
+    if (activeTab === 'approval') return u.status === 'Pending Approval' || u.status === 'Approved';
+    if (activeTab === 'payment') return u.status === 'Approved' || u.status === 'Tally Entry' || u.status === 'Payment In Progress' || u.status === 'Pending Payment';
     if (activeTab === 'completed') return u.status === 'Completed' || u.status === 'Paid';
     return true;
   });
@@ -299,7 +299,7 @@ export default function Utility() {
                         Approve Payment
                       </button>
                     )}
-                    {u.status === 'Approved' && (
+                    {(u.status === 'Approved' || u.status === 'Tally Entry' || u.status === 'Payment In Progress' || u.status === 'Pending Payment') && (
                       <button
                         onClick={() => handlePayOpen(u)}
                         className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold transition-colors"
