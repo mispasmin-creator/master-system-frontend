@@ -42,13 +42,14 @@ import {
   TableRow,
 } from "@/systems/production/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/systems/production/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetBody,
+} from "@/systems/production/components/ui/sheet";
 import {
   Popover,
   PopoverContent,
@@ -62,11 +63,7 @@ import { cn } from "@/systems/production/lib/utils";
 
 // ──────────────── Constants ────────────────
 const COSTING_RESPONSE_TABLE = "costing_response";
-const PRODUCTION_TABLE = "production";
-
-const normalizeKey = (value: any) => String(value || "").trim().toLowerCase();
-const makeOrderProductKey = (orderNo: any, productName: any) =>
-  `${normalizeKey(orderNo)}::${normalizeKey(productName)}`;
+const PI_APPROVAL_TABLE = "pi_approval";
 
 const EXPECTED_LABELS: { key: string; label: string }[] = [
   { key: "Expected WC %", label: "W/C (%)" },
@@ -82,15 +79,17 @@ const EXPECTED_LABELS: { key: string; label: string }[] = [
 
 // ──────────────── Types ────────────────
 interface LabItem {
-  id: number;
+  id: string; // ProductionCosting id
+  piApprovalId: string; // ProductionPiApproval id, "" if none exists yet
   productionId?: number | string;
   compositionNo: string;
   orderNo: string;
   partyName: string;
   productName: string;
   orderQuantity: number;
-  sellingPrice: number;      // from costing_response (spec/reference)
-  productRate: number;       // from production table (actual selling price)
+  sellingPrice: number;      // ProductionCosting.sellingPrice (spec/reference)
+  productRate: number;       // No separate job-card selling price column remains distinct
+                              // from the costing spec's sellingPrice - both use the same value now.
   gpPercentage: number;
   gpActual: string;
   manufacturingCost: number;
@@ -204,105 +203,87 @@ export default function PIApprovalPage() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Fetch KYC map for RM details
+      // ProductionKyc has no firmName field, so no firm-matching is done against it -
+      // it's only used here for per-material Alumina/Iron/BD/AP composition lookups.
       const { data: kycData, error: kycErr } = await productionApi.get('kyc');
       if (kycErr) throw kycErr;
-      const kycMap = new Map();
+      const kycMap = new Map<string, any>();
       (kycData || []).forEach((k: any) => {
-        kycMap.set(String(k["Product name"] || "").trim().toLowerCase(), k);
+        kycMap.set(String(k.productName || "").trim().toLowerCase(), k);
       });
 
-      // 2. Fetch product metadata from production table (keyed by Delivery Order No. + product)
-      const { data: prodData, error: prodErr } = await productionApi.get(PRODUCTION_TABLE);
-      if (prodErr) throw prodErr;
-      const productionMetaMap = new Map<
-        string,
-        { productionId?: number | string; productRate: number; firmName: string; partyName: string; orderQuantity: number }
-      >();
-      (prodData || []).forEach((p: any) => {
-        const orderNo = String(p["Delivery Order No."] || "").trim();
-        const productName = String(p["Product Name"] || "").trim();
-        if (orderNo) {
-          const meta = {
-            productionId: p.id,
-            productRate: Number(p.product_rate || 0),
-            firmName: String(p["Firm Name"] || ""),
-            partyName: String(p["Party Name"] || ""),
-            orderQuantity: Number(p["Order Quantity"] || 0),
-          };
-          productionMetaMap.set(makeOrderProductKey(orderNo, productName), meta);
-          if (!productionMetaMap.has(normalizeKey(orderNo))) {
-            productionMetaMap.set(normalizeKey(orderNo), meta);
-          }
-        }
-      });
-
-      // 3. Fetch Costing data
+      // /production/costing now returns ProductionCosting rows with `order`
+      // (ProductionOrder), `materials` and `piApproval` already joined in - no more
+      // manual cross-table string matching against a separate "production" sheet.
       const { data, error: dbErr } = await productionApi.get(COSTING_RESPONSE_TABLE);
-
       if (dbErr) throw dbErr;
 
-      const mapped: LabItem[] = (data || []).map((row: any) => {
-        const rmValues: LabItem["rmValues"] = [];
-        for (let i = 1; i <= 20; i++) {
-          const rm = row[`RM${i}`];
-          const qty = row[`QTY${i}`];
-          const cost = row[`COST${i}`];
-          if (rm && String(rm).trim()) {
-            const rmKey = String(rm).trim().toLowerCase();
-            const kycInfo = kycMap.get(rmKey);
-            rmValues.push({ 
-              rm: String(rm), 
-              qty: Number(qty || 0),
-              cost: Number(cost || 0),
-              al: kycInfo ? Number(kycInfo.Alumina || 0) : 0,
-              fe: kycInfo ? Number(kycInfo.Iron || 0) : 0,
-              bd: kycInfo ? Number(kycInfo.Bd || 0) : 0,
-              ap: kycInfo ? Number(kycInfo.Ap || 0) : 0,
-            });
-          }
-        }
-        const expectedValues: Record<string, string> = {};
-        EXPECTED_LABELS.forEach(({ key }) => {
-          expectedValues[key] = row[key] ? String(row[key]) : "";
+      const mapped: LabItem[] = (data || []).map((costing: any) => {
+        const rmValues: LabItem["rmValues"] = (costing.materials || []).map((m: any) => {
+          const kycInfo = kycMap.get(String(m.materialName || "").trim().toLowerCase());
+          return {
+            rm: String(m.materialName || ""),
+            qty: Number(m.quantity || 0),
+            // ProductionCostingMaterial only has {materialName, quantity, sequence} - no
+            // per-material cost column exists any more (cost is only tracked in
+            // aggregate on ProductionCosting.variableCost), so this is left at 0.
+            cost: 0,
+            al: kycInfo ? Number(kycInfo.alumina || 0) : 0,
+            fe: kycInfo ? Number(kycInfo.iron || 0) : 0,
+            bd: kycInfo ? Number(kycInfo.bd || 0) : 0,
+            ap: kycInfo ? Number(kycInfo.ap || 0) : 0,
+          };
         });
 
-        const orderNo = row["Order No."] || "";
-        const productName = row["product name"] || "";
-        const productionMeta =
-          productionMetaMap.get(makeOrderProductKey(orderNo, productName)) ||
-          productionMetaMap.get(normalizeKey(orderNo));
-        const productRate = productionMeta?.productRate || 0;
+        // EXPECTED_LABELS (Expected WC%, Sticky/Flow, IST/FST, BD/CCS/PLC at various
+        // temps) have no matching columns on ProductionCosting - no backend home, so
+        // they stay blank. The "Expected Values Table" section hides itself when empty.
+        const expectedValues: Record<string, string> = {};
+        EXPECTED_LABELS.forEach(({ key }) => { expectedValues[key] = ""; });
+
+        const order = costing.order || {};
+        const piApproval = costing.piApproval || null;
 
         return {
-          id: row.id,
-          productionId: productionMeta?.productionId || "",
-          compositionNo: row["Composition No."] || "",
-          orderNo,
-          partyName: productionMeta?.partyName || "",
-          productName,
-          orderQuantity: productionMeta?.orderQuantity || 0,
-          sellingPrice: Number(row["SELLING PRICE"] || 0),
-          productRate,
-          gpPercentage: Number(row["GP %AGE"] || 0),
-          gpActual: row["GP %AGE Actual"] ? String(row["GP %AGE Actual"]) : "",
-          manufacturingCost: Number(row["Manufacturing Cost"] || 0),
-          alumina: Number(row["alumina"] || 0),
-          iron: Number(row["iron"] || 0),
-          bd: Number(row["BD"] || 0),
-          ap: Number(row["AP"] || 0),
-          aluminaActual: row["Alumina Percentage %"] ? String(row["Alumina Percentage %"]) : "",
-          ironActual: row["Iron Percentage %"] ? String(row["Iron Percentage %"]) : "",
-          planned1: row["Planned 1"] ? format(new Date(row["Planned 1"]), "dd/MM/yy") : null,
-          actual2: row["Actual 2"] ? format(new Date(row["Actual 2"]), "dd/MM/yy HH:mm") : null,
-          piApprovalStatus: row["PI Approval Status"] || "",
-          piRemarks: row["PI Remarks"] || "",
-          piApprovedAt: row["PI Approved At"]
-            ? format(new Date(row["PI Approved At"]), "dd/MM/yy HH:mm")
-            : null,
+          id: costing.id,
+          piApprovalId: piApproval?.id || "",
+          productionId: order.id || "",
+          compositionNo: costing.compositionNo || "",
+          orderNo: order.deliveryOrderNo || "",
+          partyName: order.partyName || "",
+          productName: order.productName || "",
+          orderQuantity: Number(order.orderQuantity || 0),
+          sellingPrice: Number(costing.sellingPrice || 0),
+          productRate: Number(costing.sellingPrice || 0),
+          gpPercentage: Number(costing.gpPercent || 0),
+          // Kept falsy ("") rather than "-" when absent: `openAction` below does
+          // `item.gpActual ? Number(item.gpActual) : (calculate from rate/cost)`, and a
+          // literal "-" would parse as NaN instead of falling through to the calculation.
+          gpActual: costing.gpPercent != null ? String(costing.gpPercent) : "",
+          manufacturingCost: Number(costing.manufacturingCost || 0),
+          alumina: Number(costing.aluminaPercent || 0),
+          iron: Number(costing.ironPercent || 0),
+          // ProductionCosting has no bd/ap spec columns any more.
+          bd: 0,
+          ap: 0,
+          // No distinct "lab-actual" alumina/iron columns exist separately from the
+          // spec values above any more - lab results live on ProductionQcCheckpoint
+          // (per job card), which isn't joined into /costing, so left blank here.
+          aluminaActual: "-",
+          ironActual: "-",
+          // "Planned 1"/"Actual 2" (lab planned/completed dates) no longer exist on
+          // ProductionCosting - that timing now lives on ProductionQcCheckpoint.
+          planned1: null,
+          actual2: null,
+          piApprovalStatus: piApproval?.status || "",
+          // ProductionPiApproval only has {id, costingId, status} - no remarks or
+          // approvedAt columns, so these stay blank (remarks are captured in the
+          // review dialog UI for reviewer confirmation only, not persisted).
+          piRemarks: "",
+          piApprovedAt: null,
           expectedValues,
           rmValues,
-          firmName: productionMeta?.firmName || "",
+          firmName: order.firmName || "",
         };
       });
 
@@ -327,7 +308,7 @@ export default function PIApprovalPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.firm, user?.role]);
 
   useEffect(() => {
     loadData();
@@ -415,42 +396,41 @@ export default function PIApprovalPage() {
     }
     setIsSubmitting(true);
     try {
+      // ProductionPiApproval only stores {costingId, status} - there are no
+      // remarks/approvedAt columns, so `remarks` above is kept purely as a UI
+      // confirmation step for the reviewer and is not persisted anywhere.
+      //
+      // NOTE: the old Supabase-era "Reject" flow deleted the costing row and rolled
+      // the linked production row back to Full Kitting via ad-hoc bracket-string
+      // fields ("Actual 1"/"Status") that don't exist on the real schema. There is no
+      // equivalent dedicated "send back to composition" feature on the backend yet, so
+      // Reject here simply records the decision rather than deleting/mutating other
+      // records by guesswork.
+      if (decision === "Approved") {
+        // Persist the reviewer's final manufacturing cost / GP% onto the real
+        // ProductionCosting columns (both exist on the schema).
+        const costingUpdate: Record<string, any> = {
+          gpPercent: typeof manualGP === 'number' ? Number(manualGP.toFixed(2)) : null,
+          manufacturingCost: typeof manualMfgCost === 'number' ? Number(manualMfgCost.toFixed(2)) : null,
+        };
+        const { error: costingErr } = await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.id, costingUpdate);
+        if (costingErr) throw costingErr;
+      }
+
+      if (selectedItem.piApprovalId) {
+        const { error: patchErr } = await productionApi.patch(PI_APPROVAL_TABLE, selectedItem.piApprovalId, { status: decision });
+        if (patchErr) throw patchErr;
+      } else {
+        const { error: postErr } = await productionApi.post(PI_APPROVAL_TABLE, { costingId: selectedItem.id, status: decision });
+        if (postErr) throw postErr;
+      }
+
       if (decision === "Rejected") {
-        // ── ROLLBACK TO FULL KITTING ──
-        // 1. Delete this costing_response row so it disappears from PI Approval & Full Kitting history
-        const { error: deleteErr } = await productionApi.delete(COSTING_RESPONSE_TABLE, selectedItem.id);
-        if (deleteErr) throw deleteErr;
-
-        // 2. Clear "Actual 1" on the matching production row so it re-appears in Full Kitting pending
-        if (selectedItem.orderNo) {
-          const { data: prodData, error: fetchErr } = await productionApi.get(PRODUCTION_TABLE);
-          if (fetchErr) throw fetchErr;
-          const targetProd = (prodData || []).find((p: any) => p["Delivery Order No."] === selectedItem.orderNo && (!selectedItem.productName || p["Product Name"] === selectedItem.productName));
-          if (targetProd?.id) {
-             const { error: prodErr } = await productionApi.patch(PRODUCTION_TABLE, targetProd.id, { "Actual 1": null, "Status": "Rejected – Redo Composition" });
-             if (prodErr) throw prodErr;
-          }
-        }
-
         toast({
           title: "🔴 Rejected",
-          description: `Composition sent back to Full Kitting. Order “${selectedItem.orderNo}” is now pending a new composition.`,
+          description: `Composition for order “${selectedItem.orderNo}” marked as rejected.`,
         });
       } else {
-        // ── APPROVED ──
-        const updateData: Record<string, any> = {
-          "PI Approval Status": "Approved",
-          "PI Remarks": remarks.trim(),
-          "PI Approved At": new Date().toISOString(),
-          "GP %AGE Actual": (manualGP !== null && manualGP !== undefined && typeof manualGP === 'number') ? Number(manualGP.toFixed(2)) : null,
-          "Manufacturing Cost": (manualMfgCost !== null && manualMfgCost !== undefined && typeof manualMfgCost === 'number') ? Number(manualMfgCost.toFixed(2)) : null,
-          "Material Cost Actual": (totalCost !== null && totalCost !== undefined && typeof totalCost === 'number') ? Number(totalCost.toFixed(2)) : null,
-          "Status": "PI Approved",
-        };
-
-        const { error: updateErr } = await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.id, updateData);
-        if (updateErr) throw updateErr;
-
         toast({ title: "✅ Approved", description: "Item approved and moved to the next stage." });
       }
 
@@ -726,25 +706,26 @@ export default function PIApprovalPage() {
         </CardContent>
       </Card>
 
-      {/* ── ACTION / VIEW DIALOG ─────────────────────── */}
-      <Dialog open={!!actionMode} onOpenChange={() => { setActionMode(null); setSelectedItem(null); }}>
+      {/* ── ACTION / VIEW SHEET ─────────────────────── */}
+      <Sheet open={!!actionMode} onOpenChange={() => { setActionMode(null); setSelectedItem(null); }}>
 
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className={cn("flex items-center gap-2 text-lg", {
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle className={cn("flex items-center gap-2 text-lg", {
               "text-olive-700": actionMode === "review" || actionMode === "view",
             })}>
               {actionMode === "review" && <><Settings className="h-5 w-5" /> Review Composition</>}
               {actionMode === "view" && <><Eye className="h-5 w-5" /> Composition Details</>}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               {actionMode === "review" && "Review the technical details below. You can adjust the manufacturing cost and GP% before approving or rejecting."}
               {actionMode === "view" && "Full details for the selected lab-tested composition."}
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
           {selectedItem && (
-            <div className="space-y-5 pt-2">
+            <div className="flex flex-col flex-1 min-h-0">
+              <SheetBody className="space-y-5 pt-2">
 
               {/* ── Basic Info ── */}
               <Section title="Basic Information">
@@ -969,10 +950,11 @@ export default function PIApprovalPage() {
                   {remarksError && <p className="text-xs text-red-600 mt-1">{remarksError}</p>}
                 </div>
               )}
+              </SheetBody>
             </div>
           )}
 
-          <DialogFooter className="pt-4 border-t gap-2">
+          <SheetFooter className="pt-4 border-t gap-2 mt-auto">
             <Button variant="outline" onClick={() => { setActionMode(null); setSelectedItem(null); }} disabled={isSubmitting}>
               Cancel
             </Button>
@@ -996,9 +978,9 @@ export default function PIApprovalPage() {
                 </Button>
               </>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

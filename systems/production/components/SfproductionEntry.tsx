@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input";
 import { Label } from "@/systems/production/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/systems/production/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/systems/production/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/systems/production/components/ui/popover";
 import { Badge } from "@/systems/production/components/ui/badge";
@@ -410,61 +410,41 @@ export default function SemiActualProductionPage() {
                 : calculatedMachineHours;
             const madeQty = Number(formData.qtyOfSemiFinishedGood) || 0;
             const processingCostValue = Number(formData.processingCost) || 0;
+
+            // Map raw-material-1..5 UI rows into the ProductionSemiActualRun.materials
+            // nested-create array. The single processingCost entered on the form
+            // represents the entry's total cost, so it is attached to the first
+            // material row — mapSemiActual sums material processingCost values back
+            // into a single display figure.
+            const materials = paddedRM
+                .filter(rm => rm.name)
+                .map((rm, i) => ({
+                    materialName: rm.name,
+                    quantity: Number(rm.qty) || 0,
+                    processingCost: i === 0 ? processingCostValue : 0,
+                    sequence: i + 1,
+                }));
+
             const { error: insertError } = await productionApi.post(SEMI_ACTUAL_TABLE, {
-                "Timestamp": new Date(),
-                "Semi Finished Job Card No.": selectedSjc.sjcSrNo,
-                "Supervisor Name": selectedSjc.supervisorName,
-                "Date Of Production": toSupabaseDate(formData.dateOfProduction),
-                "Product Name": selectedSjc.productName,
-                "Qty Of Semi Finished Good": madeQty,
-                "Processing Cost": processingCostValue,
-                "Raw Material Name 1": paddedRM[0].name || '',
-                "Quantity Of Raw Material 1": Number(paddedRM[0].qty) || 0,
-                "Raw Material Name 2": paddedRM[1].name || '',
-                "Quantity Of Raw Material 2": Number(paddedRM[1].qty) || 0,
-                "Raw Material Name 3": paddedRM[2].name || '',
-                "Quantity Of Raw Material 3": Number(paddedRM[2].qty) || 0,
-                "Raw Material Name 4": paddedRM[3].name || '',
-                "Quantity Of Raw Material 4": Number(paddedRM[3].qty) || 0,
-                "Raw Material Name 5": paddedRM[4].name || '',
-                "Quantity Of Raw Material 5": Number(paddedRM[4].qty) || 0,
-                "Is Any End Product": formData.isAnyEndProduct === "Yes",
-                "End Product Name": formData.endProductRawMaterialName || '',
-                "End Product Qty": Number(formData.endProductQty) || 0,
-                "Narration": '',
-                "S No.": nextSerialNo,
-                "Starting Reading": Number(formData.startingReading) || 0,
-                "Starting Reading Photo": startPhotoUrl,
-                "Ending Reading": Number(formData.endingReading) || 0,
-                "Ending Reading Photo": endPhotoUrl,
-                "Machine Running hour": machineHours >= 0 ? machineHours : 0,
-                "Machine Running": machineHours >= 0 ? machineHours : 0,
-                "Semi Finished Production No.": selectedSjc.sfSrNo,
-                "Planned1": new Date().toISOString().slice(0, 10),
+                semiJobCardId: selectedSjc._rowIndex,
+                qtyProduced: madeQty,
+                machineHours: machineHours >= 0 ? machineHours : 0,
+                startingReadingPhoto: startPhotoUrl,
+                endingReadingPhoto: endPhotoUrl,
+                isEndProduct: formData.isAnyEndProduct === "Yes",
+                endProductName: formData.endProductRawMaterialName || '',
+                endProductQty: Number(formData.endProductQty) || 0,
+                status: '',
+                materials,
             });
             if (insertError) throw insertError;
 
             const nextActualMade = Number(selectedSjc.actualMade || 0) + madeQty;
             const nextPending = Math.max(Number(selectedSjc.qty || 0) - nextActualMade, 0);
             const { error: updateError } = await productionApi.patch(SEMI_JOB_CARD_TABLE, selectedSjc._rowIndex, {
-                    "Actual Made": nextActualMade,
-                    "Pending": nextPending,
-                    "Actual": nextPending <= 0 ? new Date().toISOString().slice(0, 10) : null,
-                    "Status": nextPending <= 0 ? "COMPLETED" : "PENDING",
+                    status: nextPending <= 0 ? "COMPLETED" : "PENDING",
                 });
             if (updateError) throw updateError;
-
-            // Also update "Total Made" in semi_production table so that
-            // the "Produced" column on Semi Finished Production page and
-            // the "Total Made" column on Semi Job Card Management page show correct data.
-            if (selectedSjc.sfSrNo) {
-                const { data: spRows, error: spFetchErr } = await productionApi.get(SEMI_PRODUCTION_TABLE);
-                if (!spFetchErr && spRows && spRows.length > 0) {
-                    const spRow = spRows[0];
-                    const newTotalMade = Number(spRow["Total Made"] || 0) + madeQty;
-                    await productionApi.patch(SEMI_PRODUCTION_TABLE, spRow.id, { "Total Made": newTotalMade });
-                }
-            }
 
             setSuccessMessage(`Production entry ${nextSerialNo} logged successfully!`);
             setIsModalOpen(false);
@@ -1278,28 +1258,29 @@ export default function SemiActualProductionPage() {
                 </Card>
             )}
 
-            {/* ── Log Production Entry Modal ── */}
-            <Dialog open={isModalOpen} onOpenChange={(open) => {
+            {/* ── Log Production Entry Sheet ── */}
+            <Sheet open={isModalOpen} onOpenChange={(open) => {
                 setIsModalOpen(open);
                 if (!open) { setSelectedSjc(null); resetForm(); }
             }}>
-                <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-slate-800">
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle className="flex items-center gap-2 text-slate-800">
                             <Pencil className="h-5 w-5 text-olive-600" />
                             Log Production Entry
-                        </DialogTitle>
+                        </SheetTitle>
                         {selectedSjc && (
-                            <DialogDescription>
+                            <SheetDescription>
                                 <span className="text-olive-600 font-semibold text-xs">
                                     {selectedSjc.sjcSrNo} — {selectedSjc.productName}
                                 </span>
-                            </DialogDescription>
+                            </SheetDescription>
                         )}
-                    </DialogHeader>
+                    </SheetHeader>
 
                     {selectedSjc && (
-                        <form onSubmit={handleSubmit} className="space-y-5 py-2">
+                        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                            <SheetBody className="space-y-5">
 
                             {/* Read-only Info Grid */}
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-olive-50/60 p-4 rounded-xl border border-olive-100">
@@ -1578,7 +1559,8 @@ export default function SemiActualProductionPage() {
                                 </div>
                             )}
 
-                            <div className="flex justify-end gap-2 pt-1">
+                            </SheetBody>
+                            <SheetFooter>
                                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}
                                     className="border-slate-200">
                                     Cancel
@@ -1594,35 +1576,36 @@ export default function SemiActualProductionPage() {
                                         <><Save size={14} />Log Daily Entry</>
                                     )}
                                 </button>
-                            </div>
+                            </SheetFooter>
                         </form>
                     )}
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
 
-            {/* ── View Detail Modal ── */}
-            <Dialog open={isViewModalOpen} onOpenChange={(open) => {
+            {/* ── View Detail Sheet ── */}
+            <Sheet open={isViewModalOpen} onOpenChange={(open) => {
                 setIsViewModalOpen(open);
                 if (!open) {
                     setSelectedActual(null);
                     setIsEditingProcessingCost(false);
                 }
             }}>
-                <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-slate-800">
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle className="flex items-center gap-2 text-slate-800">
                             <Eye className="h-5 w-5 text-olive-600" />
                             Production Entry Details
-                        </DialogTitle>
+                        </SheetTitle>
                         {selectedActual && (
-                            <DialogDescription>
+                            <SheetDescription>
                                 <span className="text-olive-600 font-semibold text-xs">{selectedActual.sNo} — {selectedActual.productName}</span>
-                            </DialogDescription>
+                            </SheetDescription>
                         )}
-                    </DialogHeader>
+                    </SheetHeader>
 
                     {selectedActual && (
-                        <div className="space-y-4 py-2">
+                        <>
+                        <SheetBody className="space-y-4">
                             {/* Basic Info */}
                             <div className="bg-slate-50 p-4 rounded-xl">
                                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Basic Information</div>
@@ -1770,16 +1753,17 @@ export default function SemiActualProductionPage() {
 
 
 
-                            <div className="flex justify-end pt-1">
+                            </SheetBody>
+                            <SheetFooter>
                                 <button onClick={() => setIsViewModalOpen(false)}
                                     className="px-5 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold rounded-lg transition-colors">
                                     Close
                                 </button>
-                            </div>
-                        </div>
+                            </SheetFooter>
+                        </>
                     )}
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

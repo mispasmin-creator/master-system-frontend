@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input";
 import { Label } from "@/systems/production/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/systems/production/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/systems/production/components/ui/select";
 import { Badge } from "@/systems/production/components/ui/badge";
 import { Textarea } from "@/systems/production/components/ui/textarea";
@@ -315,18 +315,11 @@ export default function Step1List() {
             const qty = Number(formData.qty);
 
             const { error: insertError } = await productionApi.post(SEMI_PRODUCTION_TABLE, {
-                "Timestamp": new Date(),
-                "SF-Sr No.": formData.sfSrNo,
-                "Name Of Semi Finished Good": formData.name,
-                "Qty": qty,
-                "Notes": formData.notes || "",
-                "Total Planned": 0,
-                "Total Made": 0,
-                "Pending": qty,
-                "Cancel Order": 0,
-                "Status": "",
-                "Planned": new Date().toISOString().slice(0, 10),
-                "Firm name": formData.firmName || "",
+                semiGoodName: formData.name,
+                qtyPlanned: qty,
+                notes: formData.notes || "",
+                status: "",
+                firmName: formData.firmName || "",
             });
 
             if (insertError) throw insertError;
@@ -350,22 +343,12 @@ export default function Step1List() {
         setIsCancelSubmitting(true);
         try {
             const { error: updateError } = await productionApi.patch(SEMI_PRODUCTION_TABLE, cancelRecord._rowIndex, {
-                "Pending": Number(cancelRecord.pending) - Number(cancelQty),
-                "Cancel Order": Number(cancelQty),
-                "Status": "",
-                "Reason": cancelReason,
+                cancelled: true,
+                status: "CANCELLED",
+                notes: `Cancelled Qty: ${cancelQty}. Reason: ${cancelReason}`,
             });
 
-            if (updateError && /Reason/i.test(updateError.message || "")) {
-                const { error: fallbackError } = await productionApi.patch(SEMI_PRODUCTION_TABLE, cancelRecord._rowIndex, {
-                    "Pending": Number(cancelRecord.pending) - Number(cancelQty),
-                    "Cancel Order": Number(cancelQty),
-                    "Status": "",
-                });
-                if (fallbackError) throw fallbackError;
-            } else if (updateError) {
-                throw updateError;
-            }
+            if (updateError) throw updateError;
 
             setSuccessMessage(`Order ${cancelRecord.sfSrNo} cancelled successfully!`);
             setIsCancelModalOpen(false);
@@ -627,17 +610,18 @@ export default function Step1List() {
                 </CardContent>
             </Card>
 
-            {/* Create New Order Modal */}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Create New Semi-Finished Order</DialogTitle>
-                        <DialogDescription>
+            {/* Create New Order Sheet */}
+            <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>Create New Semi-Finished Order</SheetTitle>
+                        <SheetDescription>
                             Enter the details for the new production order.
-                        </DialogDescription>
-                    </DialogHeader>
+                        </SheetDescription>
+                    </SheetHeader>
 
-                    <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                    <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                        <SheetBody className="space-y-4">
                         {/* SF Sr No (Auto-generated) */}
                         <div className="space-y-2">
                             <Label htmlFor="sfSrNo">SF Sr. No.</Label>
@@ -772,8 +756,9 @@ export default function Step1List() {
                             />
                         </div>
 
+                        </SheetBody>
                         {/* Form Actions */}
-                        <div className="flex justify-end gap-2 pt-4">
+                        <SheetFooter className="pt-4 mt-auto">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -790,23 +775,24 @@ export default function Step1List() {
                                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Create Order
                             </Button>
-                        </div>
+                        </SheetFooter>
                     </form>
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
 
-            {/* Cancel Order Modal */}
-            <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Cancel Order</DialogTitle>
-                        <DialogDescription>
+            {/* Cancel Order Sheet */}
+            <Sheet open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>Cancel Order</SheetTitle>
+                        <SheetDescription>
                             Enter the quantity to cancel for {cancelRecord?.sfSrNo}
-                        </DialogDescription>
-                    </DialogHeader>
+                        </SheetDescription>
+                    </SheetHeader>
 
                     {cancelRecord && (
-                        <form onSubmit={handleCancelSubmit} className="space-y-4 py-4">
+                        <form onSubmit={handleCancelSubmit} className="flex flex-col flex-1 min-h-0">
+                            <SheetBody className="space-y-4">
                             {/* Order Summary */}
                             <div className="bg-red-50 rounded-lg p-4 space-y-2">
                                 <div className="flex justify-between text-sm">
@@ -852,8 +838,9 @@ export default function Step1List() {
                                 />
                             </div>
 
+                            </SheetBody>
                             {/* Actions */}
-                            <div className="flex justify-end gap-2 pt-4">
+                            <SheetFooter className="pt-4 mt-auto">
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -870,11 +857,11 @@ export default function Step1List() {
                                     {isCancelSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Submit Cancel
                                 </Button>
-                            </div>
+                            </SheetFooter>
                         </form>
                     )}
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

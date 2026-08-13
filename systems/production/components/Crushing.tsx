@@ -34,7 +34,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/systems/production/co
 import { Button } from "@/systems/production/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/systems/production/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/systems/production/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet";
 import { Badge } from "@/systems/production/components/ui/badge";
 import { Textarea } from "@/systems/production/components/ui/textarea";
 import { Label } from "@/systems/production/components/ui/label";
@@ -278,31 +278,41 @@ export default function Step5List() {
             }
             setSubmittedIds(submittedSet);
 
-            // Process Crushing Actual records
-            const records: CrushingRecord[] = crushingRows.map((row: any) => ({
-                _rowIndex: Number(row.id || 0),
-                timestamp: row.Timestamp || '',
-                dateOfProduction: row['Date Of Production'] || '',
-                crushingProductName: row['Crushing Product Name'] || '',
-                inputQty: Number(row['Qty Of Crushing Product'] || 0),
-                fg1Name: row['Finished Goods Name 1'] || '',
-                fg1Qty: Number(row['Qty 1'] || 0),
-                fg1Cost: Number(row['Processing Cost 1'] || 0),
-                fg2Name: row['Finished Goods Name 2'] || '',
-                fg2Qty: Number(row['Qty 2'] || 0),
-                fg2Cost: Number(row['Processing Cost 2'] || 0),
-                fg3Name: row['Finished Goods Name 3'] || '',
-                fg3Qty: Number(row['Qty 3'] || 0),
-                fg3Cost: Number(row['Processing Cost 3'] || 0),
-                fg4Name: row['Finished Goods Name 4'] || '',
-                fg4Qty: Number(row['Qty 4'] || 0),
-                fg4Cost: Number(row['Processing Cost 4'] || 0),
-                startingPhoto: row['Starting Reading Photo'] || '',
-                endingPhoto: row['Ending Reading Photo'] || '',
-                remarks: row['Remarks'] || '',
-                machineHours: Number(row['Machine Running Hour'] || 0),
-                firmName: row['Firm Name'] || '',
-            }));
+            // Process Crushing Actual records. The backend now returns real
+            // ProductionCrushingRun rows (crushingItem relation for the input
+            // product name, outputs[] relation for the finished-goods rows) —
+            // map those into the same internal CrushingRecord shape the rest
+            // of this component already renders/filters/summarizes.
+            const records: CrushingRecord[] = crushingRows.map((row: any) => {
+                const outputs = Array.isArray(row.outputs)
+                    ? [...row.outputs].sort((a: any, b: any) => (a.sequence || 0) - (b.sequence || 0))
+                    : [];
+                const out = (i: number) => outputs[i - 1] || {};
+                return {
+                    _rowIndex: row.id,
+                    timestamp: row.createdAt || '',
+                    dateOfProduction: row.dateOfProduction || '',
+                    crushingProductName: String(row.crushingItem?.inputProductName || ''),
+                    inputQty: Number(row.inputQty || 0),
+                    fg1Name: String(out(1).outputName || ''),
+                    fg1Qty: Number(out(1).quantity || 0),
+                    fg1Cost: Number(out(1).processingCost || 0),
+                    fg2Name: String(out(2).outputName || ''),
+                    fg2Qty: Number(out(2).quantity || 0),
+                    fg2Cost: Number(out(2).processingCost || 0),
+                    fg3Name: String(out(3).outputName || ''),
+                    fg3Qty: Number(out(3).quantity || 0),
+                    fg3Cost: Number(out(3).processingCost || 0),
+                    fg4Name: String(out(4).outputName || ''),
+                    fg4Qty: Number(out(4).quantity || 0),
+                    fg4Cost: Number(out(4).processingCost || 0),
+                    startingPhoto: row.startingReadingPhoto || '',
+                    endingPhoto: row.endingReadingPhoto || '',
+                    remarks: row.remarks || '',
+                    machineHours: Number(row.machineHours || 0),
+                    firmName: '',
+                };
+            });
             
             // Filter by Firm
             const filterByFirm = (data: any[]) => {
@@ -604,34 +614,41 @@ export default function Step5List() {
                 endPhotoUrl = await uploadImageToStorage(endingPhoto, fileName);
             }
 
-            const timestamp = new Date().toISOString();
+            // Find-or-create the crushing item (input product) by name — the
+            // /crushing-items route does an idempotent find-or-create so this
+            // is safe to call every submit.
+            const { data: itemData, error: itemError } = await productionApi.post('crushing_items', {
+                inputProductName: formData.crushingProductName,
+            });
+            if (itemError) throw itemError;
+            const crushingItemId = itemData?.id;
 
-            // Determine firm name based on user role
-            const firmNameValue = user?.role === 'admin' ? formData.firmName : (user?.firm || '');
+            // Map Finished Goods 1-4 UI rows into the ProductionCrushingRun.outputs
+            // nested-create array (outputName, quantity, processingCost, sequence).
+            const outputs = [
+                { name: formData.fg1Name, qty: formData.fg1Qty, cost: formData.fg1Cost },
+                { name: formData.fg2Name, qty: formData.fg2Qty, cost: formData.fg2Cost },
+                { name: formData.fg3Name, qty: formData.fg3Qty, cost: formData.fg3Cost },
+                { name: formData.fg4Name, qty: formData.fg4Qty, cost: formData.fg4Cost },
+            ]
+                .filter(o => o.name)
+                .map((o, i) => ({
+                    outputName: o.name,
+                    quantity: Number(o.qty) || 0,
+                    processingCost: Number(o.cost) || 0,
+                    sequence: i + 1,
+                }));
 
-            // Insert new crushing record into Supabase
+            // Insert new crushing record
             const { error: insertError } = await productionApi.post('crushing_actual', {
-                    "Timestamp": timestamp,
-                    "Date Of Production": formData.dateOfProduction,
-                    "Crushing Product Name": formData.crushingProductName,
-                    "Qty Of Crushing Product": Number(formData.inputQty),
-                    "Finished Goods Name 1": formData.fg1Name || '',
-                    "Qty 1": Number(formData.fg1Qty) || 0,
-                    "Processing Cost 1": Number(formData.fg1Cost) || 0,
-                    "Finished Goods Name 2": formData.fg2Name || '',
-                    "Qty 2": Number(formData.fg2Qty) || 0,
-                    "Processing Cost 2": Number(formData.fg2Cost) || 0,
-                    "Finished Goods Name 3": formData.fg3Name || '',
-                    "Qty 3": Number(formData.fg3Qty) || 0,
-                    "Processing Cost 3": Number(formData.fg3Cost) || 0,
-                    "Finished Goods Name 4": formData.fg4Name || '',
-                    "Qty 4": Number(formData.fg4Qty) || 0,
-                    "Processing Cost 4": Number(formData.fg4Cost) || 0,
-                    "Starting Reading Photo": startPhotoUrl,
-                    "Ending Reading Photo": endPhotoUrl,
-                    "Remarks": formData.remarks || '',
-                    "Machine Running Hour": Number(formData.machineHours) || 0,
-                    "Firm Name": firmNameValue || '',
+                    crushingItemId,
+                    dateOfProduction: formData.dateOfProduction,
+                    inputQty: Number(formData.inputQty),
+                    machineHours: Number(formData.machineHours) || 0,
+                    startingReadingPhoto: startPhotoUrl,
+                    endingReadingPhoto: endPhotoUrl,
+                    remarks: formData.remarks || '',
+                    outputs,
                 });
 
             if (insertError) {
@@ -1397,16 +1414,17 @@ export default function Step5List() {
             </Card>
 
             {/* Create New Crushing Dialog */}
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Create New Crushing Record</DialogTitle>
-                        <DialogDescription>
+            <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>Create New Crushing Record</SheetTitle>
+                        <SheetDescription>
                             Enter the details for the crushing operation
-                        </DialogDescription>
-                    </DialogHeader>
+                        </SheetDescription>
+                    </SheetHeader>
 
-                    <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                    <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                        <SheetBody className="space-y-4 pt-4">
                         {/* Date */}
                         <div className="space-y-2">
                             <Label htmlFor="date">Production Date *</Label>
@@ -1785,8 +1803,10 @@ export default function Step5List() {
                             </div>
                         </div>
 
+                        </SheetBody>
+
                         {/* Form Actions */}
-                        <div className="flex justify-end gap-2 pt-4">
+                        <SheetFooter className="flex justify-end gap-2 pt-4 border-t mt-auto">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1804,23 +1824,24 @@ export default function Step5List() {
                                 <Save className="h-4 w-4 mr-2" />
                                 Save Record
                             </Button>
-                        </div>
+                        </SheetFooter>
                     </form>
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
 
             {/* Details Dialog */}
-            <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Crushing Record Details</DialogTitle>
-                        <DialogDescription>
+            <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>Crushing Record Details</SheetTitle>
+                        <SheetDescription>
                             Complete information about this crushing operation
-                        </DialogDescription>
-                    </DialogHeader>
+                        </SheetDescription>
+                    </SheetHeader>
 
                     {selectedRecord && (
-                        <div className="space-y-4 py-4">
+                        <div className="flex flex-col flex-1 min-h-0">
+                            <SheetBody className="space-y-4 pt-4">
                             {/* Basic Info */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -2070,8 +2091,9 @@ export default function Step5List() {
                                     </p>
                                 </div>
                             )}
+                            </SheetBody>
                             {/* Submit to Tally Entry Action */}
-                            <div className="flex justify-end gap-3 pt-6 border-t mt-6">
+                            <SheetFooter className="flex justify-end gap-3 pt-6 border-t mt-auto">
                                 <Button 
                                     type="button" 
                                     variant="outline" 
@@ -2108,11 +2130,11 @@ export default function Step5List() {
                                         )}
                                     </Button>
                                 )}
-                            </div>
+                            </SheetFooter>
                         </div>
                     )}
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

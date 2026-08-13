@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input"
 import { Label } from "@/systems/production/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet"
 import { Popover, PopoverContent, PopoverTrigger } from "@/systems/production/components/ui/popover"
 import { Badge } from "@/systems/production/components/ui/badge"
 import { Checkbox } from "@/systems/production/components/ui/checkbox"
@@ -1628,188 +1628,192 @@ export default function ProductionPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!viewingMaterials} onOpenChange={(isOpen) => {
+      <Sheet open={!!viewingMaterials} onOpenChange={(isOpen) => {
         if (!isOpen) {
           setViewingMaterials(null)
           setEditedViewingMaterials([])
         }
       }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Raw Materials Used</DialogTitle>
-            <DialogDescription>Full list of materials and quantities used for this production run.</DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 max-h-80 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Material Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(isAdmin ? editedViewingMaterials : viewingMaterials?.materials || []).map((material, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      {material.name}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {isAdmin ? (
-                        <Input
-                          type="number"
-                          step="any"
-                          value={material.quantity}
-                          onChange={(e) => {
-                            const updated = [...editedViewingMaterials]
-                            updated[index] = { ...updated[index], quantity: e.target.value }
-                            setEditedViewingMaterials(updated)
-                          }}
-                          className="text-right"
-                        />
-                      ) : (
-                        material.quantity
-                      )}
-                    </TableCell>
+        <SheetContent className="flex flex-col p-0 max-w-4xl max-h-[90vh] overflow-hidden">
+          <SheetHeader className="p-6 pb-2">
+            <SheetTitle>Raw Materials Used</SheetTitle>
+            <SheetDescription>Full list of materials and quantities used for this production run.</SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="px-6 py-2">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material Name</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {(isAdmin ? editedViewingMaterials : viewingMaterials?.materials || []).map((material, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        {material.name}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {isAdmin ? (
+                          <Input
+                            type="number"
+                            step="any"
+                            value={material.quantity}
+                            onChange={(e) => {
+                              const updated = [...editedViewingMaterials]
+                              updated[index] = { ...updated[index], quantity: e.target.value }
+                              setEditedViewingMaterials(updated)
+                            }}
+                            className="text-right"
+                          />
+                        ) : (
+                          material.quantity
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {(() => {
+                const activeMaterials = isAdmin ? editedViewingMaterials : viewingMaterials?.materials || [];
+
+                const totalQty = activeMaterials.reduce((sum, material) => {
+                  const nameLower = (material.name || "").trim().toLowerCase();
+                  if (
+                    nameLower === "shmp" ||
+                    nameLower === "ppf" ||
+                    nameLower === "ffb flow 796" ||
+                    nameLower === "ssf 304" ||
+                    nameLower === "ssf 310" ||
+                    nameLower === "pp bag (25 kgs)" ||
+                    nameLower === "pp bag (50 kgs)" ||
+                    nameLower === "ton bag(1 ton)" ||
+                    nameLower === "pp bag 25kg" ||
+                    nameLower === "pp bag 25 kg"
+                  ) {
+                    return sum;
+                  }
+                  return sum + (Number(material.quantity) || 0);
+                }, 0);
+
+                const viewedItem = historyProductions.find(item => item._rowIndex === viewingMaterials?.rowId);
+                const fgQuantity = viewedItem ? (Number(viewedItem.actualQuantity) || 0) : 0;
+
+                const roundedTotal = Number(totalQty.toFixed(2));
+                const roundedFG = Number(fgQuantity.toFixed(2));
+
+                const isExceeded = roundedFG > 0 && roundedTotal > roundedFG;
+                const isLow = roundedFG > 0 && roundedTotal > 0 && roundedTotal < roundedFG;
+
+
+
+                // Find specific quantities for PP Bags, PPF, SHMP
+                const pp25 = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "pp bag (25 kgs)");
+                const pp50 = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "pp bag (50 kgs)");
+                const pp25kg = activeMaterials.find(m => {
+                  const nameLower = (m.name || "").trim().toLowerCase();
+                  return nameLower === "pp bag 25kg" || nameLower === "pp bag 25 kg";
+                });
+                const shmp = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "shmp");
+                const ppf = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "ppf");
+                const ffbFlow = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "ffb flow 796");
+
+                const pp25Qty = pp25 ? (Number(pp25.quantity) || 0) : 0;
+                const pp50Qty = pp50 ? (Number(pp50.quantity) || 0) : 0;
+                const pp25kgQty = pp25kg ? (Number(pp25kg.quantity) || 0) : 0;
+                const shmpQty = shmp ? (Number(shmp.quantity) || 0) : 0;
+                const ppfQty = ppf ? (Number(ppf.quantity) || 0) : 0;
+                const ffbFlowQty = ffbFlow ? (Number(ffbFlow.quantity) || 0) : 0;
+
+                return (
+                  <div className="mt-4 pt-4 border-t space-y-2 text-sm font-semibold text-slate-800">
+                    <div className={`flex justify-between border-b pb-1 ${isExceeded ? "text-red-600 bg-red-50 p-1.5 rounded-lg border border-red-200" : isLow ? "text-orange-600 bg-orange-50 p-1.5 rounded-lg border border-orange-200" : ""}`}>
+                      <span>Total Qty :</span>
+                      <span>{totalQty.toFixed(2)}</span>
+                    </div>
+                    {(pp25Qty > 0 || pp50Qty > 0 || pp25kgQty > 0) && (
+                      <div className="space-y-1 pt-1">
+                        <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">Packaging Bags</div>
+                        {pp25Qty > 0 && (
+                          <div className="flex justify-between text-slate-600 font-medium pl-2">
+                            <span>PP Bag (25 kgs):</span>
+                            <span>{pp25Qty}</span>
+                          </div>
+                        )}
+                        {pp50Qty > 0 && (
+                          <div className="flex justify-between text-slate-600 font-medium pl-2">
+                            <span>Pp Bag (50 kgs):</span>
+                            <span>{pp50Qty}</span>
+                          </div>
+                        )}
+                        {pp25kgQty > 0 && (
+                          <div className="flex justify-between text-slate-600 font-medium pl-2">
+                            <span>PP BAG 25KG:</span>
+                            <span>{pp25kgQty}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {(shmpQty > 0 || ppfQty > 0 || ffbFlowQty > 0) && (
+                      <div className="space-y-1 pt-1 border-t border-dashed mt-1">
+                        <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">Excluded Additives</div>
+                        {shmpQty > 0 && (
+                          <div className="flex justify-between text-slate-600 font-medium pl-2">
+                            <span>SHMP:</span>
+                            <span>{shmpQty}</span>
+                          </div>
+                        )}
+                        {ppfQty > 0 && (
+                          <div className="flex justify-between text-slate-600 font-medium pl-2">
+                            <span>PPF:</span>
+                            <span>{ppfQty}</span>
+                          </div>
+                        )}
+                        {ffbFlowQty > 0 && (
+                          <div className="flex justify-between text-slate-600 font-medium pl-2">
+                            <span>FFB Flow 796:</span>
+                            <span>{ffbFlowQty}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </SheetBody>
+            {isAdmin && (
+              <SheetFooter className="flex justify-end gap-2 p-6 border-t mt-auto bg-white">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setViewingMaterials(null)
+                    setEditedViewingMaterials([])
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" onClick={handleSaveViewingMaterials} disabled={isSubmitting}>
+                  {isSubmitting ? "Saving..." : "Save Changes"}
+                </Button>
+              </SheetFooter>
+            )}
           </div>
-          {(() => {
-            const activeMaterials = isAdmin ? editedViewingMaterials : viewingMaterials?.materials || [];
+        </SheetContent>
+      </Sheet>
 
-            const totalQty = activeMaterials.reduce((sum, material) => {
-              const nameLower = (material.name || "").trim().toLowerCase();
-              if (
-                nameLower === "shmp" ||
-                nameLower === "ppf" ||
-                nameLower === "ffb flow 796" ||
-                nameLower === "ssf 304" ||
-                nameLower === "ssf 310" ||
-                nameLower === "pp bag (25 kgs)" ||
-                nameLower === "pp bag (50 kgs)" ||
-                nameLower === "ton bag(1 ton)" ||
-                nameLower === "pp bag 25kg" ||
-                nameLower === "pp bag 25 kg"
-              ) {
-                return sum;
-              }
-              return sum + (Number(material.quantity) || 0);
-            }, 0);
-
-            const viewedItem = historyProductions.find(item => item._rowIndex === viewingMaterials?.rowId);
-            const fgQuantity = viewedItem ? (Number(viewedItem.actualQuantity) || 0) : 0;
-
-            const roundedTotal = Number(totalQty.toFixed(2));
-            const roundedFG = Number(fgQuantity.toFixed(2));
-
-            const isExceeded = roundedFG > 0 && roundedTotal > roundedFG;
-            const isLow = roundedFG > 0 && roundedTotal > 0 && roundedTotal < roundedFG;
-
-
-
-            // Find specific quantities for PP Bags, PPF, SHMP
-            const pp25 = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "pp bag (25 kgs)");
-            const pp50 = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "pp bag (50 kgs)");
-            const pp25kg = activeMaterials.find(m => {
-              const nameLower = (m.name || "").trim().toLowerCase();
-              return nameLower === "pp bag 25kg" || nameLower === "pp bag 25 kg";
-            });
-            const shmp = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "shmp");
-            const ppf = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "ppf");
-            const ffbFlow = activeMaterials.find(m => (m.name || "").trim().toLowerCase() === "ffb flow 796");
-
-            const pp25Qty = pp25 ? (Number(pp25.quantity) || 0) : 0;
-            const pp50Qty = pp50 ? (Number(pp50.quantity) || 0) : 0;
-            const pp25kgQty = pp25kg ? (Number(pp25kg.quantity) || 0) : 0;
-            const shmpQty = shmp ? (Number(shmp.quantity) || 0) : 0;
-            const ppfQty = ppf ? (Number(ppf.quantity) || 0) : 0;
-            const ffbFlowQty = ffbFlow ? (Number(ffbFlow.quantity) || 0) : 0;
-
-            return (
-              <div className="mt-4 pt-4 border-t space-y-2 text-sm font-semibold text-slate-800">
-                <div className={`flex justify-between border-b pb-1 ${isExceeded ? "text-red-600 bg-red-50 p-1.5 rounded-lg border border-red-200" : isLow ? "text-orange-600 bg-orange-50 p-1.5 rounded-lg border border-orange-200" : ""}`}>
-                  <span>Total Qty :</span>
-                  <span>{totalQty.toFixed(2)}</span>
-                </div>
-                {(pp25Qty > 0 || pp50Qty > 0 || pp25kgQty > 0) && (
-                  <div className="space-y-1 pt-1">
-                    <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">Packaging Bags</div>
-                    {pp25Qty > 0 && (
-                      <div className="flex justify-between text-slate-600 font-medium pl-2">
-                        <span>PP Bag (25 kgs):</span>
-                        <span>{pp25Qty}</span>
-                      </div>
-                    )}
-                    {pp50Qty > 0 && (
-                      <div className="flex justify-between text-slate-600 font-medium pl-2">
-                        <span>Pp Bag (50 kgs):</span>
-                        <span>{pp50Qty}</span>
-                      </div>
-                    )}
-                    {pp25kgQty > 0 && (
-                      <div className="flex justify-between text-slate-600 font-medium pl-2">
-                        <span>PP BAG 25KG:</span>
-                        <span>{pp25kgQty}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {(shmpQty > 0 || ppfQty > 0 || ffbFlowQty > 0) && (
-                  <div className="space-y-1 pt-1 border-t border-dashed mt-1">
-                    <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">Excluded Additives</div>
-                    {shmpQty > 0 && (
-                      <div className="flex justify-between text-slate-600 font-medium pl-2">
-                        <span>SHMP:</span>
-                        <span>{shmpQty}</span>
-                      </div>
-                    )}
-                    {ppfQty > 0 && (
-                      <div className="flex justify-between text-slate-600 font-medium pl-2">
-                        <span>PPF:</span>
-                        <span>{ppfQty}</span>
-                      </div>
-                    )}
-                    {ffbFlowQty > 0 && (
-                      <div className="flex justify-between text-slate-600 font-medium pl-2">
-                        <span>FFB Flow 796:</span>
-                        <span>{ffbFlowQty}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-          {isAdmin && (
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setViewingMaterials(null)
-                  setEditedViewingMaterials([])
-                }}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleSaveViewingMaterials} disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Log Production for JC: {selectedJobCard?.jobCardNo}</DialogTitle>
-            <DialogDescription>Enter the final production details. Fields with * are required.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6 p-1">
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 border rounded-lg bg-muted/50">
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Log Production for JC: {selectedJobCard?.jobCardNo}</SheetTitle>
+            <SheetDescription>Enter the final production details. Fields with * are required.</SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 p-1">
+            <SheetBody className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 border rounded-lg bg-muted/50">
               <div>
                 <Label className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">DO No.</Label>
                 <p className="text-sm font-bold text-olive-800">{selectedJobCard?.deliveryOrderNo}</p>
@@ -2181,7 +2185,8 @@ export default function ProductionPage() {
             </div>
 
 
-            <div className="flex justify-between items-center pt-4 border-t">
+            </SheetBody>
+            <SheetFooter className="flex justify-between items-center pt-4 border-t mt-auto">
               <div>
                 {selectedJobCard && (
                   <Button
@@ -2203,22 +2208,23 @@ export default function ProductionPage() {
                   Save Production
                 </Button>
               </div>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Cancel Job Card Dialog */}
-      <Dialog open={isCancelJcDialogOpen} onOpenChange={setIsCancelJcDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cancel Job Card: {selectedJobCard?.jobCardNo}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isCancelJcDialogOpen} onOpenChange={setIsCancelJcDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Cancel Job Card: {selectedJobCard?.jobCardNo}</SheetTitle>
+            <SheetDescription>
               Enter the quantity to cancel and provide remarks/reason.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCancelJcSubmit} className="space-y-4">
-            <div className="space-y-2">
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleCancelJcSubmit} className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="space-y-4">
+              <div className="space-y-2">
               <Label htmlFor="cancelJcQty">Cancel Quantity *</Label>
               <Input
                 id="cancelJcQty"
@@ -2248,7 +2254,8 @@ export default function ProductionPage() {
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
+            </SheetBody>
+            <SheetFooter className="flex justify-end gap-2 pt-4 mt-auto">
               <Button type="button" variant="outline" onClick={() => setIsCancelJcDialogOpen(false)} disabled={isSubmitting}>
                 No, Keep it
               </Button>
@@ -2256,10 +2263,10 @@ export default function ProductionPage() {
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Yes, Cancel Job Card
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input"
 import { Label } from "@/systems/production/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/systems/production/components/ui/select"
 import { Badge } from "@/systems/production/components/ui/badge"
 import { Checkbox } from "@/systems/production/components/ui/checkbox"
@@ -20,9 +20,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/systems/production/co
 // Table Names
 const JOBCARDS_TABLE = "jobcards"
 const MASTER_TABLE = "master"
-const PRODUCTION_TABLE = "production"
-const ACTUAL_PRODUCTION_TABLE = "actual_production"
-const COSTING_RESPONSE_TABLE = "costing_response"
+const QC_CHECKPOINTS_TABLE = "qc_checkpoints"
+const LAB2_STAGE = "lab2"
+const CHEMICAL_STAGE = "chemical"
 
 // Type Definitions
 interface RawMaterial {
@@ -31,7 +31,8 @@ interface RawMaterial {
 }
 
 interface PendingChemicalTestItem {
-  id: number
+  id: string
+  jobCardId: string
   productionId?: number | string
   jobCardNo: string
   firmName: string
@@ -51,7 +52,8 @@ interface PendingChemicalTestItem {
 }
 
 interface HistoryChemicalTestItem {
-  id: number
+  id: string
+  jobCardId: string
   productionId?: number | string
   jobCardNo: string
   firmName: string
@@ -153,16 +155,8 @@ const initialFormState = {
   remarks: "",
 }
 
-const hasValue = (value: any) => {
-  if (value === null || value === undefined) return false
-  const normalized = String(value).trim().toLowerCase()
-  return normalized !== "" && normalized !== "-" && normalized !== "null" && normalized !== "undefined"
-}
-
 const isCancelledStatus = (value: any) => String(value || "").trim().toLowerCase() === "cancelled"
 const normalizeKey = (value: any) => String(value || "").trim().toLowerCase()
-const makeOrderProductKey = (orderNo: any, productName: any) =>
-  `${normalizeKey(orderNo)}::${normalizeKey(productName)}`
 const getFirmMatchValues = (firm?: string) => {
   const firms = String(firm || "").split(',').map((f: string) => f.trim()).filter(Boolean);
   return firms.flatMap(rawFirm => {
@@ -245,115 +239,84 @@ export default function ChemicalTestPage() {
     setLoading(true)
     setError(null)
     try {
+      // job-cards returns each card with its order (ProductionOrder), actualRuns
+      // (with materials) and qcChecks already joined in - no more manual
+      // jobCardNo/orderNo/productName string-matching across separate sheets.
       const [
         { data: jobCardsData, error: jobCardsErr },
         { data: masterData, error: masterErr },
-        { data: productionData, error: prodErr },
-        { data: actualProductionData, error: actualProdErr },
-        { data: costingResponseData, error: costingErr }
       ] = await Promise.all([
-        await productionApi.get(JOBCARDS_TABLE),
-        await productionApi.get(MASTER_TABLE),
-        await productionApi.get(PRODUCTION_TABLE),
-        await productionApi.get(ACTUAL_PRODUCTION_TABLE),
-        await productionApi.get(COSTING_RESPONSE_TABLE),
+        productionApi.get(JOBCARDS_TABLE),
+        productionApi.get(MASTER_TABLE),
       ])
 
       if (jobCardsErr) throw jobCardsErr
       if (masterErr) throw masterErr
-      if (prodErr) throw prodErr
-      if (actualProdErr) throw actualProdErr
-      if (costingErr) throw costingErr
 
-      const costingDataMap = new Map()
-      ;(costingResponseData || []).forEach((row: any) => {
-        const orderNo = row["Order No."] ? String(row["Order No."]).trim() : ""
-        const productName = row["product name"] ? String(row["product name"]).trim() : ""
-        if (orderNo) {
-          const costingInfo = {
-            productName,
-            plannedDate: row["Planned 4"] ? format(new Date(row["Planned 4"]), "dd/MM/yyyy") : "",
-          }
-          costingDataMap.set(makeOrderProductKey(orderNo, productName), costingInfo)
-          if (!costingDataMap.has(normalizeKey(orderNo))) costingDataMap.set(normalizeKey(orderNo), costingInfo)
+      const buildRawMaterials = (materials: any[]): RawMaterial[] =>
+        (materials || []).map((m: any) => ({ name: m.materialName || "", quantity: m.quantity ?? 0 }))
+
+      const pendingData: PendingChemicalTestItem[] = []
+      const historyData: HistoryChemicalTestItem[] = []
+
+      ;(jobCardsData || []).forEach((jc: any) => {
+        if (isCancelledStatus(jc.status)) return
+        const order = jc.order || {}
+        const actualRun = (jc.actualRuns && jc.actualRuns[0]) || null
+        if (!actualRun) return
+
+        const lab1Check = (jc.qcChecks || []).find((c: any) => c.stage === "lab1")
+        const lab2Check = (jc.qcChecks || []).find((c: any) => c.stage === LAB2_STAGE)
+        // Chemical testing only becomes relevant once Lab 2 has a recorded decision.
+        if (!lab2Check) return
+        const chemicalCheck = (jc.qcChecks || []).find((c: any) => c.stage === CHEMICAL_STAGE)
+
+        const base = {
+          id: jc.id,
+          jobCardId: jc.id,
+          productionId: order.id ?? "",
+          jobCardNo: String(jc.jobCardNo || "").trim(),
+          firmName: String(order.firmName || ""),
+          deliveryOrderNo: String(order.deliveryOrderNo || ""),
+          partyName: String(order.partyName || ""),
+          productName: String(order.productName || ""),
+          quantity: Number(actualRun.quantityFg || jc.quantity || 0),
+          expectedDeliveryDate: order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy") : "",
+          priority: String(order.priority || ""),
+          dateOfProduction: actualRun.dateOfProduction ? format(new Date(actualRun.dateOfProduction), "dd/MM/yyyy") : "",
+          // No "Planned Date" concept remains for this stage in the new schema.
+          plannedDate: "",
+          shift: String(jc.shift || ""),
+          rawMaterials: buildRawMaterials(actualRun.materials),
+          machineHours: actualRun.machineHours != null ? String(actualRun.machineHours) : "-",
+          labTest1Status: String(lab1Check?.status || "N/A"),
+          labTest2Status: String(lab2Check.status || "N/A"),
+        }
+
+        if (!chemicalCheck) {
+          pendingData.push(base as PendingChemicalTestItem)
+        } else {
+          historyData.push({
+            id: base.id,
+            jobCardId: base.jobCardId,
+            productionId: base.productionId,
+            jobCardNo: base.jobCardNo,
+            firmName: base.firmName,
+            deliveryOrderNo: base.deliveryOrderNo,
+            partyName: base.partyName,
+            productName: base.productName,
+            quantity: base.quantity,
+            labTest2Status: base.labTest2Status,
+            dateOfChemicalTest: chemicalCheck.dateOfTest ? format(new Date(chemicalCheck.dateOfTest), "dd/MM/yyyy") : "",
+            testedBy: String(chemicalCheck.testedBy || ""),
+            aluminaPercentage: chemicalCheck.aluminaPercent != null ? String(chemicalCheck.aluminaPercent) : "",
+            ironPercentage: chemicalCheck.ironPercent != null ? String(chemicalCheck.ironPercent) : "",
+            silicaPercentage: chemicalCheck.silicaPercent != null ? String(chemicalCheck.silicaPercent) : "",
+            calciumPercentage: chemicalCheck.calciumPercent != null ? String(chemicalCheck.calciumPercent) : "",
+            chemicalTestCompletedAt: chemicalCheck.createdAt ? format(new Date(chemicalCheck.createdAt), "dd/MM/yy HH:mm") : "",
+          } as HistoryChemicalTestItem)
         }
       })
-
-      const productionDataMap = new Map()
-      ;(actualProductionData || []).forEach((row: any) => {
-        const jobCardNo = String(row["Job Card No."] || "").trim()
-        if (jobCardNo) {
-          const materials = []
-          for (let i = 1; i <= 20; i++) {
-            const name = row[`Raw Material Name ${i}`]
-            const quantity = row[`Quantity Of Raw Material ${i}`]
-            if (name && String(name).trim()) {
-              materials.push({ name: String(name).trim(), quantity: quantity || 0 })
-            }
-          }
-
-          productionDataMap.set(jobCardNo, {
-            jobCardNo: jobCardNo,
-            machineHours: String(row["Machine Running hour"] || "-").trim(),
-            rawMaterials: materials,
-          })
-        }
-      })
-
-      // Filter pending tests: actual_production rows where Planned3 is set and Actual3 is null
-      const pendingData = (actualProductionData || [])
-        .filter(
-          (row: any) => hasValue(row["Planned3"]) && !hasValue(row["Actual3"]),
-        )
-        .map((row: any) => {
-          const jobCardNo = String(row["Job Card No."] || "").trim()
-          const deliveryOrderNo = String(row["Order No."] || "").trim()
-          const productName = String(row["Product Name"] || "").trim()
-
-          const productionRow = (productionData || []).find(
-            (prodRow: any) =>
-              normalizeKey(prodRow["Delivery Order No."]) === normalizeKey(deliveryOrderNo) &&
-              normalizeKey(prodRow["Product Name"]) === normalizeKey(productName),
-          ) || (productionData || []).find(
-            (prodRow: any) => normalizeKey(prodRow["Delivery Order No."]) === normalizeKey(deliveryOrderNo),
-          )
-
-          const jobCard = (jobCardsData || []).find(
-            (jc: any) => normalizeKey(jc["JC-Job Card Number"]) === normalizeKey(jobCardNo)
-          )
-
-          if (isCancelledStatus(jobCard?.["Status"])) return null
-
-          const materials = []
-          for (let i = 1; i <= 20; i++) {
-            const name = row[`Raw Material Name ${i}`]
-            const quantity = row[`Quantity Of Raw Material ${i}`]
-            if (name && String(name).trim()) {
-              materials.push({ name: String(name).trim(), quantity: quantity || 0 })
-            }
-          }
-
-          return {
-            id: row.id,
-            productionId: productionRow?.id ?? "",
-            jobCardNo: jobCardNo,
-            firmName: String(row["FIRM Name"] || ""),
-            deliveryOrderNo: deliveryOrderNo,
-            partyName: String(row["Party Name"] || ""),
-            productName: productName,
-            quantity: Number(row["Quantity Of FG"] || 0),
-            expectedDeliveryDate: productionRow?.["Expected Delivery Date"] ? format(new Date(productionRow["Expected Delivery Date"]), "dd/MM/yyyy") : "",
-            priority: String(productionRow?.["Priority"] || ""),
-            dateOfProduction: row["Date Of Production"] ? format(new Date(row["Date Of Production"]), "dd/MM/yyyy") : "",
-            plannedDate: row["Planned3"] ? format(new Date(row["Planned3"]), "dd/MM/yyyy") : "",
-            shift: jobCard ? String(jobCard["Shift"] || "") : "",
-            rawMaterials: materials,
-            machineHours: String(row["Machine Running hour"] || "-").trim(),
-            labTest1Status: String(row["Status2"] || "N/A"),
-            labTest2Status: String(row["Status3"] || "N/A"),
-          }
-        })
-        .filter(Boolean)
 
       const firmSearchValues = getFirmMatchValues(user?.firm)
       const isAdmin = user?.role?.toLowerCase() === "admin"
@@ -366,54 +329,19 @@ export default function ChemicalTestPage() {
       }
 
       setPendingTests(filterByFirm(pendingData))
-
-      // Filter history: actual_production rows where Actual3 is set
-      const historyData = (actualProductionData || [])
-        .filter(
-          (row: any) => hasValue(row["Actual3"]),
+      setHistoryTests(
+        filterByFirm(historyData).sort(
+          (a: any, b: any) => new Date(b.chemicalTestCompletedAt).getTime() - new Date(a.chemicalTestCompletedAt).getTime()
         )
-        .map((row: any) => {
-          const jobCardNo = String(row["Job Card No."] || "").trim()
-          const deliveryOrderNo = String(row["Order No."] || "").trim()
-          const productName = String(row["Product Name"] || "").trim()
-          const productionRow = (productionData || []).find(
-            (prodRow: any) =>
-              normalizeKey(prodRow["Delivery Order No."]) === normalizeKey(deliveryOrderNo) &&
-              normalizeKey(prodRow["Product Name"]) === normalizeKey(productName),
-          ) || (productionData || []).find(
-            (prodRow: any) => normalizeKey(prodRow["Delivery Order No."]) === normalizeKey(deliveryOrderNo),
-          )
-
-          return {
-            id: row.id,
-            productionId: productionRow?.id ?? "",
-            jobCardNo: jobCardNo,
-            firmName: String(row["FIRM Name"] || ""),
-            deliveryOrderNo: deliveryOrderNo,
-            partyName: String(row["Party Name"] || ""),
-            productName: productName,
-            quantity: Number(row["Quantity Of FG"] || 0),
-            labTest2Status: String(row["Status3"] || "N/A"),
-            dateOfChemicalTest: row["Actual3"] ? format(new Date(row["Actual3"]), "dd/MM/yyyy") : "",
-            testedBy: String(row["TestedBy3"] || ""),
-            aluminaPercentage: String(row["AluminaPct"] || ""),
-            ironPercentage: String(row["IronPct"] || ""),
-            silicaPercentage: String(row["SilicaPct"] || ""),
-            calciumPercentage: String(row["CalciumPct"] || ""),
-            chemicalTestCompletedAt: row["Actual3"] ? format(new Date(row["Actual3"]), "dd/MM/yy HH:mm") : "",
-          }
-        })
-        .sort((a: any, b: any) => new Date(b.chemicalTestCompletedAt).getTime() - new Date(a.chemicalTestCompletedAt).getTime())
-
-      setHistoryTests(filterByFirm(historyData))
+      )
 
       // Set options from master data
-      const statuses = [...new Set((masterData || []).map((row: any) => String(row["Test Status"] || "")).filter(Boolean))] as string[]
+      const statuses = [...new Set((masterData || []).map((row: any) => String(row.testStatus || "")).filter(Boolean))] as string[]
       if (!statuses.includes("Tested")) statuses.push("Tested")
       if (!statuses.includes("Non Tested")) statuses.push("Non Tested")
       setStatusOptions(statuses)
 
-      const testedByOpts = [...new Set((masterData || []).map((row: any) => String(row["Tested By"] || "")).filter(Boolean))] as string[]
+      const testedByOpts = [...new Set((masterData || []).map((row: any) => String(row.testedBy || "")).filter(Boolean))] as string[]
       setTestedByOptions(testedByOpts)
     } catch (err: any) {
       console.error("Error in loadAllData:", err)
@@ -459,32 +387,35 @@ export default function ChemicalTestPage() {
 
     setIsSubmitting(true)
     try {
-      const now = new Date().toISOString()
       const isNonTested = formData.status === "Non Tested"
+
+      // Only jobCardId/stage/dateOfTest/testedBy/aluminaPercent/ironPercent/
+      // silicaPercent/calciumPercent/status map to real columns on
+      // ProductionQcCheckpoint. Free-text remarks have no matching column, so they're
+      // folded into `status` for the Non Tested case instead of being dropped.
+      let statusNote = String(formData.status)
+      if (isNonTested && formData.remarks?.trim()) {
+        statusNote = `${statusNote}: ${formData.remarks.trim()}`
+      }
+
       const payload: any = {
-        "Actual3": now,
-        "ChemicalStatus": formData.status,
+        jobCardId: selectedTest.jobCardId,
+        stage: CHEMICAL_STAGE,
+        status: statusNote,
       }
 
       if (!isNonTested) {
-        payload["TestedBy3"] = formData.testedBy
-        payload["AluminaPct"] = formData.aluminaPercentage ? Number(formData.aluminaPercentage) : null
-        payload["IronPct"] = formData.ironPercentage ? Number(formData.ironPercentage) : null
-        payload["SilicaPct"] = formData.silicaPercentage ? Number(formData.silicaPercentage) : null
-        payload["CalciumPct"] = formData.calciumPercentage ? Number(formData.calciumPercentage) : null
-        payload["Remarks3"] = null
-      } else {
-        payload["TestedBy3"] = null
-        payload["AluminaPct"] = null
-        payload["IronPct"] = null
-        payload["SilicaPct"] = null
-        payload["CalciumPct"] = null
-        payload["Remarks3"] = formData.remarks
+        payload.testedBy = formData.testedBy
+        payload.dateOfTest = format(new Date(), "yyyy-MM-dd")
+        payload.aluminaPercent = formData.aluminaPercentage ? Number(formData.aluminaPercentage) : null
+        payload.ironPercent = formData.ironPercentage ? Number(formData.ironPercentage) : null
+        payload.silicaPercent = formData.silicaPercentage ? Number(formData.silicaPercentage) : null
+        payload.calciumPercent = formData.calciumPercentage ? Number(formData.calciumPercentage) : null
       }
 
-      const { error: updateErr } = await productionApi.patch(ACTUAL_PRODUCTION_TABLE, selectedTest.id, payload)
+      const { error: createErr } = await productionApi.post(QC_CHECKPOINTS_TABLE, payload)
 
-      if (updateErr) throw updateErr
+      if (createErr) throw createErr
 
       alert("Chemical Test data saved successfully!")
       setIsDialogOpen(false)
@@ -786,48 +717,51 @@ export default function ChemicalTestPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!viewingMaterials} onOpenChange={(isOpen) => !isOpen && setViewingMaterials(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Raw Materials Used</DialogTitle>
-            <DialogDescription>Full list of materials and quantities used for this production run.</DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 max-h-80 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Material Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {viewingMaterials?.map((material, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{material.name}</TableCell>
-                    <TableCell className="text-right">{material.quantity}</TableCell>
+      <Sheet open={!!viewingMaterials} onOpenChange={(isOpen) => !isOpen && setViewingMaterials(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Raw Materials Used</SheetTitle>
+            <SheetDescription>Full list of materials and quantities used for this production run.</SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0 mt-4">
+            <SheetBody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material Name</TableHead>
+                    <TableHead className="text-right">Quantity</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {viewingMaterials?.map((material, index) => (
+                    <TableRow key={index}>
+                      <TableCell>{material.name}</TableCell>
+                      <TableCell className="text-right">{material.quantity}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </SheetBody>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Chemical Test Details for JC: {selectedTest?.jobCardNo}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <SheetHeader className="p-6 pb-2">
+            <SheetTitle>Chemical Test Details for JC: {selectedTest?.jobCardNo}</SheetTitle>
+            <SheetDescription>
               Enter the chemical analysis results below. Fields with * are required.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
           <form
             onSubmit={(e) => {
               e.preventDefault()
               handleSaveChemicalTest()
             }}
-            className="space-y-4 pt-4"
+            className="flex flex-col flex-1 min-h-0"
           >
+            <SheetBody className="space-y-4 px-6 pt-4">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/50">
               <div>
                 <Label className="text-xs">DO No.</Label>
@@ -942,8 +876,9 @@ export default function ChemicalTestPage() {
                 </div>
               </div>
             )}
+            </SheetBody>
 
-            <div className="flex justify-end gap-2 pt-4 border-t">
+            <SheetFooter className="flex justify-end gap-2 p-6 border-t mt-auto bg-white">
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
@@ -951,10 +886,10 @@ export default function ChemicalTestPage() {
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Test Results
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

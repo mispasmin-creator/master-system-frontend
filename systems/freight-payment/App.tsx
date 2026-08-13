@@ -31,7 +31,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <FreightDashboard user={user || { id: 0, username: 'User', role: 'user' }} onLogout={handleLogout} />
+      <FreightDashboard user={user || { id: 0, username: 'User', role: 'user', page_access: '', firm_name: '', last_login: '' }} onLogout={handleLogout} />
     </QueryClientProvider>
   );
 }

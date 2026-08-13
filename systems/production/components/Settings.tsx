@@ -9,7 +9,7 @@ import { Label } from "@/systems/production/components/ui/label"
 import { Checkbox } from "@/systems/production/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/systems/production/components/ui/tabs"
 import { Alert, AlertDescription } from "@/systems/production/components/ui/alert"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetBody } from "@/systems/production/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/systems/production/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
 import { Settings, Shield, Key, Plus, Trash2, Edit, Loader2, Eye, EyeOff } from "lucide-react"
@@ -44,21 +44,26 @@ interface ConfirmationDialogProps {
 
 // --- Confirmation Dialog Component for Deleting Users ---
 const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({ open, onOpenChange, onConfirm, title, description, isSubmitting }) => (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="bg-white"> {/* White background for dialog */}
-            <DialogHeader>
-                <DialogTitle>{title}</DialogTitle>
-                <DialogDescription>{description}</DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2 sm:justify-end">
-                <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
-                <Button variant="destructive" onClick={onConfirm} disabled={isSubmitting} className="bg-olive-600 text-white hover:bg-olive-700"> {/* Light olive delete button */}
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                    Confirm Delete
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="bg-white"> {/* White background for dialog */}
+            <SheetHeader>
+                <SheetTitle>{title}</SheetTitle>
+                <SheetDescription>{description}</SheetDescription>
+            </SheetHeader>
+            <div className="flex flex-col flex-1 min-h-0">
+                <SheetBody>
+                    {/* Empty body for spacing, since description is in header */}
+                </SheetBody>
+                <SheetFooter className="gap-2 sm:justify-end mt-auto pt-4">
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancel</Button>
+                    <Button variant="destructive" onClick={onConfirm} disabled={isSubmitting} className="bg-olive-600 text-white hover:bg-olive-700"> {/* Light olive delete button */}
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                        Confirm Delete
+                    </Button>
+                </SheetFooter>
+            </div>
+        </SheetContent>
+    </Sheet>
 );
 
 
@@ -331,11 +336,12 @@ export default function SettingsPage() {
         )}
       </Tabs>
 
-      {/* Add / Edit User Dialog */}
-      <Dialog open={isAddUserOpen || isEditUserOpen} onOpenChange={isEditUserOpen ? setIsEditUserOpen : setIsAddUserOpen}>
-        <DialogContent className="sm:max-w-2xl bg-white"> {/* White background for dialog */}
-          <DialogHeader><DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle></DialogHeader>
-          <div className="py-4 space-y-4">
+      {/* Add / Edit User Sheet */}
+      <Sheet open={isAddUserOpen || isEditUserOpen} onOpenChange={isEditUserOpen ? setIsEditUserOpen : setIsAddUserOpen}>
+        <SheetContent className="sm:max-w-2xl bg-white"> {/* White background for dialog */}
+          <SheetHeader><SheetTitle>{editingUser ? "Edit User" : "Add New User"}</SheetTitle></SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0">
+          <SheetBody className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2"><Label>Username</Label><Input value={editingUser ? editUserData.username : newUserData.username} onChange={e => editingUser ? setEditUserData({...editUserData, username: e.target.value}) : setNewUserData({...newUserData, username: e.target.value})} className="bg-white border-olive-200 focus:ring-olive-400"/></div> {/* Light olive input */}
                   <div className="space-y-2">
@@ -502,13 +508,16 @@ export default function SettingsPage() {
                     })}
                 </div>
               </div>
-              <Button onClick={editingUser ? handleUpdateUser : handleAddUser} disabled={isSubmitting} className="w-full bg-olive-600 text-white hover:bg-olive-700"> {/* Light olive button */}
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                {editingUser ? "Save Changes" : "Create User"}
-              </Button>
+              </SheetBody>
+              <SheetFooter className="pt-4 mt-auto">
+                <Button onClick={editingUser ? handleUpdateUser : handleAddUser} disabled={isSubmitting} className="w-full bg-olive-600 text-white hover:bg-olive-700"> {/* Light olive button */}
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                  {editingUser ? "Save Changes" : "Create User"}
+                </Button>
+              </SheetFooter>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
       
       <ConfirmationDialog 
         open={isConfirmOpen} 

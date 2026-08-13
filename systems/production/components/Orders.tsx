@@ -58,12 +58,14 @@ import {
 } from "@/systems/production/components/ui/card";
 import { Badge } from "@/systems/production/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/systems/production/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetBody,
+  SheetFooter,
+} from "@/systems/production/components/ui/sheet";
 import { Checkbox } from "@/systems/production/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/systems/production/components/ui/tabs";
 import { format } from "date-fns";
@@ -1053,18 +1055,19 @@ export default function OrdersPage() {
       </Card>
 
       {/* Modals Section */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-2xl rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
-          <div className="bg-olive-600 px-8 py-6 text-white">
-            <DialogTitle className="text-2xl font-black tracking-tight uppercase">
+      <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <SheetContent className="max-w-2xl rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col min-h-0">
+          <SheetHeader className="bg-olive-600 px-8 py-6 text-white m-0">
+            <SheetTitle className="text-2xl font-black tracking-tight uppercase text-white">
               New Job Card
-            </DialogTitle>
-            <DialogDescription className="text-olive-100 text-sm font-medium mt-1">
+            </SheetTitle>
+            <SheetDescription className="text-olive-100 text-sm font-medium mt-1">
               Initialize a production lifecycle by providing order details.
-            </DialogDescription>
-          </div>
+            </SheetDescription>
+          </SheetHeader>
 
-          <form onSubmit={handleSubmit} className="p-8 space-y-8 bg-white">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 bg-white">
+            <SheetBody className="p-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5">
@@ -1230,7 +1233,9 @@ export default function OrdersPage() {
               />
             </div>
 
-            <div className="flex gap-4 pt-4">
+            </SheetBody>
+
+            <SheetFooter className="flex gap-4 p-8 pt-4 border-t mt-auto">
               <Button
                 type="button"
                 variant="ghost"
@@ -1250,20 +1255,21 @@ export default function OrdersPage() {
                   "Initiate Job Card"
                 )}
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
-      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-        <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl">
-          <div className="bg-red-600 px-8 py-6 text-white">
-            <DialogTitle className="text-2xl font-black tracking-tight uppercase">
+      <Sheet open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <SheetContent className="max-w-md rounded-3xl p-0 overflow-hidden border-none shadow-2xl flex flex-col min-h-0">
+          <SheetHeader className="bg-red-600 px-8 py-6 text-white m-0">
+            <SheetTitle className="text-2xl font-black tracking-tight uppercase text-white">
               Cancel Order
-            </DialogTitle>
-          </div>
+            </SheetTitle>
+          </SheetHeader>
 
-          <div className="p-8 space-y-6">
+          <div className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="p-8 space-y-6">
             {selectedItem && (
               <div className="p-4 bg-red-50 rounded-2xl space-y-2 border border-red-100">
                 <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-red-400">
@@ -1303,7 +1309,8 @@ export default function OrdersPage() {
               </div>
             </div>
 
-            <div className="flex gap-4">
+            </SheetBody>
+            <SheetFooter className="flex gap-4 p-8 pt-4 mt-auto">
               <Button
                 variant="ghost"
                 onClick={() => setIsCancelDialogOpen(false)}
@@ -1322,10 +1329,10 @@ export default function OrdersPage() {
                   "Confirm Cancel"
                 )}
               </Button>
-            </div>
+            </SheetFooter>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input";
 import { Label } from "@/systems/production/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/systems/production/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/systems/production/components/ui/select";
 import { Badge } from "@/systems/production/components/ui/badge";
 import { productionApi } from "@/systems/production/lib/api";
@@ -285,17 +285,11 @@ export default function SFJobCardPage() {
 
             const plannedQty = Number(formData.qty);
             const { error: insertError } = await productionApi.post(SEMI_JOB_CARD_TABLE, {
-                "Timestamp": new Date(),
-                "SJC-Sr No.": sjcSrNo,
-                "Semi Finished Production No.": selectedProd.sfSrNo,
-                "Supervisor Name": formData.supervisorName,
-                "Product Name": selectedProd.nameOfSemiFinished,
-                "Qty": plannedQty,
-                "Date Of Production": toSupabaseDate(formData.dateOfProduction),
-                "Actual Made": 0,
-                "Pending": plannedQty,
-                "Status": "",
-                "Planned": new Date().toISOString().slice(0, 10),
+                semiOrderId: selectedProd._rowIndex,
+                supervisorName: formData.supervisorName,
+                qty: plannedQty,
+                dateOfProduction: toSupabaseDate(formData.dateOfProduction),
+                status: "",
             });
 
             if (insertError) throw insertError;
@@ -304,10 +298,7 @@ export default function SFJobCardPage() {
             const cancelledQty = Number(selectedProd.cancelOrder || 0);
             const nextPending = Math.max(Number(selectedProd.qty || 0) - nextTotalPlanned - (Number.isFinite(cancelledQty) ? cancelledQty : 0), 0);
             const { error: updateError } = await productionApi.patch(SEMI_PRODUCTION_TABLE, selectedProd._rowIndex, {
-                    "Total Planned": nextTotalPlanned,
-                    "Pending": nextPending,
-                    "Planned": new Date().toISOString().slice(0, 10),
-                    "Status": nextPending <= 0 ? "COMPLETED" : "PENDING",
+                    status: nextPending <= 0 ? "COMPLETED" : "PENDING",
                 });
 
             if (updateError) throw updateError;
@@ -642,24 +633,25 @@ export default function SFJobCardPage() {
                 </CardContent>
             </Card>
 
-            {/* ── Create Job Card Modal ── */}
-            <Dialog open={isModalOpen} onOpenChange={(open) => {
+            {/* ── Create Job Card Sheet ── */}
+            <Sheet open={isModalOpen} onOpenChange={(open) => {
                 setIsModalOpen(open);
                 if (!open) { setSelectedProd(null); setFormError(''); }
             }}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle className="flex items-center gap-2">
                             <ClipboardList className="h-5 w-5 text-olive-600" />
                             Create Job Card
-                        </DialogTitle>
-                        <DialogDescription>
+                        </SheetTitle>
+                        <SheetDescription>
                             Fill in the details to create a new semi job card entry in the <strong>Semi Job Card</strong> sheet.
-                        </DialogDescription>
-                    </DialogHeader>
+                        </SheetDescription>
+                    </SheetHeader>
 
                     {selectedProd && (
-                        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+                        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+                            <SheetBody className="space-y-4 py-2">
                             {/* SF Sr No (Read Only) */}
                             <div className="space-y-2">
                                 <Label htmlFor="jc-sfSrNo">SF Sr. No. (Production No.)</Label>
@@ -735,8 +727,9 @@ export default function SFJobCardPage() {
                                 </div>
                             )}
 
+                            </SheetBody>
                             {/* Actions */}
-                            <div className="flex justify-end gap-2 pt-2">
+                            <SheetFooter className="pt-2 mt-auto">
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -753,11 +746,11 @@ export default function SFJobCardPage() {
                                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     {isSubmitting ? 'Creating...' : 'Create Job Card'}
                                 </Button>
-                            </div>
+                            </SheetFooter>
                         </form>
                     )}
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

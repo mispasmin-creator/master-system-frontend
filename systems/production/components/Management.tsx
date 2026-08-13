@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input"
 import { Label } from "@/systems/production/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet"
 import { Badge } from "@/systems/production/components/ui/badge"
 import { Toaster } from "@/systems/production/components/ui/toaster"
 import { Checkbox } from "@/systems/production/components/ui/checkbox"
@@ -324,14 +324,13 @@ export default function ManagementApprovalPage() {
     if (!validateForm() || !selectedApproval) return
     setIsSubmitting(true)
     try {
-      const now = new Date().toISOString()
-      const todayDate = format(new Date(), "yyyy-MM-dd")
+      // This page approves the production run itself (job card + lab test readiness),
+      // not a costing record — ProductionActualRun only has a single {status, remarks}
+      // pair, not the four separate Planned/Actual checkpoint columns the old sheet had,
+      // so all four stages collapse into one approval here.
       const { error: updateErr } = await productionApi.patch(ACTUAL_PRODUCTION_TABLE, selectedApproval.id, {
-          "Actual4": now,
-          "Actual5": now,
-          "Actual6": now,
-          "Actual7": todayDate,
-          "Remarks2": formData.remarks,
+          status: "Management Approved",
+          remarks: formData.remarks,
         })
 
       if (updateErr) throw updateErr
@@ -631,19 +630,20 @@ export default function ManagementApprovalPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Management Approval for JC: {selectedApproval?.jobCardNo}</DialogTitle>
-            <DialogDescription>Add your remarks to approve this production item.</DialogDescription>
-          </DialogHeader>
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Management Approval for JC: {selectedApproval?.jobCardNo}</SheetTitle>
+            <SheetDescription>Add your remarks to approve this production item.</SheetDescription>
+          </SheetHeader>
           <form
             onSubmit={(e) => {
               e.preventDefault()
               handleSaveApproval()
             }}
-            className="space-y-4 pt-4"
+            className="flex flex-col flex-1 min-h-0"
           >
+            <SheetBody className="space-y-4 pt-4">
             <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/50">
               <div>
                 <Label className="text-xs">DO No.</Label>
@@ -680,7 +680,9 @@ export default function ManagementApprovalPage() {
               {formErrors.remarks && <p className="text-xs text-red-600 mt-1">{formErrors.remarks}</p>}
             </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t">
+            </SheetBody>
+
+            <SheetFooter className="flex justify-end gap-2 pt-4 border-t mt-auto">
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
@@ -688,25 +690,26 @@ export default function ManagementApprovalPage() {
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Submit Approval
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
       {/* View Details Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-blue-700">
+      <Sheet open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2 text-blue-700">
               <ClipboardCheck className="h-5 w-5" />
               Test Details — JC: {viewingItem?.jobCardNo}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               Physical Lab Test 1, Physical Lab Test 2, Chemical Test, and Management Check details for this job card.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
           {viewingItem && (
-            <div className="space-y-5 pt-2">
+            <div className="flex flex-col flex-1 min-h-0">
+              <SheetBody className="space-y-5 pt-2">
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-lg border text-sm">
                 <div><span className="text-xs text-gray-500 block">Product Name</span><span className="font-semibold">{viewingItem.productName || "-"}</span></div>
@@ -788,14 +791,15 @@ export default function ManagementApprovalPage() {
                   )}
                 </div>
               </div>
+              </SheetBody>
             </div>
           )}
 
-          <div className="flex justify-end pt-4 border-t">
+          <SheetFooter className="flex justify-end pt-4 border-t mt-auto">
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>Close</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

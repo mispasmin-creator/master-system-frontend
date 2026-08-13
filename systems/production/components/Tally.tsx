@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
 import { Badge } from "@/systems/production/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/systems/production/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet"
 import { Label } from "@/systems/production/components/ui/label"
 import { Textarea } from "@/systems/production/components/ui/textarea"
 import { Separator } from "@/systems/production/components/ui/separator"
@@ -119,55 +119,66 @@ export default function TallyPage() {
       if (fetchError) throw fetchError
 
       const allItems: ActualProductionItem[] = (data || []).map((row: any) => {
-        const rawMaterials: RawMaterial[] = []
-        for (let i = 1; i <= 20; i++) {
-          const name = row[`Raw Material Name ${i}`]
-          const qty = row[`Quantity Of Raw Material ${i}`]
-          if (name && String(name).trim() !== "") {
-            rawMaterials.push({
-              name: String(name),
-              quantity: qty || 0
-            })
-          }
-        }
+        const rawMaterials: RawMaterial[] = (Array.isArray(row.materials) ? row.materials : [])
+          .slice()
+          .sort((a: any, b: any) => (a.sequence ?? 0) - (b.sequence ?? 0))
+          .filter((m: any) => m.materialName && String(m.materialName).trim() !== "")
+          .map((m: any) => ({ name: String(m.materialName), quantity: m.quantity ?? 0 }))
+
+        const order = row.jobCard?.order
+        // ProductionActualRun has no dedicated tally-timestamp column, so `status` doubles
+        // as the tally flag: handleSaveTally sets it to "Tallied" on verification.
+        const isTallied = String(row.status || "").trim().toLowerCase() === "tallied"
 
         return {
           id: row.id,
-          timestamp: formatDateForDisplay(row.Timestamp),
-          jobCardNo: String(row["Job Card No."] || ""),
-          firmName: String(row["FIRM Name"] || ""),
-          dateOfProduction: formatDateForDisplay(row["Date Of Production"], "dd/MM/yyyy"),
-          nameOfSupervisor: String(row["Name Of Supervisor"] || ""),
-          productName: String(row["Product Name"] || ""),
-          quantityOfFG: Number(row["Quantity Of FG"] || 0),
-          serialNumber: String(row["Serial Number"] || ""),
+          timestamp: formatDateForDisplay(row.createdAt),
+          jobCardNo: String(row.jobCard?.jobCardNo || ""),
+          firmName: String(order?.firmName || ""),
+          dateOfProduction: formatDateForDisplay(row.dateOfProduction, "dd/MM/yyyy"),
+          nameOfSupervisor: String(row.supervisorName || ""),
+          productName: String(order?.productName || ""),
+          quantityOfFG: Number(row.quantityFg || 0),
+          serialNumber: String(row.serialNumber || ""),
           rawMaterials,
-          machineRunningHour: String(row["Machine Running hour"] || ""),
-          remarks1: String(row.Remarks1 || ""),
-          ppBagUsed: String(row["PP BAG USED"] || ""),
-          ppBagToBeUsed: String(row["PP BAG TO BE USED"] || ""),
-          partyName: String(row["Party Name"] || ""),
-          ppBagSmall: String(row["PP Bag (Small)"] || ""),
-          costingAmount: Number(row["Costing Amount"] || 0),
-          colorCondition: String(row["Color Condition"] || ""),
-          orderNo: String(row["Order No."] || ""),
-          planned1: formatDateForDisplay(row.Planned1, "dd/MM/yy"),
-          actual1: formatDateForDisplay(row.Actual1, "dd/MM/yy"),
-          status: String(row.Status || ""),
-          actualQty1: String(row.Qty || ""), 
-          planned2: formatDateForDisplay(row.Planned2, "dd/MM/yy"),
-          actual2: formatDateForDisplay(row.Actual2, "dd/MM/yy"),
-          actual3: formatDateForDisplay(row.Actual3, "dd/MM/yy"),
-          actual4: formatDateForDisplay(row.Actual4, "dd/MM/yy"),
-          planned9: formatDateForDisplay(row.Planned9, "dd/MM/yy"),
-          actual9: formatDateForDisplay(row.Actual9, "dd/MM/yy"),
-          timeDelay2: String(row.TimeDelay2 || ""),
-          remarks: String(row.Remarks || ""),
-          checkStatus: String(row.Status || "N/A"),
-          checkTimestamp: formatDateForDisplay(row.Planned2, "dd/MM/yy HH:mm"),
-          tallyTimestamp: row.TallyActual ? formatDateForDisplay(row.TallyActual, "dd/MM/yy HH:mm") : null,
-          tallyRemarks: String(row.TallyRemarks || ""),
-          costingAmount2: "", 
+          machineRunningHour: String(row.machineHours ?? ""),
+          // No real column for the old "Remarks1" field on ProductionActualRun; dropped.
+          remarks1: "",
+          ppBagUsed: String(row.ppBagUsed ?? ""),
+          // No real column for "PP BAG TO BE USED"; dropped.
+          ppBagToBeUsed: "",
+          partyName: String(order?.partyName || ""),
+          // No real column for "PP Bag (Small)"; dropped.
+          ppBagSmall: "",
+          costingAmount: Number(row.costingAmount || 0),
+          // No real column for "Color Condition"; dropped.
+          colorCondition: "",
+          orderNo: String(order?.deliveryOrderNo || ""),
+          // No real column for the old "Planned1" workflow field; dropped.
+          planned1: "",
+          // "Actual 1" duplicated the production date, already shown via dateOfProduction; dropped.
+          actual1: "",
+          status: String(row.status || ""),
+          // "Qty"/actualQty1 duplicated quantityOfFG above; dropped.
+          actualQty1: "",
+          // No real columns for the old Planned2/Actual2/Actual3/Actual4/TimeDelay2
+          // workflow-tracking fields on ProductionActualRun; dropped.
+          planned2: "",
+          actual2: "",
+          actual3: "",
+          actual4: "",
+          // Planned9 used to gate readiness for tally; there's no equivalent column anymore,
+          // so pending/history is now derived purely from `status` (see filters below).
+          planned9: "",
+          actual9: "",
+          timeDelay2: "",
+          remarks: String(row.remarks || ""),
+          checkStatus: String(row.status || "N/A"),
+          checkTimestamp: "",
+          // `updatedAt` approximates when the row was last tallied, since PATCH bumps it.
+          tallyTimestamp: isTallied ? formatDateForDisplay(row.updatedAt, "dd/MM/yy HH:mm") : null,
+          tallyRemarks: isTallied ? String(row.remarks || "") : "",
+          costingAmount2: "",
         }
       })
 
@@ -181,9 +192,10 @@ export default function TallyPage() {
         });
       };
 
+      // Planned9 no longer exists on ProductionActualRun; a row counts as pending tally
+      // simply when it has a job card and hasn't been marked "Tallied" yet.
       const pendingData = allItems.filter(item =>
         hasValue(item.jobCardNo) &&
-        hasValue(item.planned9) &&
         !hasValue(item.tallyTimestamp)
       )
       setPendingTallies(filterByFirm(pendingData))
@@ -243,11 +255,12 @@ export default function TallyPage() {
     if (!selectedTally) return
     setIsSubmitting(true)
     try {
-      // Update dedicated tally fields in actual_production.
+      // ProductionActualRun has no dedicated tally fields, so `status` doubles as the tally
+      // flag and `remarks` stores the verification remarks (overwriting the production
+      // remarks, which is fine since tallying is the final step for a row).
       const { error: updateError } = await productionApi.patch('actual_production', selectedTally.id, {
-          "TallyActual": new Date().toISOString(),
-          "TallyRemarks": remarks,
-          "Actual9": format(new Date(), "yyyy-MM-dd"),
+          status: "Tallied",
+          remarks: remarks,
         })
 
       if (updateError) throw updateError
@@ -497,17 +510,17 @@ export default function TallyPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl border-b pb-2">
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2 text-xl border-b pb-2">
               <Package className="h-5 w-5 text-olive-600" />
               Complete Production Details - Job Card: {selectedTally?.jobCardNo}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               All information from Actual Production for this job card
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
           {selectedTally && (
             <form
@@ -515,9 +528,10 @@ export default function TallyPage() {
                 e.preventDefault()
                 handleSaveTally()
               }}
-              className="space-y-6 pt-2"
+              className="flex flex-col flex-1 min-h-0"
             >
-              {/* Section 1: Basic Information */}
+              <SheetBody className="space-y-6 pt-2">
+                {/* Section 1: Basic Information */}
               <div className="space-y-3">
                 <h3 className="text-md font-semibold flex items-center gap-2 text-olive-700 bg-olive-50 p-2 rounded">
                   <Building className="h-4 w-4" /> Basic Information
@@ -716,8 +730,9 @@ export default function TallyPage() {
                 </div>
               </div>
 
+              </SheetBody>
               {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-4 border-t">
+              <SheetFooter className="pt-4 border-t mt-auto">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                   Cancel
                 </Button>
@@ -725,11 +740,11 @@ export default function TallyPage() {
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Complete Tally Verification
                 </Button>
-              </div>
+              </SheetFooter>
             </form>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

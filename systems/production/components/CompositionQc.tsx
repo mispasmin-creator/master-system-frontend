@@ -8,7 +8,7 @@ import { Button } from "@/systems/production/components/ui/button"
 import { Input } from "@/systems/production/components/ui/input"
 import { Badge } from "@/systems/production/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/systems/production/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetBody } from "@/systems/production/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -53,7 +53,6 @@ const JOBCARDS_TABLE        = "jobcards"
 const ACTUAL_PROD_TABLE     = "actual_production"
 const PRODUCTION_TABLE      = "production"
 const COSTING_TABLE         = "costing_response"
-const KYC_TABLE             = "kyc"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const pct = (v: number | null) =>
@@ -97,187 +96,68 @@ export default function CompositionQCPage() {
       const [
         { data: jcData,     error: jcErr },
         { data: apData,     error: apErr },
-        { data: prodData,   error: prodErr },
+        { data: ordersData, error: ordersErr },
         { data: costData,   error: costErr },
-        { data: kycData,    error: kycErr },
-        { data: orderReceiptData, error: orderReceiptErr },
       ] = await Promise.all([
         await productionApi.get(JOBCARDS_TABLE),
         await productionApi.get(ACTUAL_PROD_TABLE),
         await productionApi.get(PRODUCTION_TABLE),
         await productionApi.get(COSTING_TABLE),
-        await productionApi.get(KYC_TABLE),
-        await productionApi.get('ORDER RECEIPT'),
       ])
       if (jcErr)   throw jcErr
       if (apErr)   throw apErr
-      if (prodErr) throw prodErr
+      if (ordersErr) throw ordersErr
       if (costErr) throw costErr
-      if (kycErr)  throw kycErr
-      if (orderReceiptErr) throw orderReceiptErr
 
-      // Build product metadata lookup: DO No. → { rate, firm, checkDeliveryInStockOrNot }
-      const normalize = (value: any) => String(value || "").trim().toLowerCase()
-      const makeOrderProductKey = (orderNo: any, productName: any) => `${normalize(orderNo)}::${normalize(productName)}`
+      // The real backend is normalized (ProductionJobCard -> ProductionOrder via
+      // orderId, ProductionActualRun -> ProductionJobCard via jobCardId,
+      // ProductionCosting -> ProductionOrder via orderId) instead of the old
+      // Supabase spreadsheet columns (DO No., Product Name, Firm Name...) that used
+      // to be duplicated onto every row. Build id-keyed lookup maps and join on
+      // those foreign keys.
+      const orderById = new Map<string, any>()
+      ;(ordersData || []).forEach((o: any) => orderById.set(o.id, o))
 
-      const orderReceiptMetaMap = new Map<string, { rate: number; firm: string; party: string; checkDeliveryInStockOrNot: string; productName?: string }>()
-      ;(orderReceiptData || []).forEach((p: any) => {
-        const doNo = String(p["DO-Delivery Order No."] || "").trim()
-        const productName = String(p["Product Name"] || "").trim()
-        if (doNo) {
-          const meta = {
-            rate: Number(p["Rate Of Material"] || 0),
-            firm: String(p["Firm Name"] || ""),
-            party: String(p["Party Names"] || ""),
-            checkDeliveryInStockOrNot: String(p["check_delivery_in_stock_or_not"] || ""),
-            productName,
-          }
-          orderReceiptMetaMap.set(makeOrderProductKey(doNo, productName), meta)
-          if (!orderReceiptMetaMap.has(doNo)) orderReceiptMetaMap.set(doNo, meta)
-        }
-      })
+      const jobCardById = new Map<string, any>()
+      ;(jcData || []).forEach((jc: any) => jobCardById.set(jc.id, jc))
 
-      const productionMetaMap = new Map<string, { productionId?: number | string; rate: number; firm: string; party: string; productName: string }>()
-      ;(prodData || []).forEach((p: any) => {
-        const doNo = String(p["Delivery Order No."] || "").trim()
-        const productName = String(p["Product Name"] || "").trim()
-        if (!doNo) return
-        const meta = {
-          productionId: p.id,
-          rate: Number(p["product_rate"] || 0),
-          firm: String(p["Firm Name"] || ""),
-          party: String(p["Party Name"] || ""),
-          productName,
-        }
-        productionMetaMap.set(makeOrderProductKey(doNo, productName), meta)
-        if (!productionMetaMap.has(doNo)) productionMetaMap.set(doNo, meta)
-      })
-
-      // Build price lookup: product name → price per unit
-      const priceMap = new Map<string, number>()
-      ;(kycData || []).forEach((r: any) => {
-        const name = String(r["Product name"] || "").trim().toLowerCase()
-        if (name) priceMap.set(name, Number(r["Price"] || 0))
-      })
-
-      // Build actual production lookup: job card no → actual record.
-      // The same job card number is reused across several DOs, so keying on it
-      // alone returns whichever row the query happened to yield first and pulls
-      // another order's FG qty and materials in. Key on DO + product as well.
-      const apMap = new Map<string, any>()
-      ;(apData || []).forEach((r: any) => {
-        const jc = String(r["Job Card No."] || "").trim()
-        if (!jc) return
-        const apDo = normalize(r["Order No."])
-        const apProduct = normalize(r["Product Name"])
-        const withProduct = `${jc}::${apDo}::${apProduct}`
-        const withDo = `${jc}::${apDo}`
-        if (!apMap.has(withProduct)) apMap.set(withProduct, r)
-        if (!apMap.has(withDo)) apMap.set(withDo, r)
-        if (!apMap.has(jc)) apMap.set(jc, r) // keep first (latest insert)
-      })
-
-      // Build costing lookup: order no → latest costing row
-      const costMap = new Map<string, any>()
-      ;(costData || []).forEach((r: any) => {
-        const on = String(r["Order No."] || "").trim()
-        const productName = String(r["product name"] || "").trim()
-        if (!on) return
-        const key = makeOrderProductKey(on, productName)
-        if (!costMap.has(key)) costMap.set(key, r)
-        if (!costMap.has(on)) costMap.set(on, r)
+      // Latest costing row per order (GET /costing is already ordered by createdAt desc)
+      const costingByOrder = new Map<string, any>()
+      ;(costData || []).forEach((c: any) => {
+        if (c.orderId && !costingByOrder.has(c.orderId)) costingByOrder.set(c.orderId, c)
       })
 
       const result: QCRecord[] = []
 
-      for (const jc of (jcData || []) as any[]) {
-        const jobCardNo = String(jc["JC-Job Card Number"] || "").trim()
-        const doNo      = String(jc["Delivery Order No."] || "").trim()
-        const productName = String(jc["Product Name"] || "").trim()
-        // Most specific match first; falls back to the bare number so job cards
-        // that appear only once behave exactly as before.
-        const apRow =
-          apMap.get(`${jobCardNo}::${normalize(doNo)}::${normalize(productName)}`) ||
-          apMap.get(`${jobCardNo}::${normalize(doNo)}`) ||
-          apMap.get(jobCardNo)
-        let costRow = costMap.get(makeOrderProductKey(doNo, productName));
-        if (!costRow) {
-          const fallback = costMap.get(doNo);
-          if (fallback && (!fallback["product name"] || !productName || normalize(fallback["product name"]) === normalize(productName))) {
-            costRow = fallback;
-          }
-        }
+      for (const apRow of (apData || []) as any[]) {
+        const jobCard = apRow.jobCardId ? jobCardById.get(apRow.jobCardId) : null
+        if (!jobCard) continue
+        const order = jobCard.orderId ? orderById.get(jobCard.orderId) : null
+        if (!order) continue
+        const costRow = costingByOrder.get(order.id)
+        if (!costRow) continue // can't compare without a costing record
 
-        if (!apRow || !costRow) continue // can't compare without both sides
+        const jobCardNo    = String(jobCard.jobCardNo || "").trim()
+        const doNo          = String(order.deliveryOrderNo || "").trim()
+        const productName   = String(order.productName || "").trim()
+        const firmName       = String(order.firmName || "")
+        const fgQty           = Number(apRow.quantityFg || 0)
+        // ProductionOrder has no per-unit rate column; use the costing sheet's selling price.
+        const productRate     = Number(costRow.sellingPrice || 0)
+        const sellingPriceTotal = productRate * fgQty
+        const manufacturingCostTotal = Number(costRow.manufacturingCost || 0) * fgQty
 
-        let orderMeta = orderReceiptMetaMap.get(makeOrderProductKey(doNo, productName));
-        if (!orderMeta) {
-          const fallback = orderReceiptMetaMap.get(doNo);
-          if (fallback && (!fallback.productName || !productName || normalize(fallback.productName) === normalize(productName))) {
-            orderMeta = fallback;
-          }
-        }
-        if (!orderMeta || orderMeta.checkDeliveryInStockOrNot !== "For Production Planning") continue
-
-        let productionMeta = productionMetaMap.get(makeOrderProductKey(doNo, productName));
-        if (!productionMeta) {
-          const fallback = productionMetaMap.get(doNo);
-          if (fallback && (!fallback.productName || !productName || normalize(fallback.productName) === normalize(productName))) {
-            productionMeta = fallback;
-          }
-        }
-        const firmName           = productionMeta?.firm || orderMeta?.firm || String(jc["Firm Name"] || "")
-        const fgQty              = Number(apRow["Quantity Of FG"] || 0)
-        const productRate         = productionMeta?.rate || orderMeta?.rate || Number(costRow["SELLING PRICE"] || 0)
-        const sellingPriceTotal   = productRate * fgQty
-        const manufacturingCostTotal = Number(costRow["Manufacturing Cost"] || 0) * fgQty
-
-        // Build actual material map from actual_production
-        const actualMap = new Map<string, number>()
-        for (let i = 1; i <= 20; i++) {
-          const name = String(apRow[`Raw Material Name ${i}`] || "").trim().toLowerCase()
-          const qty  = Number(apRow[`Quantity Of Raw Material ${i}`] || 0)
-          if (name) actualMap.set(name, qty)
-        }
-
-        // Build material rows from composition
+        // NOTE: GET /actual-production and GET /costing do not `include` their
+        // material line-item relations (ProductionActualMaterial /
+        // ProductionCostingMaterial), so a per-material expected-vs-actual
+        // breakdown can't be built from the list endpoints alone. We fall back to
+        // the aggregate cost fields that ARE returned (variableCost = expected RM
+        // cost, costingAmount = actual RM cost) and leave the material table empty.
         const materials: MaterialRow[] = []
-        const compositionNames = new Set<string>()
-        for (let i = 1; i <= 20; i++) {
-          const name    = String(costRow[`RM${i}`] || "").trim()
-          const pctVal  = Number(costRow[`QTY${i}`] || 0)
-          if (!name) continue
+        const expTotal   = Number(costRow.variableCost || 0)
+        const actTotal   = Number(apRow.costingAmount || 0)
+        const matDiffPct = null
 
-          const lname       = name.toLowerCase()
-          compositionNames.add(lname)
-          const expectedQty = (pctVal / 100) * fgQty
-          const actualQty   = actualMap.get(lname) ?? 0
-          const price       = priceMap.get(lname) ?? 0
-          const expectedCost = expectedQty * price
-          const actualCost   = actualQty   * price
-          const qtyDiffPct   = expectedQty > 0 ? ((actualQty - expectedQty) / expectedQty) * 100 : null
-          const costDiffPct  = expectedCost > 0 ? ((actualCost - expectedCost) / expectedCost) * 100 : null
-
-          materials.push({ name, expectedPct: pctVal, expectedQty, actualQty, pricePerUnit: price,
-                           expectedCost, actualCost, qtyDiffPct, costDiffPct })
-        }
-        // Extra materials: used in actual but NOT in composition
-        actualMap.forEach((qty, lname) => {
-          if (!compositionNames.has(lname)) {
-            const price = priceMap.get(lname) ?? 0
-            materials.push({
-              name: lname, expectedPct: 0, expectedQty: 0, actualQty: qty,
-              pricePerUnit: price, expectedCost: 0, actualCost: qty * price,
-              qtyDiffPct: null, costDiffPct: null, isExtra: true
-            })
-          }
-        })
-
-        const expTotal  = materials.reduce((s, m) => s + m.expectedCost, 0)
-        const actTotal  = materials.reduce((s, m) => s + m.actualCost,   0)
-        const matDiffPct = materials.length > 0
-          ? materials.reduce((s, m) => s + Math.abs(m.qtyDiffPct ?? 0), 0) / materials.length
-          : null
         const costDiffPct    = expTotal > 0 ? ((actTotal - expTotal) / expTotal) * 100 : null
         const expectedProfit = sellingPriceTotal > 0 ? sellingPriceTotal - (expTotal + manufacturingCostTotal) : null
         const actualProfit   = sellingPriceTotal > 0 ? sellingPriceTotal - (actTotal + manufacturingCostTotal) : null
@@ -285,17 +165,17 @@ export default function CompositionQCPage() {
         const profitLoss     = actualProfit // backward compat alias
 
         result.push({
-          productionId: productionMeta?.productionId || "",
+          productionId: order.id || "",
           jobCardNo, doNo,
-          partyName:   String(jc["Party Name"] || productionMeta?.party || orderMeta?.party || ""),
-          productName: String(jc["Product Name"] || productionMeta?.productName || costRow["product name"] || ""),
+          partyName:   String(order.partyName || ""),
+          productName,
           fgQty,
           productRate,
           sellingPriceTotal,
           manufacturingCostTotal,
           expectedCostTotal: expTotal,
           actualCostTotal:   actTotal,
-          matDiffPct: matDiffPct !== null ? (materials.some(m => (m.qtyDiffPct ?? 0) > 0) ? matDiffPct : -matDiffPct) : null,
+          matDiffPct,
           costDiffPct,
           expectedProfit,
           actualProfit,
@@ -303,7 +183,7 @@ export default function CompositionQCPage() {
           profitLoss,
           materials,
           firmName,
-          productionDate: apRow["Timestamp"] ? format(new Date(apRow["Timestamp"]), "dd/MM/yyyy") : "",
+          productionDate: apRow.dateOfProduction ? format(new Date(apRow.dateOfProduction), "dd/MM/yyyy") : "",
         })
       }
 
@@ -491,14 +371,14 @@ export default function CompositionQCPage() {
       </Card>
 
       {/* ── Detail Modal ───────────────────────────────────────────────────── */}
-      <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Sheet open={!!selected} onOpenChange={() => setSelected(null)}>
+        <SheetContent>
           {selected && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="text-lg font-bold text-slate-800">
+            <div className="flex flex-col flex-1 min-h-0">
+              <SheetHeader>
+                <SheetTitle className="text-lg font-bold text-slate-800">
                   QC Detail — {selected.jobCardNo}
-                </DialogTitle>
+                </SheetTitle>
                 <div className="flex flex-wrap gap-2 pt-1">
                   <Badge variant="outline" className="text-xs">{selected.doNo}</Badge>
                   <Badge variant="outline" className="text-xs">ID: {selected.productionId || "—"}</Badge>
@@ -509,8 +389,9 @@ export default function CompositionQCPage() {
                     <Badge variant="outline" className="text-xs">📅 {selected.productionDate}</Badge>
                   )}
                 </div>
-              </DialogHeader>
+              </SheetHeader>
 
+              <SheetBody className="mt-2 pr-2">
               {/* Summary KPIs */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
                 {[
@@ -707,10 +588,11 @@ export default function CompositionQCPage() {
                   </div>
                 )
               })()}
-            </>
+              </SheetBody>
+            </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

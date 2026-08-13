@@ -25,7 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/systems/production/co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/systems/production/components/ui/card";
 import { Badge } from "@/systems/production/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/systems/production/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet";
 import { cn } from "@/systems/production/lib/utils";
 import { useToast } from "@/systems/production/components/ui/use-toast";
 
@@ -397,17 +397,18 @@ export default function ProductionTracking() {
         </Card>
       </Tabs>
 
-      {/* Log Production Dialog */}
-      <Dialog open={isLogDialogOpen} onOpenChange={setIsLogDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Log Production</DialogTitle>
-            <DialogDescription>
+      {/* Log Production Sheet */}
+      <Sheet open={isLogDialogOpen} onOpenChange={setIsLogDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle className="text-xl">Log Production</SheetTitle>
+            <SheetDescription>
               Submit actual production run details for Job Card: <span className="font-semibold text-zinc-900 dark:text-white">{selectedJobCard?.jobCardNo}</span>
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          <div className="grid gap-6 py-4">
+          <div className="flex flex-col flex-1 min-h-0">
+          <SheetBody className="grid gap-6 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Quantity FG</Label>
@@ -506,9 +507,8 @@ export default function ProductionTracking() {
                 className="resize-none h-20"
               />
             </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+          </SheetBody>
+          <SheetFooter className="flex justify-end gap-3 pt-4 mt-auto border-t border-zinc-100 dark:border-zinc-800">
             <Button variant="outline" onClick={() => setIsLogDialogOpen(false)}>
               Cancel
             </Button>
@@ -519,9 +519,10 @@ export default function ProductionTracking() {
                 'Submit Log'
               )}
             </Button>
+          </SheetFooter>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

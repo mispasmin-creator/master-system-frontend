@@ -46,13 +46,14 @@ import {
 } from "@/systems/production/components/ui/table";
 import { Checkbox } from "@/systems/production/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/systems/production/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetBody
+} from "@/systems/production/components/ui/sheet";
 import { Label } from "@/systems/production/components/ui/label";
 import { Input } from "@/systems/production/components/ui/input";
 import {
@@ -134,6 +135,7 @@ interface CostingHistoryItem {
   productName: string;
   alumina: number;
   iron: number;
+  gp: number | null;
   bd: number;
   ap: number;
   rawMaterials: string[]; // RM1..RM20
@@ -221,6 +223,7 @@ const HISTORY_COLUMNS_META = [
   { header: "Product Name", dataKey: "productName", toggleable: true },
   { header: "Total AL", dataKey: "alumina", toggleable: true },
   { header: "Total FE", dataKey: "iron", toggleable: true },
+  { header: "GP %", dataKey: "gp", toggleable: true },
   { header: "Total BD", dataKey: "bd", toggleable: true },
   { header: "Total AP", dataKey: "ap", toggleable: true },
   { header: "Raw Materials", dataKey: "rawMaterials", toggleable: true },
@@ -353,6 +356,10 @@ export default function CheckPage() {
     const userFirms = user.firm.split(',').map((f: string) => f.trim()).filter(Boolean);
     return kycProducts.filter((p) => {
       const fName = (p.firmName || "").toLowerCase();
+      // No real firm data on this entry (e.g. ProductionKyc fallback rows have no
+      // firmName column at all) — treat as generic reference data visible to every
+      // firm rather than hiding it from firm-scoped users.
+      if (!fName) return true;
       return userFirms.some((uf: string) => {
         const mappedFirm = (FIRM_MAP[uf] || uf).toLowerCase();
         const firmSearch = uf.toLowerCase();
@@ -538,9 +545,14 @@ export default function CheckPage() {
       const verifiedKeysWithoutParty = new Set<string>();
       const verifiedDosWithoutProduct = new Set<string>();
       (costData || []).forEach((row: any) => {
-        const orderNo = String(row["Order No."] || "").trim();
-        const productName = String(row["product name"] || "").trim();
-        const partyName = String(row["Party Name"] || "").trim();
+        // costData now comes straight from the real ProductionCosting model
+        // (GET /api/production/costing), which nests the linked order under
+        // `order` and has no "Order No." / "product name" / "Party Name"
+        // bracket-string keys — those were the old Google-Sheets column names
+        // and are kept only as a fallback for any not-yet-migrated rows.
+        const orderNo = String(row.order?.deliveryOrderNo || row["Order No."] || "").trim();
+        const productName = String(row.order?.productName || row["product name"] || "").trim();
+        const partyName = String(row.order?.partyName || row["Party Name"] || "").trim();
         if (orderNo) {
           if (productName) {
             if (partyName) {
@@ -585,12 +597,14 @@ export default function CheckPage() {
       const matchedProdIds = new Set<any>();
 
       (allProdData || []).forEach((row: any) => {
-        const doNo = String(row["Delivery Order No."] || "").trim();
-        const productName = String(row["Product Name"] || "").trim();
+        // row is a real ProductionOrder from GET /api/production/orders — camelCase
+        // fields, not the old Supabase bracket-string keys.
+        const doNo = String(row["deliveryOrderNo"] || row["Delivery Order No."] || "").trim();
+        const productName = String(row["productName"] || row["Product Name"] || "").trim();
         if (!doNo) return;
 
-        if (row["Actual 1"] || row["Order Cancel"]) return;
-        if (isVerified(doNo, row["Party Name"], productName)) return;
+        if (row["orderCancelled"] || row["Order Cancel"]) return;
+        if (isVerified(doNo, row["partyName"] || row["Party Name"], productName)) return;
 
         const key = makeOrderProductKey(doNo, productName);
         let meta = orderMetaMap.get(key);
@@ -604,26 +618,26 @@ export default function CheckPage() {
         pendingList.push({
           id: row.id,
           productionId: row.id,
-          timestamp: row["Timestamp"] || "",
-          firmName: row["Firm Name"] || meta?.firmName || "",
+          timestamp: row["createdAt"] || row["Timestamp"] || "",
+          firmName: row["firmName"] || row["Firm Name"] || meta?.firmName || "",
           deliveryOrderNo: doNo,
-          partyName: row["Party Name"] || meta?.partyName || "",
+          partyName: row["partyName"] || row["Party Name"] || meta?.partyName || "",
           productName,
           orderQuantity: Number(
-            row["Order Quantity"] || meta?.orderQuantity || 0,
+            row["orderQuantity"] || row["Order Quantity"] || meta?.orderQuantity || 0,
           ),
           expectedDeliveryDate: formatDate(
-            row["Expected Delivery Date"] || meta?.expectedDeliveryDate,
+            row["expectedDeliveryDate"] || row["Expected Delivery Date"] || meta?.expectedDeliveryDate,
           ),
-          priority: row["Priority"] || "",
-          note: row["Note"] || meta?.note || "",
+          priority: row["priority"] || row["Priority"] || "",
+          note: row["reason"] || row["Note"] || meta?.note || "",
           plannedDate: formatDate(row["Planned 1"] || meta?.plannedDate),
-          status: row["Status"] || meta?.status || "",
-          crmName: meta?.crmName || "",
-          quantityDelivered: meta?.quantityDelivered || "",
+          status: row["status"] || row["Status"] || meta?.status || "",
+          crmName: row["crmName"] || meta?.crmName || "",
+          quantityDelivered: String(row["quantityDelivered"] ?? "") || meta?.quantityDelivered || "",
           productionPending: meta?.productionPending || "",
           productRate: meta?.productRate || "",
-          uploadSo: row["Upload SO"] || meta?.uploadSo || "",
+          uploadSo: row["uploadSo"] || row["Upload SO"] || meta?.uploadSo || "",
         });
       });
 
@@ -789,20 +803,24 @@ export default function CheckPage() {
       const procCostMap = new Map<string, number>();
 
       (semiActualData || []).forEach((row: any) => {
-        const sjcNo = String(row["Semi Finished Job Card No."] || "").trim();
-        const sfNo = String(row["Semi Finished Production No."] || "").trim();
-        const prodName = normProd(row["Product Name"]);
+        // Real ProductionSemiActualRun shape: semiJobCardId, qtyProduced,
+        // machineHours, endProductName, endProductQty, status, with
+        // materials: [{materialName, quantity, processingCost}] and
+        // semiJobCard: { ...semiOrder: { firmName, semiGoodName, ... } }.
+        const sjcNo = String(row["semiJobCardId"] || row.semiJobCard?.id || "").trim();
+        const sfNo = String(row.semiJobCard?.semiOrderId || row.semiJobCard?.semiOrder?.id || "").trim();
+        const prodName = normProd(row["endProductName"] || row.semiJobCard?.semiOrder?.semiGoodName);
 
         const fName = normFirm(
-          row["Firm name"] || 
-          row["Firm Name"] || 
-          sjcFirmMap.get(`${sjcNo}::${prodName}`) || 
-          sjcFirmMap.get(sjcNo) || 
-          sfFirmMap.get(`${sfNo}::${prodName}`) || 
+          row.semiJobCard?.semiOrder?.firmName ||
+          sjcFirmMap.get(`${sjcNo}::${prodName}`) ||
+          sjcFirmMap.get(sjcNo) ||
+          sfFirmMap.get(`${sfNo}::${prodName}`) ||
           sfFirmMap.get(sfNo)
         );
 
-        const mainCost = Number(row["Processing Cost"] || 0);
+        const materials = Array.isArray(row.materials) ? row.materials : [];
+        const mainCost = materials.reduce((sum: number, m: any) => sum + (Number(m.processingCost) || 0), 0);
 
         if (prodName && mainCost > 0) {
           if (fName) {
@@ -812,9 +830,9 @@ export default function CheckPage() {
           if (!procCostMap.has(prodName)) procCostMap.set(prodName, mainCost);
         }
 
-        for (let i = 1; i <= 5; i++) {
-          const rmName = normProd(row[`Raw Material Name ${i}`]);
-          const cost = Number(row[`Processing Cost ${i}`] || 0);
+        materials.forEach((m: any) => {
+          const rmName = normProd(m.materialName);
+          const cost = Number(m.processingCost || 0);
           if (rmName && cost > 0) {
             if (fName) {
               const key = `${fName}___${rmName}`;
@@ -822,7 +840,7 @@ export default function CheckPage() {
             }
             if (!procCostMap.has(rmName)) procCostMap.set(rmName, cost);
           }
-        }
+        });
       });
 
       (crushingActualData || []).forEach((row: any) => {
@@ -1008,20 +1026,20 @@ export default function CheckPage() {
 
       // Process ALL semi_actual history products with traced firm names
       (semiActualData || []).forEach((row: any) => {
-        const sjcNo = String(row["Semi Finished Job Card No."] || "").trim();
-        const sfNo = String(row["Semi Finished Production No."] || "").trim();
-        const prodName = String(row["Product Name"] || "").trim();
-        const procCost = Number(row["Processing Cost"] || 0);
+        const sjcNo = String(row["semiJobCardId"] || row.semiJobCard?.id || "").trim();
+        const sfNo = String(row.semiJobCard?.semiOrderId || row.semiJobCard?.semiOrder?.id || "").trim();
+        const prodName = String(row["endProductName"] || row.semiJobCard?.semiOrder?.semiGoodName || "").trim();
+        const materials = Array.isArray(row.materials) ? row.materials : [];
+        const procCost = materials.reduce((sum: number, m: any) => sum + (Number(m.processingCost) || 0), 0);
 
         if (!prodName) return;
 
         const tracedFirmRaw = String(
-          row["Firm name"] || 
-          row["Firm Name"] || 
-          sjcFirmMap.get(`${sjcNo}::${normProd(prodName)}`) || 
-          sjcFirmMap.get(sjcNo) || 
-          sfFirmMap.get(`${sfNo}::${normProd(prodName)}`) || 
-          sfFirmMap.get(sfNo) || 
+          row.semiJobCard?.semiOrder?.firmName ||
+          sjcFirmMap.get(`${sjcNo}::${normProd(prodName)}`) ||
+          sjcFirmMap.get(sjcNo) ||
+          sfFirmMap.get(`${sfNo}::${normProd(prodName)}`) ||
+          sfFirmMap.get(sfNo) ||
           ""
         ).trim();
 
@@ -1034,7 +1052,7 @@ export default function CheckPage() {
           const grainRec = findGrainRateForFines(displayFirm, prodName);
 
           // Date comparison: Compare Production Entry date vs Purchase FMS timestamp
-          const semiDateStr = row["Date Of Production"] || row["Timestamp"];
+          const semiDateStr = row.semiJobCard?.dateOfProduction || row["createdAt"];
           const semiTime = semiDateStr ? new Date(semiDateStr).getTime() : 0;
 
           const existingRec = recordMap.get(grainKey);
@@ -1067,10 +1085,15 @@ export default function CheckPage() {
         });
       });
 
-      // Fallback: Merge products from Supabase 'kyc' table ONLY IF they are missing from active recordMap
+      // Fallback: Merge products from the real ProductionKyc table (GET
+      // /api/production/kyc — camelCase fields, no firmName column at all) ONLY
+      // IF they are missing from active recordMap. An empty firmName here is
+      // intentional: the popover's firm filter does `selectedFirm.includes(p.firmName)`,
+      // and includes("") is always true, so these generic reference entries show
+      // up for every firm instead of being excluded by a fake "N/A" mismatch.
       (kycMasterData || []).forEach((row: any) => {
-        const pName = String(row["Product name"] || "").trim();
-        const fName = String(row["Firm Name"] || "N/A").trim();
+        const pName = String(row["productName"] || row["Product name"] || "").trim();
+        const fName = String(row["firmName"] || "").trim();
         if (!pName) return;
 
         const key = `${normFirm(fName)}___${normProd(pName)}`;
@@ -1080,11 +1103,11 @@ export default function CheckPage() {
           recordMap.set(key, {
             id: idxCounter++,
             productName: pName,
-            alumina: row["Alumina"] != null && !isNaN(Number(row["Alumina"])) ? Number(row["Alumina"]) : null,
-            iron: row["Iron"] != null && !isNaN(Number(row["Iron"])) ? Number(row["Iron"]) : null,
-            bd: row["Bd"] != null && !isNaN(Number(row["Bd"])) ? Number(row["Bd"]) : null,
-            ap: row["Ap"] != null && !isNaN(Number(row["Ap"])) ? Number(row["Ap"]) : null,
-            price: row["Price"] != null && !isNaN(Number(row["Price"])) ? Number(row["Price"]) : null,
+            alumina: row["alumina"] != null && !isNaN(Number(row["alumina"])) ? Number(row["alumina"]) : null,
+            iron: row["iron"] != null && !isNaN(Number(row["iron"])) ? Number(row["iron"]) : null,
+            bd: row["bd"] != null && !isNaN(Number(row["bd"])) ? Number(row["bd"]) : null,
+            ap: row["ap"] != null && !isNaN(Number(row["ap"])) ? Number(row["ap"]) : null,
+            price: row["price"] != null && !isNaN(Number(row["price"])) ? Number(row["price"]) : null,
             firmName: fName,
           });
         }
@@ -1159,19 +1182,34 @@ export default function CheckPage() {
         const rawMaterials: string[] = [];
         const rawMaterialQtys: string[] = [];
         const rawMaterialCosts: number[] = [];
-        for (let i = 1; i <= 20; i++) {
-          const rm = row[`RM${i}`];
-          const qty = row[`QTY${i}`];
-          const cost = row[`COST${i}`];
-          if (rm && String(rm).trim()) rawMaterials.push(String(rm));
-          if (qty !== null && qty !== undefined && String(qty).trim())
-            rawMaterialQtys.push(String(qty));
-          rawMaterialCosts.push(Number(cost || 0));
+        // Real ProductionCosting rows carry their materials via the `materials`
+        // relation (materialName/quantity/sequence — no per-line cost column).
+        // Bracket-string RM1../QTY1../COST1.. keys are the old Google-Sheets
+        // shape and only apply to rows that predate the migration.
+        const materialRows = Array.isArray(row.materials)
+          ? [...row.materials].sort((a: any, b: any) => (a.sequence || 0) - (b.sequence || 0))
+          : [];
+        if (materialRows.length > 0) {
+          materialRows.forEach((m: any) => {
+            if (m.materialName && String(m.materialName).trim()) rawMaterials.push(String(m.materialName));
+            if (m.quantity !== null && m.quantity !== undefined) rawMaterialQtys.push(String(m.quantity));
+            rawMaterialCosts.push(0);
+          });
+        } else {
+          for (let i = 1; i <= 20; i++) {
+            const rm = row[`RM${i}`];
+            const qty = row[`QTY${i}`];
+            const cost = row[`COST${i}`];
+            if (rm && String(rm).trim()) rawMaterials.push(String(rm));
+            if (qty !== null && qty !== undefined && String(qty).trim())
+              rawMaterialQtys.push(String(qty));
+            rawMaterialCosts.push(Number(cost || 0));
+          }
         }
-        const orderNo = String(row["Order No."] || "").trim();
-        const productName = String(row["product name"] || "").trim();
-        const partyName = String(row["Party Name"] || "").trim();
-        
+        const orderNo = String(row.order?.deliveryOrderNo || row["Order No."] || "").trim();
+        const productName = String(row.order?.productName || row["product name"] || "").trim();
+        const partyName = String(row.order?.partyName || row["Party Name"] || "").trim();
+
         const keyWithParty = makeOrderPartyProductKey(orderNo, partyName, productName);
         const key = makeOrderProductKey(orderNo, productName);
 
@@ -1228,16 +1266,17 @@ export default function CheckPage() {
         }
         return {
           id: row.id,
-          productionId: enriched.productionId || "",
-          firmName: meta?.firmName || enriched.firmName || "",
-          timestamp: row["TIMESTAMP"]
-            ? format(new Date(row["TIMESTAMP"]), "dd/MM/yyyy HH:mm:ss")
-            : "",
-          compositionNo: row["Composition No."] || "",
+          productionId: row.orderId || enriched.productionId || "",
+          firmName: row.order?.firmName || meta?.firmName || enriched.firmName || "",
+          timestamp: row.createdAt
+            ? format(new Date(row.createdAt), "dd/MM/yyyy HH:mm:ss")
+            : (row["TIMESTAMP"] ? format(new Date(row["TIMESTAMP"]), "dd/MM/yyyy HH:mm:ss") : ""),
+          compositionNo: row.compositionNo || row["Composition No."] || "",
           orderNo,
           productName,
-          alumina: Number(row["alumina"] || 0),
-          iron: Number(row["iron"] || 0),
+          alumina: Number(row.aluminaPercent ?? row["alumina"] ?? 0),
+          iron: Number(row.ironPercent ?? row["iron"] ?? 0),
+          gp: row.gpPercent !== undefined && row.gpPercent !== null ? Number(row.gpPercent) : null,
           bd: Number(row["BD"] || 0),
           ap: Number(row["AP"] || 0),
           rawMaterials,
@@ -1246,8 +1285,8 @@ export default function CheckPage() {
           plannedDate: enriched.plannedDate,
           expectedDeliveryDate: enriched.expectedDeliveryDate,
           priority: enriched.priority,
-          status: row["Status"] || meta?.status || enriched.status || "",
-          partyName: meta?.partyName || enriched.partyName || "",
+          status: row.status || row["Status"] || meta?.status || enriched.status || "",
+          partyName: partyName || meta?.partyName || enriched.partyName || "",
           orderQuantity: meta?.orderQuantity || enriched.orderQuantity || 0,
           note: meta?.note || enriched.note || "",
           productRate: meta?.productRate || enriched.productRate || "",
@@ -1255,7 +1294,7 @@ export default function CheckPage() {
           crmName: meta?.crmName || enriched.crmName || "",
           quantityDelivered: meta?.quantityDelivered || enriched.quantityDelivered || "",
           productionPending: meta?.productionPending || enriched.productionPending || "",
-          manufacturingCost: row["Manufacturing Cost"] !== undefined && row["Manufacturing Cost"] !== null ? Number(row["Manufacturing Cost"]) : undefined,
+          manufacturingCost: row.manufacturingCost !== undefined && row.manufacturingCost !== null ? Number(row.manufacturingCost) : (row["Manufacturing Cost"] !== undefined && row["Manufacturing Cost"] !== null ? Number(row["Manufacturing Cost"]) : undefined),
         };
       });
 
@@ -1674,7 +1713,7 @@ export default function CheckPage() {
 
     let maxNumber = 0;
     (data || []).forEach((row: any) => {
-      const cn = row["Composition No."];
+      const cn = row.compositionNo || row["Composition No."];
       if (cn && typeof cn === "string" && cn.startsWith("CN-")) {
         const num = Number.parseInt(cn.substring(3));
         if (!isNaN(num) && num > maxNumber) maxNumber = num;
@@ -1754,42 +1793,37 @@ export default function CheckPage() {
     try {
       const compositionNumber = await generateCompositionNumber();
 
-      // Build RM1..RM20 / QTY1..QTY20 fields
-      const rmFields: Record<string, any> = {};
-      for (let i = 1; i <= 20; i++) {
-        const row = kittingFormRows[i - 1];
-        rmFields[`RM${i}`] = row?.productName || null;
-        rmFields[`QTY${i}`] = row?.percentage ? Number(row.percentage) : null;
-        rmFields[`COST${i}`] = row?.cost ? Number(row.cost) : null;
-      }
+      // Raw material rows entered in the kitting form, mapped to the
+      // ProductionCostingMaterial relation shape (materialName/quantity/sequence).
+      const materialRows = kittingFormRows.filter((row) => row?.productName);
 
-      const insertPayload = {
-        "Composition No.": compositionNumber,
-        "Order No.": selectedCheck.deliveryOrderNo,
-        "product name": selectedCheck.productName,
-        "Firm Name": selectedCheck.firmName || null,
-        "Party Name": selectedCheck.partyName || null,
-        alumina: kittingTotals.al,
-        iron: kittingTotals.fe,
-        BD: kittingTotals.bd,
-        AP: kittingTotals.ap,
-        "VARIABLE COST": kittingTotals.variableCost,
-        "Manufacturing Cost": manufacturingCost || 1500,
-        "SELLING PRICE": kittingTotals.variableCost + (manufacturingCost || 1500),
-        ...rmFields,
-        // Expected Values (mapped by index to DB columns)
-        "Expected WC %": expectedValues[0]?.value || null,
-        "Expected Sticky Flow": expectedValues[1]?.value || null,
-        "Expected IST": expectedValues[2]?.value || null,
-        "Expected FST": expectedValues[3]?.value || null,
-        "Expected BD 110C": expectedValues[4]?.value || null,
-        "Expected BD 1100C": expectedValues[5]?.value || null,
-        "Expected CCS 110C": expectedValues[6]?.value || null,
-        "Expected CCS 1100C": expectedValues[7]?.value || null,
-        "Expected PLC 1100C": expectedValues[8]?.value || null,
+      // NOTE: ProductionCosting (the real Prisma model) has no columns for the
+      // BD/AP composition totals or the "Expected Values" block (W/C %, Sticky/
+      // Flow, IST, FST, BD/CCS/PLC at 110C & 1100C) that the old Supabase sheet
+      // stored — there is nothing to map them onto, so they are intentionally
+      // left off this payload rather than being written to the wrong field.
+      const insertPayload: Record<string, any> = {
+        compositionNo: compositionNumber,
+        orderId: selectedCheck.productionId ? String(selectedCheck.productionId) : null,
+        aluminaPercent: kittingTotals.al,
+        ironPercent: kittingTotals.fe,
+        variableCost: kittingTotals.variableCost,
+        manufacturingCost: manufacturingCost || 1500,
+        sellingPrice: kittingTotals.variableCost + (manufacturingCost || 1500),
+        ...(materialRows.length > 0
+          ? {
+              materials: {
+                create: materialRows.map((row, i) => ({
+                  materialName: row.productName,
+                  quantity: Number(row.percentage) || 0,
+                  sequence: i + 1,
+                })),
+              },
+            }
+          : {}),
       };
 
-      const { error: insertErr } = await productionApi.post(COSTING_RESPONSE_TABLE, [insertPayload]);
+      const { error: insertErr } = await productionApi.post(COSTING_RESPONSE_TABLE, insertPayload);
 
       if (insertErr) throw insertErr;
 
@@ -1823,33 +1857,33 @@ export default function CheckPage() {
             ? null
             : parsed.toISOString().slice(0, 10);
         };
-        const productionPayload = {
-          "Delivery Order No.": selectedCheck.deliveryOrderNo,
-          "Firm Name": selectedCheck.firmName || null,
-          "Party Name": selectedCheck.partyName || null,
-          "Product Name": selectedCheck.productName || null,
-          "Order Quantity": toNumberOrNull(selectedCheck.orderQuantity),
-          "Expected Delivery Date": toDateOrNull(
+        // NOTE: ProductionOrder (the real Prisma model) has no columns for the
+        // free-text note, "Production Pending" quantity, planned date, selling
+        // rate, or uploaded SO file that the old Supabase sheet stored, so
+        // those are intentionally left off this payload. "status" is the
+        // closest real field to mark this order as having completed full
+        // kitting, replacing the old "Actual 1" completion timestamp.
+        const productionPayload: Record<string, any> = {
+          deliveryOrderNo: selectedCheck.deliveryOrderNo,
+          firmName: selectedCheck.firmName || null,
+          partyName: selectedCheck.partyName || null,
+          productName: selectedCheck.productName || null,
+          orderQuantity: toNumberOrNull(selectedCheck.orderQuantity),
+          expectedDeliveryDate: toDateOrNull(
             selectedCheck.expectedDeliveryDate,
           ),
-          Priority: selectedCheck.priority || null,
-          Note: selectedCheck.note || null,
-          "Crm Name": selectedCheck.crmName || null,
-          "Quantity Delivered": toNumberOrNull(selectedCheck.quantityDelivered),
-          "Production Pending": toNumberOrNull(selectedCheck.productionPending),
-          Status: selectedCheck.status || null,
-          "Planned 1": toDateOrNull(selectedCheck.plannedDate),
-          "Actual 1": completedAt,
-          product_rate: toNumberOrNull(selectedCheck.productRate),
-          "Upload SO": selectedCheck.uploadSo || null,
+          priority: selectedCheck.priority || null,
+          crmName: selectedCheck.crmName || null,
+          quantityDelivered: toNumberOrNull(selectedCheck.quantityDelivered),
+          status: selectedCheck.status || "Kitted",
         };
 
         const { data: prodData, error: prodFetchErr } = await productionApi.get(PRODUCTION_TABLE);
         if (prodFetchErr) throw prodFetchErr;
-        const targetRow = (prodData || []).find((r: any) => 
-            r["Firm Name"] === selectedCheck.firmName && 
-            r["Party Name"] === selectedCheck.partyName &&
-            r["Product Name"] === selectedCheck.productName
+        const targetRow = (prodData || []).find((r: any) =>
+            r.firmName === selectedCheck.firmName &&
+            r.partyName === selectedCheck.partyName &&
+            r.productName === selectedCheck.productName
         );
 
         let updatedRows: any[] | null = null;
@@ -1860,7 +1894,7 @@ export default function CheckPage() {
         }
 
         if (!updatedRows || updatedRows.length === 0) {
-          const { error: insertProdErr } = await productionApi.post(PRODUCTION_TABLE, [productionPayload]);
+          const { error: insertProdErr } = await productionApi.post(PRODUCTION_TABLE, productionPayload);
 
           if (insertProdErr) throw insertProdErr;
         }
@@ -2338,6 +2372,8 @@ export default function CheckPage() {
                                     item.alumina.toFixed(4)
                                   ) : col.dataKey === "iron" ? (
                                     item.iron.toFixed(4)
+                                  ) : col.dataKey === "gp" ? (
+                                    item.gp !== null ? `${item.gp.toFixed(2)}%` : "-"
                                   ) : col.dataKey === "bd" ? (
                                     item.bd.toFixed(4)
                                   ) : col.dataKey === "ap" ? (
@@ -2679,53 +2715,64 @@ export default function CheckPage() {
       </Card>
 
       {/* ──── Raw Materials Dialog ──── */}
-      <Dialog
+      <Sheet
         open={!!viewingMaterials}
         onOpenChange={() => setViewingMaterials(null)}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Raw Materials Used</DialogTitle>
-            <DialogDescription>
+        <SheetContent className="max-w-lg sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Raw Materials Used</SheetTitle>
+            <SheetDescription>
               Detailed list of raw materials and their percentages.
-            </DialogDescription>
-          </DialogHeader>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Material</TableHead>
-                <TableHead>Quantity (%)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {viewingMaterials?.names.map((name, i) => (
-                <TableRow key={i}>
-                  <TableCell>{name}</TableCell>
-                  <TableCell>{viewingMaterials.qtys[i] || "0"}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </DialogContent>
-      </Dialog>
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0 mt-4">
+            <SheetBody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Material</TableHead>
+                    <TableHead>Quantity (%)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {viewingMaterials?.names.map((name, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{name}</TableCell>
+                      <TableCell>{viewingMaterials.qtys[i] || "0"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </SheetBody>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* ──── Full Kitting Dialog ──── */}
-      <Dialog open={isKittingDialogOpen} onOpenChange={setIsKittingDialogOpen}>
-        <DialogContent className="max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
+      {/* modal={false}: this dialog contains a nested material-select Popover.
+          Radix Dialog's default modal mode sets pointer-events:none on <body> and
+          only re-enables it for the Dialog's own content — the Popover, being a
+          separate sibling portal, never gets exempted, so every click on it (even
+          though it paints correctly on top) falls through to the dialog beneath.
+          Non-modal keeps the visual overlay/backdrop but drops that interaction lock. */}
+      <Sheet open={isKittingDialogOpen} onOpenChange={setIsKittingDialogOpen} modal={false}>
+        <SheetContent className="max-w-7xl sm:max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col p-0">
+          <SheetHeader className="p-6 pb-2">
+            <SheetTitle>
               Full Kitting Details{" "}
               {selectedHistoryItem
                 ? `— Revising ${selectedHistoryItem.compositionNo}`
                 : ""}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               Review and verify the raw material composition and expected
               values.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          <div className="flex-1 overflow-y-auto space-y-6 p-1 pr-2">
+          <div className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="space-y-6 p-6 pt-2">
             {/* Order Info */}
             <div className="grid grid-cols-3 gap-4 px-1">
               <div>
@@ -2837,7 +2884,11 @@ export default function CheckPage() {
                                 <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-2" align="start">
+                            {/* z-[60]: this popover opens while the parent Dialog (also z-50)
+                                is already open — equal z-index left the dialog's own later
+                                content (e.g. the Manufacturing Cost row) intercepting clicks
+                                meant for the material list underneath it. */}
+                            <PopoverContent className="w-[300px] p-2 z-[60]" align="start">
                               <div className="space-y-2">
                                 <Input
                                   placeholder="Search material..."
@@ -3117,13 +3168,13 @@ export default function CheckPage() {
                 💡 Supports ranges (e.g.{" "}
                 <code className="bg-gray-100 px-1 rounded">10–12</code>) and
                 exact values (e.g.{" "}
-                <code className="bg-gray-100 px-1 rounded">0.5</code>)
               </p>
             </div>
+            </SheetBody>
           </div>
 
           {/* Footer */}
-          <div className="flex justify-end gap-2 p-4 border-t bg-white">
+          <SheetFooter className="flex justify-end gap-2 p-6 border-t bg-white mt-auto">
             <Button
               variant="outline"
               onClick={() => setIsKittingDialogOpen(false)}
@@ -3151,27 +3202,28 @@ export default function CheckPage() {
               )}
               Save
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
 
       {/* ──── Full Kitting Preview Dialog ──── */}
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-5xl w-full max-h-[90vh] overflow-y-auto flex flex-col p-6">
-          <DialogHeader className="pb-3 border-b border-slate-100">
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold text-slate-800">
+      <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <SheetContent className="max-w-5xl sm:max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <SheetHeader className="pb-3 border-b border-slate-100 p-6">
+            <SheetTitle className="flex items-center gap-2 text-xl font-bold text-slate-800">
               <Eye className="h-5 w-5 text-olive-600" />
               Full Kitting Details Preview
               {selectedHistoryItem
                 ? ` (Revision of ${selectedHistoryItem.compositionNo})`
                 : ""}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            </SheetTitle>
+            <SheetDescription className="text-xs text-slate-500">
               Raw Materials Composition, calculated parameters, and cost breakdown preview.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          <div className="space-y-4 my-2 flex-1">
+          <div className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="space-y-4 px-6 py-2">
             {/* Raw Materials Composition Summary Table (Exact View as in Screenshot) */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -3257,9 +3309,10 @@ export default function CheckPage() {
                 </Table>
               </div>
             </div>
+            </SheetBody>
           </div>
 
-          <DialogFooter className="gap-2 border-t pt-3 mt-2">
+          <SheetFooter className="gap-2 border-t pt-3 p-6 mt-auto bg-white">
             <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
               Back to Edit
             </Button>
@@ -3274,9 +3327,9 @@ export default function CheckPage() {
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm & Save
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

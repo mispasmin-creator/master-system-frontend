@@ -31,7 +31,7 @@ import {
 import { Button } from "@/systems/production/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/systems/production/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/systems/production/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet";
 import { Badge } from "@/systems/production/components/ui/badge";
 import { Textarea } from "@/systems/production/components/ui/textarea";
 import { Label } from "@/systems/production/components/ui/label";
@@ -278,18 +278,18 @@ export default function Step4List() {
         );
     }, [semiActualData, searchQuery, firmFilter]);
 
-    // Filter data based on tabs
-    // Pending Tab: entries where Stage 2 is not verified yet
-    const pendingOrders = useMemo(() => filteredSemiActual.filter(item => {
-        const actual2 = String(item.actual2 || '').trim();
-        return actual2 === '' || actual2 === '-' || actual2 === 'null' || actual2 === 'undefined';
-    }), [filteredSemiActual]);
+    // Filter data based on tabs.
+    // mapSemiActual derives actual1/actual2 from createdAt/updatedAt, which are always
+    // populated, so they can't be used to detect verification anymore. ProductionSemiActualRun
+    // has no dedicated tally column, so `status` doubles as the verification flag
+    // (set to "Tallied: <remarks>" by handleMarkDoneSubmit below).
+    const isTallied = (item: SemiActualRecord) => String(item.status || '').trim().toLowerCase().startsWith('tallied');
 
-    // History Tab: entries where Stage 2 has been verified
-    const historyOrders = useMemo(() => filteredSemiActual.filter(item => {
-        const actual2 = String(item.actual2 || '').trim();
-        return actual2 !== '' && actual2 !== '-' && actual2 !== 'null' && actual2 !== 'undefined';
-    }), [filteredSemiActual]);
+    // Pending Tab: entries not yet verified
+    const pendingOrders = useMemo(() => filteredSemiActual.filter(item => !isTallied(item)), [filteredSemiActual]);
+
+    // History Tab: entries that have been verified
+    const historyOrders = useMemo(() => filteredSemiActual.filter(item => isTallied(item)), [filteredSemiActual]);
 
     const getCurrentData = () => {
         switch (activeTab) {
@@ -310,19 +310,12 @@ export default function Step4List() {
     const getStatusBadge = (record: SemiActualRecord) => {
         if (activeTab === 'pending') {
             return <Badge className="bg-amber-50 text-amber-600 hover:bg-amber-100">Tally Pending</Badge>;
-        } else {
-            const actual1 = String(record.actual1 || '').trim();
-            const actual2 = String(record.actual2 || '').trim();
-            
-            if (actual1 && actual1 !== '-' && actual2 && actual2 !== '-') {
-                return <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100">Fully Verified</Badge>;
-            } else if (actual1 && actual1 !== '-') {
-                return <Badge className="bg-olive-50 text-olive-600 hover:bg-olive-100">Stage 1 Completed</Badge>;
-            } else if (actual2 && actual2 !== '-') {
-                return <Badge className="bg-olive-50 text-olive-600 hover:bg-olive-100">Stage 2 Completed</Badge>;
-            }
-            return <Badge className="bg-slate-50 text-slate-600 hover:bg-slate-100">Completed</Badge>;
         }
+        // ProductionSemiActualRun only exposes a single `status` column (no separate
+        // stage-1/stage-2 actual date fields anymore), so history rows are just tallied or not.
+        return isTallied(record)
+            ? <Badge className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100">Fully Verified</Badge>
+            : <Badge className="bg-slate-50 text-slate-600 hover:bg-slate-100">Completed</Badge>;
     };
 
     const handleViewDetails = (record: SemiActualRecord) => {
@@ -352,13 +345,11 @@ export default function Step4List() {
         setError(null);
 
         try {
-            const today = new Date().toISOString().slice(0, 10);
+            // ProductionSemiActualRun has no Actual1/Planned2/Actual2/Status1/remarks columns —
+            // `status` is the only real field available, so it doubles as the tally flag and
+            // carries the remarks text (see isTallied() above, which checks this same prefix).
             const updatePayload = {
-                "Actual1": today,
-                "Status": markDoneRemarks.trim(),
-                "Planned2": today,
-                "Actual2": today,
-                "Status1": markDoneRemarks.trim()
+                status: `Tallied: ${markDoneRemarks.trim()}`,
             };
 
             const { error: updateError } = await productionApi.patch("semi_actual", String(selectedRecord._rowIndex), updatePayload);
@@ -638,18 +629,18 @@ export default function Step4List() {
                 </CardContent>
             </Card>
 
-            {/* Details Dialog */}
-            <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-                <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Production Details</DialogTitle>
-                        <DialogDescription>
+            {/* Details Sheet */}
+            <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>Production Details</SheetTitle>
+                        <SheetDescription>
                             Job Card: {selectedRecord?.semiFinishedJobCardNo} | S.No: {selectedRecord?.serialNo}
-                        </DialogDescription>
-                    </DialogHeader>
+                        </SheetDescription>
+                    </SheetHeader>
 
                     {selectedRecord && (
-                        <div className="space-y-6 py-4">
+                        <SheetBody className="space-y-6">
                             {/* Basic Information */}
                             <div className="space-y-3">
                                 <h4 className="text-sm font-semibold text-slate-700 bg-slate-50 px-3 py-2 rounded-md">Basic Information</h4>
@@ -805,23 +796,24 @@ export default function Step4List() {
                                     </p>
                                 </div>
                             )}
-                        </div>
+                        </SheetBody>
                     )}
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
 
-            {/*Tally Dialog */}
-            <Dialog open={isMarkDoneOpen} onOpenChange={setIsMarkDoneOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Verify Tally</DialogTitle>
-                        <DialogDescription>
+            {/*Tally Sheet */}
+            <Sheet open={isMarkDoneOpen} onOpenChange={setIsMarkDoneOpen}>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>Verify Tally</SheetTitle>
+                        <SheetDescription>
                             {selectedRecord?.semiFinishedJobCardNo} — {selectedRecord?.productName}
-                        </DialogDescription>
-                    </DialogHeader>
+                        </SheetDescription>
+                    </SheetHeader>
 
                     {selectedRecord && (
-                        <form onSubmit={(e) => { e.preventDefault(); handleMarkDoneSubmit(); }} className="space-y-4 py-4">
+                        <form onSubmit={(e) => { e.preventDefault(); handleMarkDoneSubmit(); }} className="flex flex-col flex-1 min-h-0">
+                            <SheetBody className="space-y-4">
                             {/* Summary */}
                             <div className="bg-slate-50 rounded-lg p-4 space-y-2">
                                 <div className="flex justify-between text-sm">
@@ -865,8 +857,8 @@ export default function Step4List() {
                                 )}
                             </div>
 
-                            {/* Actions */}
-                            <div className="flex justify-end gap-2 pt-4">
+                            </SheetBody>
+                            <SheetFooter>
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -883,11 +875,11 @@ export default function Step4List() {
                                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Confirm
                                 </Button>
-                            </div>
+                            </SheetFooter>
                         </form>
                     )}
-                </DialogContent>
-            </Dialog>
+                </SheetContent>
+            </Sheet>
         </div>
     );
 }

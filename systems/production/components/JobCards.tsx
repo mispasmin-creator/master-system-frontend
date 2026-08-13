@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input"
 import { Label } from "@/systems/production/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/systems/production/components/ui/select"
 import { Calendar } from "@/systems/production/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/systems/production/components/ui/popover"
@@ -270,40 +270,38 @@ export default function JobCardsPage() {
         return true;
       })
 
-      // Process job cards history
+      // Process job cards history. GET /api/production/job-cards now includes
+      // the real `order` relation on each row (ProductionOrder), so we read
+      // firm/party/product/priority/expected-delivery straight off that
+      // instead of separately fetching + string-matching production rows.
       const processedHistory: JobCard[] = allJobCardsData
         .map((row: any) => {
-          const prodDate = row["Date Of Production"] ? new Date(row["Date Of Production"]) : null
-          const createdAt = row["Timestamp"] ? new Date(row["Timestamp"]) : null
-          
-          const productionRow = findProductionRow(
-            String(row["Delivery Order No."] || ""),
-            String(row["Party Name"] || ""),
-            String(row["Product Name"] || "")
-          )
+          const prodDate = row.dateOfProduction ? new Date(row.dateOfProduction) : null
+          const createdAt = row.createdAt ? new Date(row.createdAt) : null
+          const order = row.order || null
 
           return {
             key: row.id,
             id: row.id,
-            productionId: productionRow?.id ?? "",
+            productionId: order?.id ?? "",
             _rowIndex: row.id,
-            jobCardNo: String(row["JC-Job Card Number"] || ""),
-            firmName: String(row["Firm Name"] || ""),
-            supervisorName: String(row["Supervisor Name"] || ""),
-            deliveryOrderNo: String(row["Delivery Order No."] || ""),
-            partyName: String(row["Party Name"] || productionRow?.["Party Name"] || ""),
-            productName: String(row["Product Name"] || ""),
-            orderQuantity: Number(row["Quantity"] || 0),
+            jobCardNo: String(row.jobCardNo || ""),
+            firmName: String(order?.firmName || ""),
+            supervisorName: String(row.supervisorName || ""),
+            deliveryOrderNo: String(order?.deliveryOrderNo || ""),
+            partyName: String(order?.partyName || ""),
+            productName: String(order?.productName || ""),
+            orderQuantity: Number(row.quantity || 0),
             dateOfProduction: prodDate ? format(prodDate, "dd/MM/yyyy") : "",
-            shift: String(row["Shift"] || ""),
-            totalMade: Number(row["Total Made"] || 0),
-            notes: String(row["Notes"] || ""),
+            shift: String(row.shift || ""),
+            totalMade: Number(row.quantity || 0),
+            notes: String(row.notes || ""),
             createdAt: createdAt ? format(createdAt, "dd/MM/yyyy HH:mm:ss") : "",
-            expectedDeliveryDate: productionRow && productionRow["Expected Delivery Date"] 
-              ? format(new Date(productionRow["Expected Delivery Date"]), "dd/MM/yyyy") 
+            expectedDeliveryDate: order?.expectedDeliveryDate
+              ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy")
               : "",
-            priority: productionRow ? String(productionRow["Priority"] || "") : "",
-            status: String(row["Status"] || "active").toLowerCase(),
+            priority: String(order?.priority || ""),
+            status: String(row.status || "active").toLowerCase(),
           }
         })
         .sort((a: any, b: any) => b.id - a.id)
@@ -474,19 +472,16 @@ export default function JobCardsPage() {
       const nextNumber = getNextJobCardNumber(selectedOrder.firmName)
       const jobCardNumber = `JC-${String(nextNumber).padStart(3, "0")}`
 
-      const { error: insertError } = await productionApi.post(JOBCARDS_TABLE, [{
-          "JC-Job Card Number": jobCardNumber,
-          "Firm Name": selectedOrder.firmName,
-          "Supervisor Name": formData.supervisorName,
-          "Delivery Order No.": selectedOrder.deliveryOrderNo,
-          "Party Name": selectedOrder.partyName,
-          "Product Name": selectedOrder.productName,
-          "Quantity": Number(formData.totalMade),
-          "Date Of Production": format(formData.dateOfProduction, "yyyy-MM-dd"),
-          "Shift": formData.shift,
-          "Notes": formData.notes || "",
-          "Status": "active"
-        }])
+      const { error: insertError } = await productionApi.post(JOBCARDS_TABLE, {
+          orderId: selectedOrder.productionId || undefined,
+          jobCardNo: jobCardNumber,
+          supervisorName: formData.supervisorName,
+          quantity: Number(formData.totalMade),
+          dateOfProduction: format(formData.dateOfProduction, "yyyy-MM-dd"),
+          shift: formData.shift,
+          notes: formData.notes || "",
+          status: "active"
+        })
 
       if (insertError) throw insertError
 
@@ -511,8 +506,8 @@ export default function JobCardsPage() {
     setIsSubmitting(true)
     try {
       const { error: updateError } = await productionApi.patch(JOBCARDS_TABLE, selectedJobCard.id, {
-          Status: "cancelled",
-          Notes: `${selectedJobCard.notes}\nCancelled: ${cancelFormData.cancelRemarks} (Qty: ${cancelFormData.cancelQty})`
+          status: "cancelled",
+          notes: `${selectedJobCard.notes}\nCancelled: ${cancelFormData.cancelRemarks} (Qty: ${cancelFormData.cancelQty})`
         })
 
       if (updateError) throw updateError
@@ -551,8 +546,8 @@ export default function JobCardsPage() {
     setIsSubmitting(true)
     try {
       const { error: updateError } = await productionApi.patch(PRODUCTION_TABLE, selectedOrder.productionId, {
-          "Order Cancel": true,
-          Reason: `Qty: ${cancelOrderQty} - ${cancelOrderRemarks}`
+          orderCancelled: true,
+          reason: `Qty: ${cancelOrderQty} - ${cancelOrderRemarks}`
         })
 
       if (updateError) throw updateError
@@ -986,16 +981,16 @@ export default function JobCardsPage() {
       </Card>
 
       {/* Create Job Card Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create Job Card for DO: {selectedOrder?.deliveryOrderNo}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Create Job Card for DO: {selectedOrder?.deliveryOrderNo}</SheetTitle>
+            <SheetDescription>
               Fill out the production details below. Fields with * are required.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-6 py-4">
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="space-y-6 pt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <Label>Firm Name</Label>
@@ -1122,9 +1117,8 @@ export default function JobCardsPage() {
                   rows={3}
                 />
               </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-4 border-t">
+            </SheetBody>
+            <SheetFooter className="flex justify-between items-center pt-4 border-t mt-auto">
               <div>
                 {selectedOrder && (
                   <Button
@@ -1146,23 +1140,24 @@ export default function JobCardsPage() {
                   Create Job Card
                 </Button>
               </div>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Cancel Job Card Dialog */}
-      <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cancel Job Card: {selectedJobCard?.jobCardNo}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Cancel Job Card: {selectedJobCard?.jobCardNo}</SheetTitle>
+            <SheetDescription>
               Enter the quantity to cancel and provide remarks.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCancelSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cancelQty">Cancel Quantity *</Label>
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleCancelSubmit} className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="cancelQty">Cancel Quantity *</Label>
               <Input
                 id="cancelQty"
                 type="number"
@@ -1198,7 +1193,8 @@ export default function JobCardsPage() {
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
+            </SheetBody>
+            <SheetFooter className="flex justify-end gap-2 pt-4 mt-auto">
               <Button type="button" variant="outline" onClick={() => setIsCancelDialogOpen(false)} disabled={isSubmitting}>
                 No, Keep it
               </Button>
@@ -1206,23 +1202,24 @@ export default function JobCardsPage() {
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Yes, Cancel
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Cancel Order Dialog */}
-      <Dialog open={isCancelOrderDialogOpen} onOpenChange={setIsCancelOrderDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Cancel Order: {selectedOrder?.deliveryOrderNo}</DialogTitle>
-            <DialogDescription>
+      <Sheet open={isCancelOrderDialogOpen} onOpenChange={setIsCancelOrderDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Cancel Order: {selectedOrder?.deliveryOrderNo}</SheetTitle>
+            <SheetDescription>
               Enter the quantity to cancel and provide remarks/reason.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleCancelOrderSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="cancelOrderQty">Cancel Quantity *</Label>
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={handleCancelOrderSubmit} className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="cancelOrderQty">Cancel Quantity *</Label>
               <Input
                 id="cancelOrderQty"
                 type="number"
@@ -1251,7 +1248,8 @@ export default function JobCardsPage() {
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
+            </SheetBody>
+            <SheetFooter className="flex justify-end gap-2 pt-4 mt-auto">
               <Button type="button" variant="outline" onClick={() => setIsCancelOrderDialogOpen(false)} disabled={isSubmitting}>
                 No, Keep it
               </Button>
@@ -1259,10 +1257,10 @@ export default function JobCardsPage() {
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Yes, Cancel Order
               </Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

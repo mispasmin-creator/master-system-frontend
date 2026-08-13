@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input"
 import { Label } from "@/systems/production/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet"
 import { Popover, PopoverContent, PopoverTrigger } from "@/systems/production/components/ui/popover"
 import { Badge } from "@/systems/production/components/ui/badge"
 import { Checkbox } from "@/systems/production/components/ui/checkbox"
@@ -29,7 +29,8 @@ interface RawMaterial {
 }
 
 interface ProductionItem {
-  _rowIndex: number | string
+  _rowIndex: string
+  jobCardId: string
   productionId?: number | string
   jobCardNo: string
   firmName?: string
@@ -44,19 +45,12 @@ interface ProductionItem {
   shift: string
   rawMaterials: RawMaterial[]
   machineHours: string
-  gpPercentage?: string
-  alumina?: string
-  iron?: string
-  bd?: string
-  ap?: string
-  rm1?: string
-  aluminaPercentage?: string
-  ironPercentage?: string
   plannedDate?: string
 }
 
 interface HistoryItem {
-  _rowIndex: number | string
+  _rowIndex: string
+  jobCardId: string
   productionId?: number | string
   jobCardNo: string
   firmName?: string
@@ -75,16 +69,6 @@ interface HistoryItem {
   sieveAnalysisTest: string
   test1CompletedAt: string
   timestamp?: string
-  bdAt110?: string
-  ccsAt100?: string
-  gpPercentage?: string
-  alumina?: string
-  iron?: string
-  bd?: string
-  ap?: string
-  rm1?: string
-  aluminaPercentage?: string
-  ironPercentage?: string
   plannedDate?: string
   labTest1Remarks?: string
 }
@@ -92,9 +76,10 @@ interface HistoryItem {
 // Table Names
 const JOBCARDS_TABLE = "jobcards"
 const MASTER_TABLE = "master"
-const PRODUCTION_TABLE = "production"
-const ACTUAL_PRODUCTION_TABLE = "actual_production"
-const COSTING_RESPONSE_TABLE = "costing_response"
+const QC_CHECKPOINTS_TABLE = "qc_checkpoints"
+const LAB1_STAGE = "lab1"
+const LAB2_STAGE = "lab2"
+const CHEMICAL_STAGE = "chemical"
 
 // Add this function for formatting machine hours
 const formatMachineHours = (hours: any) => {
@@ -174,20 +159,9 @@ const initialFormState = {
   labTest1Remarks: "",
 }
 
-const hasValue = (value: any) => {
-  if (value === null || value === undefined) return false
-  const normalized = String(value).trim().toLowerCase()
-  return normalized !== "" && normalized !== "-" && normalized !== "null" && normalized !== "undefined"
-}
-
 const isCancelledStatus = (value: any) => String(value || "").trim().toLowerCase() === "cancelled"
 
 const normalizeKey = (value: any) => String(value || "").trim().toLowerCase()
-
-const makeOrderProductKey = (orderNo: any, productName: any) => `${normalizeKey(orderNo)}::${normalizeKey(productName)}`
-
-const makeProductionRecordKey = (jobCardNo: any, orderNo: any, productName: any) =>
-  `${normalizeKey(jobCardNo)}::${normalizeKey(orderNo)}::${normalizeKey(productName)}`
 
 const getFirmMatchValues = (firm?: string) => {
   const firms = String(firm || "").split(',').map((f: string) => f.trim()).filter(Boolean);
@@ -397,184 +371,82 @@ export default function LabTesting1Page() {
     setLoading(true)
     setError(null)
     try {
+      // job-cards now returns each card with its order (ProductionOrder), actualRuns
+      // (with materials) and qcChecks already joined in - no more manual
+      // jobCardNo/orderNo/productName string-matching across separate sheets.
       const [
         { data: jobCardsData, error: jobCardsErr },
         { data: masterData, error: masterErr },
-        { data: productionData, error: prodErr },
-        { data: actualProductionData, error: actualProdErr },
-        { data: costingResponseData, error: costingErr }
       ] = await Promise.all([
-        await productionApi.get(JOBCARDS_TABLE),
-        await productionApi.get(MASTER_TABLE),
-        await productionApi.get(PRODUCTION_TABLE),
-        await productionApi.get(ACTUAL_PRODUCTION_TABLE),
-        await productionApi.get(COSTING_RESPONSE_TABLE),
+        productionApi.get(JOBCARDS_TABLE),
+        productionApi.get(MASTER_TABLE),
       ])
 
       if (jobCardsErr) throw jobCardsErr
       if (masterErr) throw masterErr
-      if (prodErr) throw prodErr
-      if (actualProdErr) throw actualProdErr
-      if (costingErr) throw costingErr
 
-      const costingDataMap = new Map()
-      const costingDataByOrder = new Map()
-      ;(costingResponseData || []).forEach((row: any) => {
-        const orderNo = row["Order No."] ? String(row["Order No."]).trim() : ""
-        const productName = row["product name"] ? String(row["product name"]).trim() : ""
-        if (orderNo) {
-          const costingInfo = {
-            compositionNo: row["Composition No."] ? String(row["Composition No."]).trim() : "",
-            orderNo: orderNo,
-            productName,
-            gpPercentage: row["GP %AGE"] ? String(row["GP %AGE"]) : "",
-            alumina: row["alumina"] ? String(row["alumina"]) : "",
-            iron: row["iron"] ? String(row["iron"]) : "",
-            bd: row["BD"] ? String(row["BD"]) : "",
-            ap: row["AP"] ? String(row["AP"]) : "",
-            rm1: row["RM1"] ? String(row["RM1"]) : "",
-            aluminaPercentage: row["Alumina Percentage %"] ? String(row["Alumina Percentage %"]) : "",
-            ironPercentage: row["Iron Percentage %"] ? String(row["Iron Percentage %"]) : "",
-            plannedDate: row["Planned 1"] ? format(new Date(row["Planned 1"]), "dd/MM/yyyy") : "",
-          }
-          costingDataMap.set(makeOrderProductKey(orderNo, productName), costingInfo)
-          if (!costingDataByOrder.has(orderNo)) costingDataByOrder.set(orderNo, [])
-          costingDataByOrder.get(orderNo).push(costingInfo)
+      const buildRawMaterials = (materials: any[]): RawMaterial[] =>
+        (materials || []).map((m: any) => ({ name: m.materialName || "", quantity: m.quantity ?? 0 }))
+
+      const pendingData: ProductionItem[] = []
+      const historyData: HistoryItem[] = []
+
+      ;(jobCardsData || []).forEach((jc: any) => {
+        if (isCancelledStatus(jc.status)) return
+        const order = jc.order || {}
+        const actualRun = (jc.actualRuns && jc.actualRuns[0]) || null
+        // A job only reaches Lab Test 1 once actual production has been logged.
+        if (!actualRun) return
+
+        const lab1Check = (jc.qcChecks || []).find((c: any) => c.stage === LAB1_STAGE)
+
+        const base = {
+          _rowIndex: jc.id,
+          jobCardId: jc.id,
+          productionId: order.id ?? "",
+          jobCardNo: String(jc.jobCardNo || "").trim(),
+          firmName: String(order.firmName || ""),
+          deliveryOrderNo: String(order.deliveryOrderNo || ""),
+          partyName: String(order.partyName || ""),
+          productName: String(order.productName || ""),
+          quantity: Number(actualRun.quantityFg || jc.quantity || 0),
+          expectedDeliveryDate: order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy") : "",
+          priority: String(order.priority || ""),
+          dateOfProduction: actualRun.dateOfProduction
+            ? format(new Date(actualRun.dateOfProduction), "dd/MM/yyyy")
+            : (jc.dateOfProduction ? format(new Date(jc.dateOfProduction), "dd/MM/yyyy") : ""),
+          supervisorName: String(actualRun.supervisorName || jc.supervisorName || ""),
+          shift: String(jc.shift || ""),
+          rawMaterials: buildRawMaterials(actualRun.materials),
+          machineHours: actualRun.machineHours != null ? String(actualRun.machineHours) : "-",
+          // No "Planned Date" concept remains for this stage in the new schema.
+          plannedDate: "",
+        }
+
+        if (!lab1Check) {
+          pendingData.push(base as ProductionItem)
+        } else {
+          historyData.push({
+            ...base,
+            testStatus: String(lab1Check.status || ""),
+            dateOfTest: lab1Check.dateOfTest ? format(new Date(lab1Check.dateOfTest), "dd/MM/yy") : "",
+            testedBy: String(lab1Check.testedBy || ""),
+            wcPercentage: lab1Check.wcPercent != null ? String(lab1Check.wcPercent) : "",
+            // Initial/Final Setting Time, What To Be Mixed, Flow of Material, Sieve
+            // Analysis and free-text remarks have no matching columns on
+            // ProductionQcCheckpoint - they're folded into `status` when saved (see
+            // handleSaveLabTest) but there's no structured column to read them back from.
+            initialSettingTime: "",
+            finalSettingTime: "",
+            whatToBeMixed: "",
+            flowOfMaterial: "",
+            sieveAnalysisTest: "",
+            test1CompletedAt: lab1Check.createdAt || "",
+            timestamp: lab1Check.createdAt ? format(new Date(lab1Check.createdAt), "dd/MM/yyyy HH:mm:ss") : "",
+            labTest1Remarks: "",
+          } as HistoryItem)
         }
       })
-
-      const findCostingData = (orderNo: string, productName: string) => {
-        const exact = costingDataMap.get(makeOrderProductKey(orderNo, productName))
-        if (exact) return exact
-        const orderRows = costingDataByOrder.get(orderNo) || []
-        if (orderRows.length === 1) return orderRows[0]
-        return Array.from(costingDataMap.values()).find(
-          (c: any) => normalizeKey(c.productName) === normalizeKey(productName)
-        ) || {}
-      }
-
-      const findProductionRow = (orderNo: string, productName: string) => {
-        const orderRows = (productionData || []).filter(
-          (prodRow: any) => normalizeKey(prodRow["Delivery Order No."]) === normalizeKey(orderNo)
-        )
-        return orderRows.find(
-          (prodRow: any) => normalizeKey(prodRow["Product Name"]) === normalizeKey(productName)
-        ) || (orderRows.length === 1 ? orderRows[0] : null)
-      }
-
-      const productionDataMap = new Map()
-      const productionDataByJobCard = new Map()
-      const buildActualProductionInfo = (row: any) => {
-        const jobCardNo = String(row["Job Card No."] || "").trim()
-        const orderNo = String(row["Order No."] || "").trim()
-        const productName = String(row["Product Name"] || "").trim()
-        const materials = []
-        for (let i = 1; i <= 20; i++) {
-          const name = row[`Raw Material Name ${i}`]
-          const quantity = row[`Quantity Of Raw Material ${i}`]
-          if (name && String(name).trim()) {
-            materials.push({ name: String(name).trim(), quantity: quantity || 0 })
-          }
-        }
-
-        return {
-          id: row.id,
-          jobCardNo,
-          orderNo,
-          productName,
-          firmName: String(row["FIRM Name"] || "").trim(),
-          partyName: String(row["Party Name"] || "").trim(),
-          quantityFG: Number(row["Quantity Of FG"] || 0),
-          dateOfProduction: row["Date Of Production"] ? format(new Date(row["Date Of Production"]), "dd/MM/yyyy") : "",
-          supervisorName: String(row["Name Of Supervisor"] || "").trim(),
-          machineHours: String(row["Machine Running hour"] || "-").trim(),
-          planned1: row["Planned1"] || row["Planned 1"],
-          actual1: row["Actual1"] || row["Actual 1"],
-          actual2: row["Actual2"] || row["Actual 2"],
-          planned3: row["Planned3"] || row["Planned 3"],
-          status2: row["Status2"] || row["Status 2"],
-          dateOfTest1: row["DateOfTest1"] || row["Date Of Test 1"],
-          wcPercentage: row["WCPercentage"] || row["WC Percentage %"],
-          testedBy1: row["TestedBy1"] || row["Tested By 1"],
-          initialSettingTime: row["InitialSettingTime"] || row["Initial Setting Time"],
-          flowOfMaterial: row["FlowOfMaterial"] || row["Flow Of Material"],
-          finalSettingTime: row["FinalSettingTime"] || row["Final Setting Time"],
-          whatToBeMixed: row["WhatToBeMixed"] || row["What To Be Mixed"],
-          sieveAnalysis: row["SieveAnalysis"] || row["Sieve Analysis"],
-          bdAt110: row["BDAt110C"] || row["BD At 110C"],
-          ccsAt100: row["CCSAt100C"] || row["CCS At 100C"],
-          labTest1Remarks: row["LabTest1Remarks"] || "",
-        }
-      }
-
-      ;(actualProductionData || []).forEach((row: any) => {
-        const productionInfo = buildActualProductionInfo(row)
-        if (productionInfo.jobCardNo) {
-          productionDataMap.set(makeProductionRecordKey(productionInfo.jobCardNo, productionInfo.orderNo, productionInfo.productName), productionInfo)
-          if (!productionDataByJobCard.has(productionInfo.jobCardNo)) productionDataByJobCard.set(productionInfo.jobCardNo, [])
-          productionDataByJobCard.get(productionInfo.jobCardNo).push(productionInfo)
-        }
-      })
-
-      const findActualProductionInfo = (jobCardNo: string, orderNo: string, productName: string) => {
-        const exact = productionDataMap.get(makeProductionRecordKey(jobCardNo, orderNo, productName))
-        if (exact) return exact
-        const jobCardRows = productionDataByJobCard.get(jobCardNo) || []
-        return jobCardRows.find(
-          (record: any) => normalizeKey(record.orderNo) === normalizeKey(orderNo) && normalizeKey(record.productName) === normalizeKey(productName)
-        ) || jobCardRows.find(
-          (record: any) => normalizeKey(record.productName) === normalizeKey(productName)
-        ) || (jobCardRows.length === 1 ? jobCardRows[0] : null)
-      }
-
-      const pendingData = (actualProductionData || [])
-        .map((row: any) => buildActualProductionInfo(row))
-        .filter((productionDataInfo: any) => productionDataInfo.jobCardNo && productionDataInfo.planned1 && !hasValue(productionDataInfo.actual1))
-        .map((row: any) => {
-          const jobCardNo = String(row.jobCardNo || "")
-          const deliveryOrderNo = String(row.orderNo || "")
-          const jobCardProductName = String(row.productName || "")
-          const jobCard = (jobCardsData || []).find(
-            (jc: any) =>
-              normalizeKey(jc["JC-Job Card Number"]) === normalizeKey(jobCardNo) &&
-              normalizeKey(jc["Firm Name"]) === normalizeKey(row.firmName) &&
-              normalizeKey(jc["Delivery Order No."]) === normalizeKey(deliveryOrderNo) &&
-              normalizeKey(jc["Product Name"]) === normalizeKey(jobCardProductName)
-          ) || (jobCardsData || []).find((jc: any) => normalizeKey(jc["JC-Job Card Number"]) === normalizeKey(jobCardNo))
-
-          if (isCancelledStatus(jobCard?.["Status"])) return null
-          const productionRow = findProductionRow(deliveryOrderNo, jobCardProductName)
-
-          const costingData = findCostingData(deliveryOrderNo.trim(), jobCardProductName.trim())
-
-          return {
-            _rowIndex: row.id,
-            productionId: productionRow?.id ?? "",
-            jobCardNo: jobCardNo.trim(),
-            deliveryOrderNo: deliveryOrderNo.trim(),
-            partyName: String(row.partyName || jobCard?.["Party Name"] || ""),
-            productName: jobCardProductName,
-            quantity: Number(row.quantityFG || 0),
-            dateOfProduction: row.dateOfProduction || "",
-            supervisorName: String(row.supervisorName || jobCard?.["Supervisor Name"] || ""),
-            shift: String(jobCard?.["Shift"] || ""),
-            expectedDeliveryDate: productionRow?.["Expected Delivery Date"] ? format(new Date(productionRow["Expected Delivery Date"]), "dd/MM/yyyy") : "",
-            priority: String(productionRow?.["Priority"] || ""),
-            rawMaterials: row.rawMaterials || [],
-            machineHours: row.machineHours || "-",
-            gpPercentage: costingData.gpPercentage || "-",
-            alumina: costingData.alumina || "-",
-            iron: costingData.iron || "-",
-            bd: costingData.bd || "-",
-            ap: costingData.ap || "-",
-            rm1: costingData.rm1 || "-",
-            aluminaPercentage: costingData.aluminaPercentage || "-",
-            ironPercentage: costingData.ironPercentage || "-",
-            plannedDate: row.planned3 ? format(new Date(row.planned3), "dd/MM/yyyy") : (costingData.plannedDate || "-"),
-            firmName: String(row.firmName || jobCard?.["Firm Name"] || ""),
-          }
-        })
-        .filter(Boolean)
 
       const firmSearchValues = getFirmMatchValues(user?.firm)
       const isAdmin = user?.role?.toLowerCase() === "admin"
@@ -587,69 +459,19 @@ export default function LabTesting1Page() {
       }
 
       setPendingTests(filterByFirm(pendingData))
+      setHistoryTests(
+        filterByFirm(historyData).sort(
+          (a: any, b: any) => new Date(b.test1CompletedAt).getTime() - new Date(a.test1CompletedAt).getTime()
+        )
+      )
 
-      const historyFiltered = (actualProductionData || [])
-        .map((row: any) => buildActualProductionInfo(row))
-        .filter((row: any) => row.jobCardNo && hasValue(row.actual1))
-        .map((row: any) => {
-          const jobCardNo = String(row.jobCardNo || "").trim()
-          const deliveryOrderNo = String(row.orderNo || "").trim()
-          const jobCardProductName = String(row.productName || "").trim()
-          const jobCard = (jobCardsData || []).find(
-            (jc: any) =>
-              normalizeKey(jc["JC-Job Card Number"]) === normalizeKey(jobCardNo) &&
-              normalizeKey(jc["Firm Name"]) === normalizeKey(row.firmName) &&
-              normalizeKey(jc["Delivery Order No."]) === normalizeKey(deliveryOrderNo) &&
-              normalizeKey(jc["Product Name"]) === normalizeKey(jobCardProductName)
-          ) || (jobCardsData || []).find((jc: any) => normalizeKey(jc["JC-Job Card Number"]) === normalizeKey(jobCardNo))
-          const productionRow = findProductionRow(deliveryOrderNo, jobCardProductName)
-          const costingData = findCostingData(deliveryOrderNo, jobCardProductName)
-
-          return {
-            _rowIndex: row.id,
-            productionId: productionRow?.id ?? "",
-            jobCardNo: jobCardNo,
-            deliveryOrderNo,
-            partyName: String(row.partyName || jobCard?.["Party Name"] || ""),
-            productName: jobCardProductName,
-            quantity: Number(row.quantityFG || 0),
-            testStatus: String(row.status2 || ""),
-            dateOfTest: row.dateOfTest1 ? format(new Date(row.dateOfTest1), "dd/MM/yy") : "",
-            testedBy: String(row.testedBy1 || ""),
-            wcPercentage: String(row.wcPercentage || ""),
-            initialSettingTime: String(row.initialSettingTime || ""),
-            finalSettingTime: String(row.finalSettingTime || ""),
-            whatToBeMixed: String(row.whatToBeMixed || ""),
-            flowOfMaterial: String(row.flowOfMaterial || ""),
-            sieveAnalysisTest: String(row.sieveAnalysis || ""),
-            bdAt110: String(row.bdAt110 || ""),
-            ccsAt100: String(row.ccsAt100 || ""),
-            test1CompletedAt: row.actual2 ? String(row.actual2) : "",
-            timestamp: row.actual2 ? format(new Date(row.actual2), "dd/MM/yyyy HH:mm:ss") : "",
-            gpPercentage: costingData.gpPercentage || "-",
-            alumina: costingData.alumina || "-",
-            iron: costingData.iron || "-",
-            bd: costingData.bd || "-",
-            ap: costingData.ap || "-",
-            rm1: costingData.rm1 || "-",
-            aluminaPercentage: costingData.aluminaPercentage || "-",
-            ironPercentage: costingData.ironPercentage || "-",
-            plannedDate: costingData.plannedDate || "-",
-            firmName: String(row.firmName || jobCard?.["Firm Name"] || ""),
-            labTest1Remarks: String(row.labTest1Remarks || ""),
-          }
-        })
-        .sort((a: any, b: any) => new Date(b.test1CompletedAt).getTime() - new Date(a.test1CompletedAt).getTime())
-
-      setHistoryTests(filterByFirm(historyFiltered))
-
-      setFlowOfMaterialOptions([...new Set((masterData || []).map((row: any) => String(row.flowOfMaterial || row["Flow Of Material"] || "")).filter(Boolean))] as string[])
-      const statuses = [...new Set((masterData || []).map((row: any) => String(row.testStatus || row["Test Status"] || "")).filter(Boolean))] as string[]
+      setFlowOfMaterialOptions([...new Set((masterData || []).map((row: any) => String(row.flowOfMaterial || "")).filter(Boolean))] as string[])
+      const statuses = [...new Set((masterData || []).map((row: any) => String(row.testStatus || "")).filter(Boolean))] as string[]
       if (!statuses.includes("Tested")) statuses.push("Tested")
       if (!statuses.includes("Non Tested")) statuses.push("Non Tested")
       if (!statuses.includes("Direct supply")) statuses.push("Direct supply")
       setStatusOptions(statuses)
-      setTestedByOptions([...new Set((masterData || []).map((row: any) => String(row.testedBy || row["Tested by"] || "")).filter(Boolean))] as string[])
+      setTestedByOptions([...new Set((masterData || []).map((row: any) => String(row.testedBy || "")).filter(Boolean))] as string[])
 
     } catch (err: any) {
       console.error("Error in loadAllData:", err)
@@ -699,46 +521,53 @@ export default function LabTesting1Page() {
     if (!validateForm() || !selectedProduction) return
     setIsSubmitting(true)
     try {
-      const jobCardNo = selectedProduction.jobCardNo.trim()
-      const now = new Date().toISOString()
       const isNonTested = formData.testStatus === "Non Tested"
       const isDirectSupply = formData.testStatus === "Direct supply"
       const isSkipped = isNonTested || isDirectSupply
-      const payload: any = {
-        "Actual1": now,
-        "Status2": String(formData.testStatus),
-      }
-      if (!isSkipped) {
-        payload["DateOfTest1"] = format(formData.dateOfTest, "yyyy-MM-dd")
-        payload["WCPercentage"] = formData.wcPercentage ? String(formData.wcPercentage).trim() : null
-        payload["TestedBy1"] = String(formData.testedBy)
-        payload["InitialSettingTime"] = String(formData.initialSettingTime)
-        payload["FlowOfMaterial"] = String(formData.flowOfMaterial)
-        payload["FinalSettingTime"] = String(formData.finalSettingTime)
-        payload["WhatToBeMixed"] = String(formData.whatToBeMixed)
-        payload["SieveAnalysis"] = String(formData.sieveAnalysis)
-        payload["LabTest1Remarks"] = null
-      } else {
-        payload["DateOfTest1"] = null
-        payload["WCPercentage"] = null
-        payload["TestedBy1"] = null
-        payload["InitialSettingTime"] = null
-        payload["FlowOfMaterial"] = null
-        payload["FinalSettingTime"] = null
-        payload["WhatToBeMixed"] = null
-        payload["SieveAnalysis"] = null
-        payload["LabTest1Remarks"] = formData.labTest1Remarks ? String(formData.labTest1Remarks).trim() : null
-        
-        // Skip Lab Test 2 and Chemical Test. Go straight to Check Devshree (Planned4).
-        const todayStr = format(new Date(), "yyyy-MM-dd")
-        payload["Actual2"] = todayStr
-        payload["Planned3"] = todayStr
-        payload["Actual3"] = todayStr
-        payload["Planned4"] = todayStr
+
+      // Only jobCardId/stage/dateOfTest/testedBy/wcPercent/status map to real columns on
+      // ProductionQcCheckpoint. InitialSettingTime, FinalSettingTime, WhatToBeMixed,
+      // FlowOfMaterial and SieveAnalysis have no backend column, so they're folded into
+      // the `status` note (for the skip case) instead of being silently dropped.
+      let statusNote = String(formData.testStatus)
+      if (isSkipped && formData.labTest1Remarks?.trim()) {
+        statusNote = `${statusNote}: ${formData.labTest1Remarks.trim()}`
       }
 
-      const { error: updateErr } = await productionApi.patch(ACTUAL_PRODUCTION_TABLE, selectedProduction._rowIndex, payload)
-      if (updateErr) throw updateErr
+      const payload: any = {
+        jobCardId: selectedProduction.jobCardId,
+        stage: LAB1_STAGE,
+        status: statusNote,
+      }
+
+      if (!isSkipped) {
+        payload.dateOfTest = format(formData.dateOfTest, "yyyy-MM-dd")
+        payload.testedBy = String(formData.testedBy)
+        payload.wcPercent = formData.wcPercentage ? Number(formData.wcPercentage) : null
+      }
+
+      const { error: createErr } = await productionApi.post(QC_CHECKPOINTS_TABLE, payload)
+      if (createErr) throw createErr
+
+      // Mirrors the old sheet's "skip forward" behaviour: if Lab Test 1 was skipped
+      // (Non Tested / Direct supply), Lab Test 2 and Chemical Test are auto-marked as
+      // skipped too so this job card doesn't sit pending in those stages.
+      if (isSkipped) {
+        const skipStatus = `Skipped (Lab 1: ${formData.testStatus})`
+        const { error: lab2Err } = await productionApi.post(QC_CHECKPOINTS_TABLE, {
+          jobCardId: selectedProduction.jobCardId,
+          stage: LAB2_STAGE,
+          status: skipStatus,
+        })
+        if (lab2Err) throw lab2Err
+        const { error: chemErr } = await productionApi.post(QC_CHECKPOINTS_TABLE, {
+          jobCardId: selectedProduction.jobCardId,
+          stage: CHEMICAL_STAGE,
+          status: skipStatus,
+        })
+        if (chemErr) throw chemErr
+      }
+
       alert("Lab Test 1 data saved successfully!")
       setIsDialogOpen(false)
       await loadAllData()
@@ -1035,25 +864,28 @@ export default function LabTesting1Page() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!viewingMaterials} onOpenChange={(isOpen) => !isOpen && setViewingMaterials(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Raw Materials Used</DialogTitle>
-            <DialogDescription>Full list of materials and quantities used for this production run.</DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 max-h-80 overflow-y-auto">
-            <Table>
-              <TableHeader><TableRow><TableHead>Material Name</TableHead><TableHead className="text-right">Quantity</TableHead></TableRow></TableHeader>
-              <TableBody>{viewingMaterials?.map((m, i) => <TableRow key={i}><TableCell>{m.name}</TableCell><TableCell className="text-right">{m.quantity}</TableCell></TableRow>)}</TableBody>
-            </Table>
+      <Sheet open={!!viewingMaterials} onOpenChange={(isOpen) => !isOpen && setViewingMaterials(null)}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Raw Materials Used</SheetTitle>
+            <SheetDescription>Full list of materials and quantities used for this production run.</SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="mt-4 max-h-80 overflow-y-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>Material Name</TableHead><TableHead className="text-right">Quantity</TableHead></TableRow></TableHeader>
+                <TableBody>{viewingMaterials?.map((m, i) => <TableRow key={i}><TableCell>{m.name}</TableCell><TableCell className="text-right">{m.quantity}</TableCell></TableRow>)}</TableBody>
+              </Table>
+            </SheetBody>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Lab Test 1: {selectedProduction?.jobCardNo}</DialogTitle></DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handleSaveLabTest(); }} className="space-y-4">
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent>
+          <SheetHeader><SheetTitle>Lab Test 1: {selectedProduction?.jobCardNo}</SheetTitle></SheetHeader>
+          <form onSubmit={(e) => { e.preventDefault(); handleSaveLabTest(); }} className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="space-y-4 pt-4">
             <div className="grid grid-cols-3 gap-4 border p-4 rounded bg-muted/50">
               <div><Label>DO No.</Label><p className="font-bold">{selectedProduction?.deliveryOrderNo}</p></div>
               <div><Label>Product</Label><p className="font-medium">{selectedProduction?.productName}</p></div>
@@ -1131,13 +963,15 @@ export default function LabTesting1Page() {
               </>
             )}
 
-            <div className="flex justify-end gap-2 pt-4 border-t">
+            </SheetBody>
+
+            <SheetFooter className="flex justify-end gap-2 pt-4 border-t mt-auto">
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Save Test Results</Button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

@@ -268,46 +268,121 @@ export default function DashboardLayout({
       ? 'repair'
       : 'overview';
 
-  // Hydration-safe localStorage reading
+  const toggleSystemAccordion = (system: 'purchase' | 'order' | 'production' | 'store' | 'rmSales' | 'checklist' | 'freightPayment' | 'inventory' | 'payment' | 'services' | 'repair') => {
+    const isCurrentlyOpen =
+      system === 'purchase' ? purchaseExpanded :
+      system === 'order' ? orderExpanded :
+      system === 'production' ? productionExpanded :
+      system === 'store' ? storeExpanded :
+      system === 'rmSales' ? rmSalesExpanded :
+      system === 'checklist' ? checklistExpanded :
+      system === 'freightPayment' ? freightPaymentExpanded :
+      system === 'inventory' ? inventoryExpanded :
+      system === 'payment' ? paymentExpanded :
+      system === 'services' ? servicesExpanded :
+      system === 'repair' ? repairExpanded : false;
+
+    const nextState = !isCurrentlyOpen;
+
+    setPurchaseExpanded(false);
+    setOrderExpanded(false);
+    setProductionExpanded(false);
+    setStoreExpanded(false);
+    setRmSalesExpanded(false);
+    setChecklistExpanded(false);
+    setFreightPaymentExpanded(false);
+    setInventoryExpanded(false);
+    setPaymentExpanded(false);
+    setServicesExpanded(false);
+    setRepairExpanded(false);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('purchaseExpanded', 'false');
+      localStorage.setItem('orderExpanded', 'false');
+      localStorage.setItem('productionExpanded', 'false');
+      localStorage.setItem('storeExpanded', 'false');
+      localStorage.setItem('rmSalesExpanded', 'false');
+      localStorage.setItem('checklistExpanded', 'false');
+      localStorage.setItem('freightPaymentExpanded', 'false');
+      localStorage.setItem('inventoryExpanded', 'false');
+      localStorage.setItem('paymentExpanded', 'false');
+      localStorage.setItem('servicesExpanded', 'false');
+      localStorage.setItem('repairExpanded', 'false');
+    }
+
+    if (nextState) {
+      if (system === 'purchase') { setPurchaseExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('purchaseExpanded', 'true'); }
+      else if (system === 'order') { setOrderExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('orderExpanded', 'true'); }
+      else if (system === 'production') { setProductionExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('productionExpanded', 'true'); }
+      else if (system === 'store') { setStoreExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('storeExpanded', 'true'); }
+      else if (system === 'rmSales') { setRmSalesExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('rmSalesExpanded', 'true'); }
+      else if (system === 'checklist') { setChecklistExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('checklistExpanded', 'true'); }
+      else if (system === 'freightPayment') { setFreightPaymentExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('freightPaymentExpanded', 'true'); }
+      else if (system === 'inventory') { setInventoryExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('inventoryExpanded', 'true'); }
+      else if (system === 'payment') { setPaymentExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('paymentExpanded', 'true'); }
+      else if (system === 'services') { setServicesExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('servicesExpanded', 'true'); }
+      else if (system === 'repair') { setRepairExpanded(true); if (typeof window !== 'undefined') localStorage.setItem('repairExpanded', 'true'); }
+    }
+  };
+
+  // Hydration-safe localStorage reading (ensures only 1 system accordion is open at a time)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedSf = localStorage.getItem('sfExpanded');
       if (savedSf !== null) setSfExpanded(savedSf === 'true');
 
-      const savedPur = localStorage.getItem('purchaseExpanded');
-      if (savedPur !== null) setPurchaseExpanded(savedPur === 'true');
+      const basePathToKey: Record<string, string> = {
+        '/purchase': 'purchase',
+        '/order': 'order',
+        '/production': 'production',
+        '/store': 'store',
+        '/rm-sales': 'rmSales',
+        '/checklist': 'checklist',
+        '/freight-payment': 'freightPayment',
+        '/inventory': 'inventory',
+        '/payment': 'payment',
+        '/services': 'services',
+        '/repair': 'repair',
+      };
 
-      const savedOrd = localStorage.getItem('orderExpanded');
-      if (savedOrd !== null) setOrderExpanded(savedOrd === 'true');
+      let activeKey = basePathToKey[basePath];
 
-      const savedProd = localStorage.getItem('productionExpanded');
-      if (savedProd !== null) setProductionExpanded(savedProd === 'true');
+      if (!activeKey) {
+        const savedKeys: Record<string, string> = {
+          purchase: 'purchaseExpanded',
+          order: 'orderExpanded',
+          production: 'productionExpanded',
+          store: 'storeExpanded',
+          rmSales: 'rmSalesExpanded',
+          checklist: 'checklistExpanded',
+          freightPayment: 'freightPaymentExpanded',
+          inventory: 'inventoryExpanded',
+          payment: 'paymentExpanded',
+          services: 'servicesExpanded',
+          repair: 'repairExpanded',
+        };
 
-      const savedStore = localStorage.getItem('storeExpanded');
-      if (savedStore !== null) setStoreExpanded(savedStore === 'true');
+        for (const [key, storeKey] of Object.entries(savedKeys)) {
+          if (localStorage.getItem(storeKey) === 'true') {
+            activeKey = key;
+            break;
+          }
+        }
+      }
 
-      const savedRm = localStorage.getItem('rmSalesExpanded');
-      if (savedRm !== null) setRmSalesExpanded(savedRm === 'true');
-
-      const savedChk = localStorage.getItem('checklistExpanded');
-      if (savedChk !== null) setChecklistExpanded(savedChk === 'true');
-
-      const savedFp = localStorage.getItem('freightPaymentExpanded');
-      if (savedFp !== null) setFreightPaymentExpanded(savedFp === 'true');
-
-      const savedInv = localStorage.getItem('inventoryExpanded');
-      if (savedInv !== null) setInventoryExpanded(savedInv === 'true');
-
-      const savedPay = localStorage.getItem('paymentExpanded');
-      if (savedPay !== null) setPaymentExpanded(savedPay === 'true');
-
-      const savedSrv = localStorage.getItem('servicesExpanded');
-      if (savedSrv !== null) setServicesExpanded(savedSrv === 'true');
-
-      const savedRep = localStorage.getItem('repairExpanded');
-      if (savedRep !== null) setRepairExpanded(savedRep === 'true');
+      setPurchaseExpanded(activeKey === 'purchase');
+      setOrderExpanded(activeKey === 'order');
+      setProductionExpanded(activeKey === 'production');
+      setStoreExpanded(activeKey === 'store');
+      setRmSalesExpanded(activeKey === 'rmSales');
+      setChecklistExpanded(activeKey === 'checklist');
+      setFreightPaymentExpanded(activeKey === 'freightPayment');
+      setInventoryExpanded(activeKey === 'inventory');
+      setPaymentExpanded(activeKey === 'payment');
+      setServicesExpanded(activeKey === 'services');
+      setRepairExpanded(activeKey === 'repair');
     }
-  }, []);
+  }, [basePath]);
 
   // Context properties defaults
   const poRows: any[] = [];
@@ -656,31 +731,7 @@ export default function DashboardLayout({
             
             {/* Purchase System */}
             <button
-              onClick={() => {
-                setPurchaseExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('purchaseExpanded', String(next));
-                  if (next) {
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('purchase')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'purchase'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -724,31 +775,7 @@ export default function DashboardLayout({
           {/* Order System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setOrderExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('orderExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('order')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'order'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -817,31 +844,7 @@ export default function DashboardLayout({
           {/* Production System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setProductionExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('productionExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('production')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'production'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -927,31 +930,7 @@ export default function DashboardLayout({
           {/* Store System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setStoreExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('storeExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('store')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'store'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -995,31 +974,7 @@ export default function DashboardLayout({
           {/* RM Sales System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setRmSalesExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('rmSalesExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('rmSales')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'rm-sales'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -1063,31 +1018,7 @@ export default function DashboardLayout({
           {/* Checklist & Delegation System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setChecklistExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('checklistExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('checklist')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'checklist'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -1131,31 +1062,7 @@ export default function DashboardLayout({
           {/* Freight Payment System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setFreightPaymentExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('freightPaymentExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setInventoryExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('freightPayment')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'freight-payment'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -1199,33 +1106,7 @@ export default function DashboardLayout({
           {/* Inventory System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setInventoryExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('inventoryExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setPaymentExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('paymentExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('inventory')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'inventory'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -1269,33 +1150,7 @@ export default function DashboardLayout({
           {/* Payment System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setPaymentExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('paymentExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('payment')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'payment'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -1339,35 +1194,7 @@ export default function DashboardLayout({
           {/* Services System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setServicesExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('servicesExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    setPaymentExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                      localStorage.setItem('paymentExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('services')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'services'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
@@ -1411,37 +1238,7 @@ export default function DashboardLayout({
           {/* Repair FMS System */}
           <div className="mt-2">
             <button
-              onClick={() => {
-                setRepairExpanded((v) => {
-                  const next = !v;
-                  if (typeof window !== 'undefined') localStorage.setItem('repairExpanded', String(next));
-                  if (next) {
-                    setPurchaseExpanded(false);
-                    setOrderExpanded(false);
-                    setProductionExpanded(false);
-                    setStoreExpanded(false);
-                    setRmSalesExpanded(false);
-                    setChecklistExpanded(false);
-                    setFreightPaymentExpanded(false);
-                    setInventoryExpanded(false);
-                    setPaymentExpanded(false);
-                    setServicesExpanded(false);
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('purchaseExpanded', 'false');
-                      localStorage.setItem('orderExpanded', 'false');
-                      localStorage.setItem('productionExpanded', 'false');
-                      localStorage.setItem('storeExpanded', 'false');
-                      localStorage.setItem('rmSalesExpanded', 'false');
-                      localStorage.setItem('checklistExpanded', 'false');
-                      localStorage.setItem('freightPaymentExpanded', 'false');
-                      localStorage.setItem('inventoryExpanded', 'false');
-                      localStorage.setItem('paymentExpanded', 'false');
-                      localStorage.setItem('servicesExpanded', 'false');
-                    }
-                  }
-                  return next;
-                });
-              }}
+              onClick={() => toggleSystemAccordion('repair')}
               className={`w-full flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors ${
                 selectedSystem === 'repair'
                   ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'

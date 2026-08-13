@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sys
 import { Input } from "@/systems/production/components/ui/input"
 import { Label } from "@/systems/production/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/systems/production/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetBody, SheetFooter } from "@/systems/production/components/ui/sheet"
 import { Badge } from "@/systems/production/components/ui/badge"
 import { Checkbox } from "@/systems/production/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/systems/production/components/ui/popover"
@@ -979,9 +979,12 @@ export default function CostingPage() {
     if (!validateForm() || !selectedCosting) return
     setIsSubmitting(true)
     try {
+      // ProductionActualRun has a real `costingAmount` column but no equivalent of the
+      // old "Actual8" completion-timestamp column, so that one is dropped; `status` is
+      // set instead to mark the run as costed (closest real field for stage tracking).
       const { error: updateErr } = await productionApi.patch(ACTUAL_PRODUCTION_TABLE, selectedCosting.id, {
-        "Actual8": format(new Date(), "yyyy-MM-dd"),
-        "Costing Amount": Number(formData.costingAmount),
+        costingAmount: Number(formData.costingAmount),
+        status: "Costed",
       })
 
       if (updateErr) throw updateErr
@@ -1441,17 +1444,17 @@ export default function CostingPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl border-b pb-2">
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <SheetHeader className="p-6 pb-2">
+            <SheetTitle className="flex items-center gap-2 text-xl border-b pb-2">
               <Package className="h-5 w-5 text-green-600" />
               Complete Production Details - Job Card: {selectedCosting?.jobCardNo}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               All information from the actual production record for this job card
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
           {selectedCosting?.completeDetails && (
             <form
@@ -1459,8 +1462,9 @@ export default function CostingPage() {
                 e.preventDefault()
                 handleSaveCosting()
               }}
-              className="space-y-6 pt-2"
+              className="flex flex-col flex-1 min-h-0"
             >
+              <SheetBody className="space-y-6 px-6 py-2">
               {/* Section 1: Basic Information */}
               <div className="space-y-3">
                 <h3 className="text-md font-semibold flex items-center gap-2 text-green-700 bg-green-50 p-2 rounded">
@@ -1756,8 +1760,9 @@ export default function CostingPage() {
                 </div>
               </div>
 
+              </SheetBody>
               {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-4 border-t">
+              <SheetFooter className="flex justify-end gap-3 p-6 border-t mt-auto">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
                   Cancel
                 </Button>
@@ -1765,11 +1770,11 @@ export default function CostingPage() {
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Costing Amount
                 </Button>
-              </div>
+              </SheetFooter>
             </form>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

@@ -21,12 +21,14 @@ import {
 } from "@/systems/production/components/ui/table";
 import { Badge } from "@/systems/production/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/systems/production/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetBody,
+  SheetFooter,
+} from "@/systems/production/components/ui/sheet";
 
 import { productionApi } from "@/systems/production/lib/api";
 import { API_URL, getToken } from "@/lib/auth";
@@ -93,7 +95,7 @@ export default function KycProductTable() {
         { data: crushingActualData },
         { data: sjcData },
         { data: sfProdData },
-        invHistoryRes
+        { data: inventoryHistoryData }
       ] = await Promise.all([
         Promise.resolve(productionApi.get('LIFT-ACCOUNTS')).catch(() => ({ data: [], error: null })),
         productionApi.get('semi_actual').catch(() => ({ data: [] })),
@@ -560,17 +562,17 @@ export default function KycProductTable() {
       (async () => {
         try {
           const totalRate = (Number(newEntry.baseRate) || 0) + (Number(newEntry.transportRate) || 0);
-          const firmOrderName = `${newEntry.firmName.toUpperCase()} ORDER`;
 
-          await productionApi.post('kyc', [{
-            "Product name": newEntry.productName,
-            "Firm Name": firmOrderName,
-            "Alumina": Number(newEntry.alumina) || null,
-            "Iron": Number(newEntry.iron) || null,
-            "Bd": Number(newEntry.bd) || null,
-            "Ap": Number(newEntry.ap) || null,
-            "Price": totalRate > 0 ? totalRate : null,
-          }]);
+          // ProductionKyc has no firmName column, so firm info is kept only in
+          // localStorage (above) and is intentionally dropped from this payload.
+          await productionApi.post('kyc', {
+            productName: newEntry.productName,
+            alumina: Number(newEntry.alumina) || null,
+            iron: Number(newEntry.iron) || null,
+            bd: Number(newEntry.bd) || null,
+            ap: Number(newEntry.ap) || null,
+            price: totalRate > 0 ? totalRate : null,
+          });
 
           await productionApi.post('custom_kyc_products', [{
             firm_name: newEntry.firmName,
@@ -621,9 +623,9 @@ export default function KycProductTable() {
       (async () => {
         try {
           const { data } = await productionApi.get("kyc");
-          const target = (data || []).find((r: any) => 
-            normFirm(r["Firm Name"]) === normFirm(firmName) && 
-            normProd(r["Product Name"]) === normProd(productName)
+          // ProductionKyc has no firmName column, so match on productName alone.
+          const target = (data || []).find((r: any) =>
+            normProd(r.productName) === normProd(productName)
           );
           if (target?.id) {
             await productionApi.delete("kyc", target.id);
@@ -887,21 +889,22 @@ export default function KycProductTable() {
         </div>
       </CardContent>
 
-      {/* ── Price Breakdown Popup Dialog ── */}
-      <Dialog open={isBreakdownOpen} onOpenChange={setIsBreakdownOpen}>
-        <DialogContent className="sm:max-w-[460px] bg-white rounded-2xl p-6 shadow-xl border border-slate-200">
-          <DialogHeader className="pb-3 border-b border-slate-100">
-            <DialogTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+      {/* ── Price Breakdown Popup SHEET ── */}
+      <Sheet open={isBreakdownOpen} onOpenChange={setIsBreakdownOpen}>
+        <SheetContent className="sm:max-w-[460px] bg-white rounded-2xl p-0 shadow-xl border border-slate-200 flex flex-col min-h-0">
+          <SheetHeader className="pb-3 border-b border-slate-100 p-6">
+            <SheetTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
               <Receipt className="h-5 w-5 text-olive-600" />
               Price Breakdown Details
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            </SheetTitle>
+            <SheetDescription className="text-xs text-slate-500">
               Complete rate breakdown for <strong className="text-slate-800">{selectedRecordForBreakdown?.productName}</strong> ({selectedRecordForBreakdown?.firmName})
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
           {selectedRecordForBreakdown && (
-            <div className="space-y-4 py-3">
+            <div className="flex flex-col flex-1 min-h-0">
+              <SheetBody className="space-y-4 py-3 px-6">
               <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100 space-y-2.5 text-xs">
                 <div className="flex justify-between items-center py-1 border-b border-slate-100">
                   <div className="flex flex-col">
@@ -943,25 +946,27 @@ export default function KycProductTable() {
                   Processing cost is matched by <strong>Firm Name ({selectedRecordForBreakdown.firmName})</strong> and <strong>Product Name ({selectedRecordForBreakdown.productName})</strong> from {selectedRecordForBreakdown.procCostSource === "crushing" ? "Actual Crushing Entry" : "Actual Production Entry"} history.
                 </div>
               </div>
+              </SheetBody>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Add Custom Product Modal */}
-      <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
-        <DialogContent className="sm:max-w-[480px] bg-white rounded-3xl p-6 shadow-2xl border border-slate-100">
-          <DialogHeader className="pb-3 border-b border-slate-100">
-            <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+      <Sheet open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
+        <SheetContent className="sm:max-w-[480px] bg-white rounded-3xl p-0 shadow-2xl border border-slate-100 flex flex-col min-h-0">
+          <SheetHeader className="pb-3 border-b border-slate-100 p-6">
+            <SheetTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <PlusCircle className="h-5 w-5 text-indigo-600" />
               Add Custom Product
-            </DialogTitle>
-            <DialogDescription className="text-xs text-slate-500">
+            </SheetTitle>
+            <SheetDescription className="text-xs text-slate-500">
               Enter quality specifications and rates to add a custom product to the KYC catalog.
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
-          <form onSubmit={handleAddProductSubmit} className="space-y-4 mt-3">
+          <form onSubmit={handleAddProductSubmit} className="flex flex-col flex-1 min-h-0">
+            <SheetBody className="space-y-4 px-6 pt-3">
             {/* Firm Name & Product Name */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1075,7 +1080,8 @@ export default function KycProductTable() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            </SheetBody>
+            <SheetFooter className="flex justify-end gap-2 p-6 pt-3 border-t border-slate-100 mt-auto">
               <button
                 type="button"
                 onClick={() => setIsAddProductOpen(false)}
@@ -1089,10 +1095,10 @@ export default function KycProductTable() {
               >
                 Save Product
               </button>
-            </div>
+            </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 }

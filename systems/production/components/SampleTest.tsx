@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/systems/production/c
 import { Button } from "@/systems/production/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/systems/production/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/systems/production/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/systems/production/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetDescription, SheetBody } from "@/systems/production/components/ui/sheet"
 import { Label } from "@/systems/production/components/ui/label"
 import { Input } from "@/systems/production/components/ui/input"
 import { Textarea } from "@/systems/production/components/ui/textarea"
@@ -32,26 +32,21 @@ import { Badge } from "@/systems/production/components/ui/badge"
 import { cn } from "@/systems/production/lib/utils"
 
 // --- Constants ---
+const SAMPLE_TEST_TABLE = "sample_test"
 const COSTING_RESPONSE_TABLE = "costing_response"
 const PRODUCTION_TABLE = "production"
 
-const normalizeKey = (value: any) => String(value || "").trim().toLowerCase()
-const makeOrderProductKey = (orderNo: any, productName: any) =>
-  `${normalizeKey(orderNo)}::${normalizeKey(productName)}`
-
 interface SampleItem {
-  id: number
-  productionId?: number | string
+  id: string // ProductionSampleTest row id; empty string if no row exists yet for this costing
+  costingId: string
+  productionId?: string
   compositionNo: string
   orderNo: string
   partyName: string
   productName: string
   orderQuantity: number
   status: string
-  managementApprovalType: string
   sampleTestStatus?: string
-  sampleTestImageUrl?: string
-  sampleTestRemarks?: string
   sampleTestCompletedAt?: string
   // Composition for display
   rmValues: { rm: string; qty: number; cost: number }[]
@@ -101,74 +96,64 @@ export default function SampleTestPage() {
     setError(null)
     try {
       const [
-        { data, error: dbErr },
+        { data: sampleTestData, error: sampleErr },
+        { data: costingData, error: costingErr },
         { data: prodData, error: prodErr },
       ] = await Promise.all([
+        await productionApi.get(SAMPLE_TEST_TABLE),
         await productionApi.get(COSTING_RESPONSE_TABLE),
         await productionApi.get(PRODUCTION_TABLE),
       ])
 
-      if (dbErr) throw dbErr
+      if (sampleErr) throw sampleErr
+      if (costingErr) throw costingErr
       if (prodErr) throw prodErr
 
-      const productionMeta = new Map<string, { productionId?: number | string; partyName: string; orderQuantity: number }>()
-        ; (prodData || []).forEach((p: any) => {
-          const orderNo = String(p["Delivery Order No."] || "").trim()
-          const productName = String(p["Product Name"] || "").trim()
-          if (orderNo) {
-            const meta = {
-              productionId: p.id,
-              partyName: String(p["Party Name"] || ""),
-              orderQuantity: Number(p["Order Quantity"] || 0),
-            }
-            productionMeta.set(makeOrderProductKey(orderNo, productName), meta)
-            if (!productionMeta.has(normalizeKey(orderNo))) productionMeta.set(normalizeKey(orderNo), meta)
-          }
+      // Map of ProductionOrder rows by id (for party/product/qty display)
+      const orderById = new Map<string, any>()
+        ; (prodData || []).forEach((o: any) => {
+          if (o?.id) orderById.set(o.id, o)
         })
 
-      const mapped: SampleItem[] = (data || []).map((row: any) => {
-        const rmValues: { rm: string; qty: number; cost: number }[] = []
-        for (let i = 1; i <= 20; i++) {
-          const rm = row[`RM${i}`]
-          const qty = row[`QTY${i}`]
-          const cost = row[`COST${i}`]
-          if (rm && String(rm).trim()) {
-            rmValues.push({
-              rm: String(rm),
-              qty: Number(qty || 0),
-              cost: Number(cost || 0)
-            })
-          }
-        }
-        const orderNo = row["Order No."] || ""
-        const productName = row["product name"] || ""
-        const meta =
-          productionMeta.get(makeOrderProductKey(orderNo, productName)) ||
-          productionMeta.get(normalizeKey(orderNo))
+      // Map of ProductionSampleTest rows by costingId (1:1 relation)
+      const sampleTestByCostingId = new Map<string, any>()
+        ; (sampleTestData || []).forEach((s: any) => {
+          if (s?.costingId) sampleTestByCostingId.set(s.costingId, s)
+        })
+
+      // Build one row per ProductionCosting, joined with its (optional) sample test
+      // result and its (optional) order for display info.
+      const mapped: SampleItem[] = (costingData || []).map((costing: any) => {
+        const order = costing?.orderId ? orderById.get(costing.orderId) : undefined
+        const sampleTest = sampleTestByCostingId.get(costing.id)
+        const rawStatus = sampleTest?.status || ""
+
+        // Synthesize the same workflow status labels the UI already understands.
+        const status =
+          rawStatus === "OK" ? "Management Approved" :
+          rawStatus === "Not OK" ? "Sample Test Failed" :
+          "Sample Test Pending"
 
         return {
-          id: row.id,
-          productionId: meta?.productionId || "",
-          compositionNo: row["Composition No."] || "",
-          orderNo,
-          partyName: meta?.partyName || "",
-          productName,
-          orderQuantity: meta?.orderQuantity || 0,
-          status: row.Status || "",
-          managementApprovalType: row["Management Approval Type"] || "",
-          sampleTestStatus: row["Sample Test Status"],
-          sampleTestImageUrl: row["Sample Test Image URL"],
-          sampleTestRemarks: row["Sample Test Remarks"],
-          sampleTestCompletedAt: row["Sample Test Completed At"]
-            ? format(new Date(row["Sample Test Completed At"]), "dd/MM/yy HH:mm")
+          id: sampleTest?.id || "",
+          costingId: costing.id,
+          productionId: order?.id || "",
+          compositionNo: costing.compositionNo || "",
+          orderNo: order?.deliveryOrderNo || "",
+          partyName: order?.partyName || "",
+          productName: order?.productName || "",
+          orderQuantity: Number(order?.orderQuantity || 0),
+          status,
+          sampleTestStatus: rawStatus || undefined,
+          sampleTestCompletedAt: sampleTest?.updatedAt
+            ? format(new Date(sampleTest.updatedAt), "dd/MM/yy HH:mm")
             : undefined,
-          rmValues
+          rmValues: [] // Composition breakdown (RM/QTY/COST) is not exposed by /costing yet
         }
       })
 
-      // Items that are either "Sample Test Pending" OR items that went through sample test
       setPendingItems(mapped.filter(i => i.status === "Sample Test Pending"))
-      setHistoryItems(mapped.filter(i => i.status === "Management Approved" && i.managementApprovalType === "Make a sample Test"))
+      setHistoryItems(mapped.filter(i => i.status !== "Sample Test Pending"))
 
     } catch (err: any) {
       setError(`Failed to load data: ${err.message}`)
@@ -183,9 +168,11 @@ export default function SampleTestPage() {
 
   const openTestDialog = (item: SampleItem) => {
     setSelectedItem(item)
-    setRemarks(item.sampleTestRemarks || "")
+    // ProductionSampleTest has no remarks/image columns, so there is nothing to
+    // preload here — each test attempt starts with a clean remarks/image state.
+    setRemarks("")
     setImageFile(null)
-    setImagePreview(item.sampleTestImageUrl || null)
+    setImagePreview(null)
     setIsDialogOpen(true)
   }
 
@@ -208,14 +195,10 @@ export default function SampleTestPage() {
 
     setIsSubmitting(true)
     try {
-      let publicUrl = imagePreview
-
-      // 1. Upload Image if new file selected
+      // 1. Upload Image if new file selected. Kept as physical evidence storage;
+      // ProductionSampleTest has no column to link this URL to, so it is not
+      // attached to the record below (only status is persisted there).
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop()
-        const fileName = `${selectedItem.compositionNo}_${Date.now()}.${fileExt}`
-        const filePath = `samples/${fileName}`
-
         const uploadResponse = await fetch(`${API_URL}/upload`, {
           method: 'POST',
           body: (() => { const fd = new FormData(); fd.append('file', imageFile); return fd; })()
@@ -225,29 +208,19 @@ export default function SampleTestPage() {
           const errorBody = await uploadResponse.json().catch(() => null)
           throw new Error(errorBody?.error || `Upload failed with status ${uploadResponse.status}`)
         }
-
-        const uploadResult = await uploadResponse.json()
-        publicUrl = uploadResult.data?.url || uploadResult.url || `${API_URL}/uploads/${filePath}`
       }
 
-      // 2. Update Record
-      const updatePayload: any = {
-        "Sample Test Status": result,
-        "Sample Test Remarks": remarks,
-        "Sample Test Image URL": publicUrl,
-        "Sample Test Completed At": new Date().toISOString()
-      }
-
-      if (result === "OK") {
-        updatePayload.Status = "Management Approved"
+      // 2. Find-or-create the ProductionSampleTest row for this costing.
+      if (selectedItem.id) {
+        const { error: updateErr } = await productionApi.patch(SAMPLE_TEST_TABLE, selectedItem.id, { status: result })
+        if (updateErr) throw updateErr
       } else {
-        // If Not OK, it stays in "Sample Test Pending" for another try
-        updatePayload.Status = "Sample Test Pending"
+        const { error: createErr } = await productionApi.post(SAMPLE_TEST_TABLE, {
+          costingId: selectedItem.costingId,
+          status: result,
+        })
+        if (createErr) throw createErr
       }
-
-      const { error: updateErr } = await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.id, updatePayload)
-
-      if (updateErr) throw updateErr
 
       toast({
         title: result === "OK" ? "Test Passed" : "Test Failed",
@@ -409,21 +382,22 @@ export default function SampleTestPage() {
         </CardContent>
       </Card>
 
-      {/* --- TEST DIALOG --- */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+      {/* --- TEST SHEET --- */}
+      <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle className="text-2xl font-bold flex items-center gap-2">
               {selectedItem?.status === "Sample Test Pending" ? "Submit Sample Test" : "Sample Test Details"}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               Order: {selectedItem?.orderNo} | Party: {selectedItem?.partyName || "-"} | Product: {selectedItem?.productName} | Qty: {selectedItem?.orderQuantity || "-"}
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
           {selectedItem && (
-            <div className="space-y-6 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col flex-1 min-h-0">
+              <SheetBody className="space-y-6 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Left: Composition Info */}
                 <div className="space-y-4">
                   <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Composition</h3>
@@ -472,37 +446,38 @@ export default function SampleTestPage() {
                   </div>
                 </div>
               </div>
+              </SheetBody>
+
+              <SheetFooter className="mt-auto pt-4 border-t gap-2">
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
+                  Cancel
+                </Button>
+                {selectedItem?.status === "Sample Test Pending" && (
+                  <>
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleSubmit("Not OK")}
+                      disabled={isSubmitting}
+                      className="px-6"
+                    >
+                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+                      Result Not OK
+                    </Button>
+                    <Button
+                      onClick={() => handleSubmit("OK")}
+                      disabled={isSubmitting}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-8"
+                    >
+                      {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                      Result OK
+                    </Button>
+                  </>
+                )}
+              </SheetFooter>
             </div>
           )}
-
-          <DialogFooter className="mt-6 border-t pt-6 gap-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            {selectedItem?.status === "Sample Test Pending" && (
-              <>
-                <Button
-                  variant="destructive"
-                  onClick={() => handleSubmit("Not OK")}
-                  disabled={isSubmitting}
-                  className="px-6"
-                >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
-                  Result Not OK
-                </Button>
-                <Button
-                  onClick={() => handleSubmit("OK")}
-                  disabled={isSubmitting}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-8"
-                >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                  Result OK
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

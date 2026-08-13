@@ -43,13 +43,14 @@ import {
   TableRow,
 } from "@/systems/production/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/systems/production/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetBody,
+} from "@/systems/production/components/ui/sheet";
 import {
   Popover,
   PopoverContent,
@@ -82,6 +83,10 @@ const EXPECTED_LABELS: { key: string; label: string }[] = [
 interface LabItem {
   id: number;
   productionId?: number | string;
+  // id of the existing ProductionManagementReview row (reviewType: 'management-app')
+  // for this costing entry, if a decision has already been recorded. Used to decide
+  // whether handleSubmitDecision should POST a new review or PATCH the existing one.
+  managementReviewId?: string | null;
   compositionNo: string;
   orderNo: string;
   partyName: string;
@@ -283,6 +288,13 @@ export default function ManagementApp() {
 
         const productRate = productionMeta?.productRate || 0;
 
+        // GET /api/production/costing includes `managementReview` (array of
+        // ProductionManagementReview) per row now. Use it directly instead of a
+        // separate fetch to find any existing management-app decision for this costing.
+        const mgmtReview = Array.isArray(row.managementReview)
+          ? row.managementReview.find((r: any) => r.reviewType === "management-app")
+          : null;
+
         return {
           id: row.id,
           productionId: productionMeta?.productionId || "",
@@ -309,10 +321,11 @@ export default function ManagementApp() {
           piApprovedAt: row["PI Approved At"]
             ? format(new Date(row["PI Approved At"]), "dd/MM/yy HH:mm")
             : null,
-          managementApprovalStatus: row["Management Approval Status"] || "",
-          managementRemarks: row["Management Remarks"] || "",
-          managementApprovedAt: row["Management Approved At"]
-            ? format(new Date(row["Management Approved At"]), "dd/MM/yy HH:mm")
+          managementReviewId: mgmtReview?.id || null,
+          managementApprovalStatus: mgmtReview?.status || "",
+          managementRemarks: mgmtReview?.remarks || "",
+          managementApprovedAt: (mgmtReview?.updatedAt || mgmtReview?.createdAt)
+            ? format(new Date(mgmtReview.updatedAt || mgmtReview.createdAt), "dd/MM/yy HH:mm")
             : null,
           expectedValues,
           rmValues,
@@ -371,23 +384,26 @@ export default function ManagementApp() {
     }
     setIsSubmitting(true);
     try {
-      const updateData: Record<string, any> = {
-        "Management Approval Status": decision,
-        "Management Remarks": remarks.trim(),
-        "Management Approved At": new Date().toISOString(),
-        "GP %AGE Actual": (manualGP !== null && manualGP !== undefined) ? Number(manualGP.toFixed(2)) : null,
-        "Material Cost Actual": (manualMaterialCost !== null && manualMaterialCost !== undefined) ? Number(manualMaterialCost.toFixed(2)) : null,
+      // ProductionManagementReview only has {costingId, reviewType, status, remarks}.
+      // The "Approval Workflow Choice" (OK vs Sample Test) and the manual GP%/Material
+      // Cost figures shown above have no matching column on that model, so they fold
+      // into `status` (below) and are not persisted separately.
+      const status = decision === "Approved"
+        ? (approvalType === "OK" ? "Management Approved" : "Sample Test Pending")
+        : "Rejected by Management";
+
+      const reviewBody = {
+        status,
+        remarks: remarks.trim(),
       };
 
-      if (decision === "Approved") {
-        updateData["Status"] = approvalType === "OK" ? "Management Approved" : "Sample Test Pending";
-        updateData["Management Approval Type"] = approvalType;
-      } else {
-        updateData["Status"] = "Rejected by Management";
-        updateData["Management Approval Type"] = null;
-      }
-
-      const { error: updateErr } = await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.id, updateData);
+      const { error: updateErr } = selectedItem.managementReviewId
+        ? await productionApi.patch("management_review", selectedItem.managementReviewId, reviewBody)
+        : await productionApi.post("management_review", {
+            costingId: String(selectedItem.id),
+            reviewType: "management-app",
+            ...reviewBody,
+          });
 
       if (updateErr) throw updateErr;
 
@@ -667,24 +683,25 @@ export default function ManagementApp() {
         </CardContent>
       </Card>
 
-      {/* ── ACTION / VIEW DIALOG ─────────────────────── */}
-      <Dialog open={!!actionMode} onOpenChange={() => { setActionMode(null); setSelectedItem(null); }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className={cn("flex items-center gap-2 text-xl", {
+      {/* ── ACTION / VIEW SHEET ─────────────────────── */}
+      <Sheet open={!!actionMode} onOpenChange={() => { setActionMode(null); setSelectedItem(null); }}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle className={cn("flex items-center gap-2 text-xl", {
               "text-olive-700": actionMode === "review" || actionMode === "view",
             })}>
               {actionMode === "review" && <><Settings className="h-5 w-5" /> Review Entry</>}
               {actionMode === "view" && <><Eye className="h-5 w-5" /> Full Entry Details</>}
-            </DialogTitle>
-            <DialogDescription>
+            </SheetTitle>
+            <SheetDescription>
               {actionMode === "review" && "Management review and final decision process."}
               {actionMode === "view" && "Full visibility of all production and costing data."}
-            </DialogDescription>
-          </DialogHeader>
+            </SheetDescription>
+          </SheetHeader>
 
           {selectedItem && (
-            <div className="space-y-6 pt-4">
+            <div className="flex flex-col flex-1 min-h-0">
+              <SheetBody className="space-y-6 pt-4">
               <Section title="Basic Information">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {[
@@ -931,10 +948,11 @@ export default function ManagementApp() {
                   {remarksError && <p className="text-sm text-red-600 mt-1.5 flex items-center gap-1.5 font-medium"><AlertTriangle className="h-3.5 w-3.5" />{remarksError}</p>}
                 </div>
               )}
+              </SheetBody>
             </div>
           )}
 
-          <DialogFooter className="pt-6 border-t gap-3">
+          <SheetFooter className="pt-6 border-t gap-3 mt-auto">
             <Button variant="outline" onClick={() => { setActionMode(null); setSelectedItem(null); }} disabled={isSubmitting} className="px-6 h-11">
               Close
             </Button>
@@ -959,9 +977,9 @@ export default function ManagementApp() {
                 </Button>
               </>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
