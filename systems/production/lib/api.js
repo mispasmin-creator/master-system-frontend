@@ -82,5 +82,21 @@ export const productionApi = {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
     return handleResponse(res);
+  },
+  upload: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+      },
+      body: formData,
+    });
+    if (!res.ok) {
+      throw new Error(`Upload failed with status ${res.status}`);
+    }
+    const json = await res.json();
+    return json.data?.url || json.url || '';
   }
 };

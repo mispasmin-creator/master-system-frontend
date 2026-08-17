@@ -77,14 +77,15 @@ export default () => {
                 const statusPending = row.status === 'Pending';
                 
                 let matchFirm = true;
-                if (user.firmNameMatch.toLowerCase() !== 'all') {
-                    matchFirm = row.firm_name === user.firmNameMatch;
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const itemFirm = (row.firm_name_match || row.firm_name || '').trim().toLowerCase();
+                    matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
                 
                 return statusPending && hasVendor && poRequiredEmpty && matchFirm;
             });
 
-            filtered.sort((a: any, b: any) => String(b.indent_number).localeCompare(String(a.indent_number)));
+            filtered.sort((a: any, b: any) => String(b.indent_number || '').localeCompare(String(a.indent_number || '')));
 
             setPendingTableData(
                 filtered.map((r: any) => ({
@@ -112,7 +113,7 @@ export default () => {
 
     useEffect(() => {
         fetchPendingPoDecisions();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     // Fetch PO decision history from Supabase
     const fetchPoDecisionHistory = async () => {
@@ -126,8 +127,9 @@ export default () => {
                 const isYesOrNo = row.po_requred === 'Yes' || row.po_requred === 'No';
                 
                 let matchFirm = true;
-                if (user.firmNameMatch.toLowerCase() !== 'all') {
-                    matchFirm = row.firm_name === user.firmNameMatch;
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const itemFirm = (row.firm_name_match || row.firm_name || '').trim().toLowerCase();
+                    matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
                 
                 return poRequiredNotEmpty && isYesOrNo && matchFirm;
@@ -164,7 +166,7 @@ export default () => {
     useEffect(() => {
         fetchPendingPoDecisions();
         fetchPoDecisionHistory();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const handlePoRequired = async (response: 'Yes' | 'No') => {
         if (!selectedIndent) return;

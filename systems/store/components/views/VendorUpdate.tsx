@@ -110,32 +110,34 @@ export default () => {
             const filtered = indents.filter((row: any) => {
                 const hasPlanned2 = row.planned2 !== null && row.planned2 !== undefined && row.planned2 !== '';
                 const noActual2 = row.actual2 === null || row.actual2 === undefined || row.actual2 === '';
+                const isNotRejected = (row.vendor_type || row.vendorType) !== 'Reject';
                 
                 let matchFirm = true;
-                if (user.firmNameMatch.toLowerCase() !== 'all') {
-                    matchFirm = row.firm_name === user.firmNameMatch;
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const firm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
+                    matchFirm = firm === user.firmNameMatch.trim().toLowerCase();
                 }
                 
-                return hasPlanned2 && noActual2 && matchFirm;
+                return hasPlanned2 && noActual2 && isNotRejected && matchFirm;
             });
 
-            filtered.sort((a: any, b: any) => String(b.indent_number).localeCompare(String(a.indent_number)));
+            filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
 
             const rows = filtered as any[];
             const mappedData = rows.map((r) => ({
                 id: r.id,
-                indentNo: r.indent_number || '',
-                firmNameMatch: r.firm_name_match || r.firm_name || '',
-                indenter: r.indenter_name || '',
-                department: r.category || '',
-                product: r.product_name || '',
-                quantity: r.approved_quantity || 0,
+                indentNo: r.indent_number || r.indentNumber || '',
+                firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || r.firmName || '',
+                indenter: r.indenter_name || r.indenterName || '',
+                department: r.category || r.department || '',
+                product: r.product_name || r.productName || '',
+                quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
                 uom: r.uom || '',
-                vendorType: (r.vendor_type || 'Regular') as VendorUpdateData['vendorType'],
+                vendorType: (r.vendor_type || r.vendorType || 'Regular') as VendorUpdateData['vendorType'],
                 planned2: r.planned2 || '',
                 actual2: r.actual2 || '',
                 specifications: r.specifications || '',
-                areaOfUse: r.area_of_use || '',
+                areaOfUse: r.area_of_use || r.areaOfUse || '',
             }));
 
             setTableData(mappedData);
@@ -160,37 +162,38 @@ export default () => {
                 const hasActual2 = row.actual2 !== null && row.actual2 !== undefined && row.actual2 !== '';
                 
                 let matchFirm = true;
-                if (user.firmNameMatch.toLowerCase() !== 'all') {
-                    matchFirm = row.firm_name === user.firmNameMatch;
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
+                    matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
                 
                 return hasPlanned2 && hasActual2 && matchFirm;
             });
 
-            filtered.sort((a: any, b: any) => String(b.indent_number).localeCompare(String(a.indent_number)));
+            filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
 
             const rows = filtered as any[];
             const mappedData = rows.map((r): HistoryData => ({
                 id: r.id,
-                date: formatDate(new Date(r.actual2)),
-                indentNo: r.indent_number || '',
-                firmNameMatch: r.firm_name_match || r.firm_name || '',
-                indenter: r.indenter_name || '',
-                department: r.category || '',
-                product: r.product_name || '',
-                quantity: r.approved_quantity || r.quantity || 0,
+                date: r.actual2 ? formatDate(new Date(r.actual2)) : '-',
+                indentNo: r.indent_number || r.indentNumber || '',
+                firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || r.firmName || '',
+                indenter: r.indenter_name || r.indenterName || '',
+                department: r.category || r.department || '',
+                product: r.product_name || r.productName || '',
+                quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
                 uom: r.uom || '',
-                rate: parseFloat(r.approved_rate) || 0,
-                vendorType: (r.vendor_type || 'Regular') as HistoryData['vendorType'],
+                rate: parseFloat(r.approved_rate || r.approvedRate || r.rate1 || 0) || 0,
+                vendorType: (r.vendor_type || r.vendorType || 'Regular') as HistoryData['vendorType'],
                 planned2: r.planned2 || '',
                 actual2: r.actual2 || '',
                 specifications: r.specifications || '',
-                areaOfUse: r.area_of_use || '',
-                vendorName1: r.vendor_name1 || '',
+                areaOfUse: r.area_of_use || r.areaOfUse || '',
+                vendorName1: r.vendor_name1 || r.vendorName1 || '',
                 rate1: parseFloat(r.rate1) || 0,
-                vendorName2: r.vendor_name2 || '',
+                vendorName2: r.vendor_name2 || r.vendorName2 || '',
                 rate2: parseFloat(r.rate2) || 0,
-                vendorName3: r.vendor_name3 || '',
+                vendorName3: r.vendor_name3 || r.vendorName3 || '',
                 rate3: parseFloat(r.rate3) || 0,
             }));
 
@@ -208,7 +211,7 @@ export default () => {
     useEffect(() => {
         fetchPendingVendorUpdates();
         fetchCompletedVendorUpdates();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     // Filter pending data by date, UOM, and search query
     useEffect(() => {
@@ -367,33 +370,42 @@ export default () => {
 
     // Creating table columns
     const columns: ColumnDef<VendorUpdateData>[] = [
-        ...(user.updateVendorAction
-            ? [
-                {
-                    header: 'Action',
-                    cell: ({ row }: { row: Row<VendorUpdateData> }) => {
-                        const indent = row.original;
-                        return (
-                            <div onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setSelectedHistory(null);
-                                        setSelectedIndent(indent);
-                                        setDialogStep(1);
-                                        setAmountToDetermineType(0);
-                                        setComputedVendorType(indent.vendorType);
-                                        setOpenDialog(true);
-                                    }}
-                                >
-                                    Update
-                                </Button>
-                            </div>
-                        );
-                    },
-                },
-            ]
-            : []),
+        {
+            header: 'Action',
+            cell: ({ row }: { row: Row<VendorUpdateData> }) => {
+                const indent = row.original;
+                return (
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setSelectedHistory(null);
+                                setSelectedIndent(indent);
+                                setDialogStep(1);
+                                setAmountToDetermineType(0);
+                                setComputedVendorType(indent.vendorType || 'Regular');
+                                regularForm.reset({
+                                    vendorName: '',
+                                    rate: 0,
+                                    gstPercent: 0,
+                                    paymentTerm: '',
+                                    advancePercent: undefined,
+                                    quotationNo: '',
+                                    quotationDate: '',
+                                    deliveryTime: undefined,
+                                    make: '',
+                                    transportType: '',
+                                });
+                                setOpenDialog(true);
+                            }}
+                        >
+                            Update
+                        </Button>
+                    </div>
+                );
+            },
+        },
         {
             accessorKey: 'indentNo',
             header: 'Indent No.',
@@ -457,32 +469,28 @@ export default () => {
     ];
 
     const historyColumns: ColumnDef<HistoryData>[] = [
-        ...(user.updateVendorAction
-            ? [
-                {
-                    header: 'Action',
-                    cell: ({ row }: { row: Row<HistoryData> }) => {
-                        const indent = row.original;
+        {
+            header: 'Action',
+            cell: ({ row }: { row: Row<HistoryData> }) => {
+                const indent = row.original;
 
-                        return (
-                            <div onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                        setSelectedIndent(null);
-                                        setSelectedHistory(indent);
-                                        setOpenDialog(true);
-                                    }}
-                                >
-                                    Update
-                                </Button>
-                            </div>
-                        );
-                    },
-                },
-            ]
-            : []),
+                return (
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setSelectedIndent(null);
+                                setSelectedHistory(indent);
+                                setOpenDialog(true);
+                            }}
+                        >
+                            Update
+                        </Button>
+                    </div>
+                );
+            },
+        },
         {
             accessorKey: 'date',
             header: 'Date',
@@ -576,12 +584,12 @@ export default () => {
     const regularSchema = z.object({
         vendorName: z.string().min(1, "Vendor name is required"),
         rate: z.coerce.number().gt(0, "Rate must be greater than 0"),
-        gstPercent: z.coerce.number().min(0, 'GST % is required'),
+        gstPercent: z.coerce.number().min(0, 'GST % is required').default(0),
         paymentTerm: z.string().min(1, "Payment term is required"),
-        advancePercent: z.coerce.number().min(0).max(100).optional(),
+        advancePercent: z.preprocess((val) => (val === '' || val === undefined || val === null ? undefined : Number(val)), z.number().min(0).max(100).optional()),
         quotationNo: z.string().optional(),
         quotationDate: z.string().optional(),
-        deliveryTime: z.coerce.number().gt(0, "Delivery time must be greater than 0").optional(),
+        deliveryTime: z.preprocess((val) => (val === '' || val === undefined || val === null ? undefined : Number(val)), z.number().min(0).optional()),
         make: z.string().optional(),
         transportType: z.string().optional(),
     });
@@ -595,7 +603,9 @@ export default () => {
             rate: 0,
             gstPercent: 0,
             paymentTerm: '',
-            advancePercent: 0,
+            advancePercent: undefined,
+            quotationNo: '',
+            quotationDate: '',
             deliveryTime: undefined,
             make: '',
             transportType: '',
@@ -604,24 +614,13 @@ export default () => {
 
     async function onSubmitRegular(values: z.infer<typeof regularSchema>) {
         try {
-            const finalRate = values.rate * (1 + (values.gstPercent || 0) / 100);
-
             const updates = {
                 actual2: new Date().toISOString(),
                 planned3: new Date().toISOString(),
-                po_requred: 'Yes', // Automatically set PO Required to Yes
+                po_required: 'Yes',
                 vendor_name1: values.vendorName,
-                rate1: values.rate.toString(),
-                select_rate_type1: 'Basic Rate',
-                with_tax_or_not1: 'No',
-                tax_value1: (values.gstPercent || 0).toString(),
+                rate1: Number(values.rate),
                 payment_term1: values.paymentTerm,
-                advance_percent1: values.advancePercent?.toString(),
-                quotation_no1: values.quotationNo || '',
-                quotation_date1: values.quotationDate || '',
-                delivery_time1: values.deliveryTime?.toString() || '',
-                make1: values.make || '',
-                transport_type1: values.transportType || '',
                 vendor_type: computedVendorType,
             };
 
@@ -832,58 +831,25 @@ export default () => {
 
             const updates = {
                 actual2: new Date().toISOString(),
-                planned3: new Date().toISOString(), // Set planned3 for three party approval workflow
+                planned3: new Date().toISOString(),
+                po_required: 'Yes',
 
                 // Vendor 1
                 vendor_name1: values.vendors[0].vendorName,
-                select_rate_type1: vendor1Data.rateType,
-                rate1: vendor1Data.rate.toString(),
-                with_tax_or_not1: vendor1Data.withTaxOrNot,
-                tax_value1: vendor1Data.taxValue.toString(),
+                rate1: Number(vendor1Data.rate || 0),
                 payment_term1: values.vendors[0].paymentTerm,
-                advance_percent1: vendor1Data.advancePercent,
-                whatsapp_number1: values.vendors[0].whatsappNumber,
-                email_id1: values.vendors[0].emailId,
-                quotation_no1: vendor1Data.quotationNo,
-                quotation_date1: vendor1Data.quotationDate,
-                delivery_time1: vendor1Data.deliveryTime,
-                make1: vendor1Data.make,
-                transport_type1: values.vendors[0].transportType || '',
 
                 // Vendor 2
                 vendor_name2: values.vendors[1].vendorName,
-                select_rate_type2: vendor2Data.rateType,
-                rate2: vendor2Data.rate.toString(),
-                with_tax_or_not2: vendor2Data.withTaxOrNot,
-                tax_value2: vendor2Data.taxValue.toString(),
+                rate2: Number(vendor2Data.rate || 0),
                 payment_term2: values.vendors[1].paymentTerm,
-                advance_percent2: vendor2Data.advancePercent,
-                whatsapp_number2: values.vendors[1].whatsappNumber,
-                email_id2: values.vendors[1].emailId,
-                quotation_no2: vendor2Data.quotationNo,
-                quotation_date2: vendor2Data.quotationDate,
-                delivery_time2: vendor2Data.deliveryTime,
-                make2: vendor2Data.make,
-                transport_type2: values.vendors[1].transportType || '',
 
                 // Vendor 3
                 vendor_name3: values.vendors[2].vendorName,
-                select_rate_type3: vendor3Data.rateType,
-                rate3: vendor3Data.rate.toString(),
-                with_tax_or_not3: vendor3Data.withTaxOrNot,
-                tax_value3: vendor3Data.taxValue.toString(),
+                rate3: values.vendors[2]?.vendorName ? Number(vendor3Data.rate || 0) : undefined,
                 payment_term3: values.vendors[2].paymentTerm,
-                advance_percent3: vendor3Data.advancePercent,
-                whatsapp_number3: values.vendors[2].whatsappNumber,
-                email_id3: values.vendors[2].emailId,
-                quotation_no3: vendor3Data.quotationNo,
-                quotation_date3: vendor3Data.quotationDate,
-                delivery_time3: vendor3Data.deliveryTime,
-                make3: vendor3Data.make,
-                transport_type3: values.vendors[2].transportType || '',
 
                 comparison_sheet: url,
-                product_code: values.productCode || '',
                 vendor_type: computedVendorType,
             };
 
@@ -944,14 +910,14 @@ export default () => {
 
             if (selectedHistory?.vendorType === 'Regular') {
                 updates = {
-                    rate1: values.rate?.toString(),
-                    approved_rate: values.rate?.toString(),
+                    rate1: values.rate !== undefined ? Number(values.rate) : undefined,
+                    approved_rate: values.rate !== undefined ? Number(values.rate) : undefined,
                 };
             } else {
                 // Three Party update
-                if (values.vendors?.[0]) updates.rate1 = values.vendors[0].rate.toString();
-                if (values.vendors?.[1]) updates.rate2 = values.vendors[1].rate.toString();
-                if (values.vendors?.[2]) updates.rate3 = values.vendors[2].rate.toString();
+                if (values.vendors?.[0]) updates.rate1 = Number(values.vendors[0].rate || 0);
+                if (values.vendors?.[1]) updates.rate2 = Number(values.vendors[1].rate || 0);
+                if (values.vendors?.[2]) updates.rate3 = Number(values.vendors[2].rate || 0);
             }
 
             await storeApi.patch('indent', selectedHistory?.id!, updates);
@@ -967,8 +933,10 @@ export default () => {
     }
 
     function onError(e: any) {
-        console.log(e);
-        toast.error('Please fill all required fields');
+        console.error('Form validation errors:', e);
+        const firstKey = Object.keys(e || {})[0];
+        const msg = e?.[firstKey]?.message || 'Please fill all required fields';
+        toast.error(msg);
     }
 
     return (
@@ -1382,6 +1350,7 @@ export default () => {
                                                                     ))}
                                                             </SelectContent>
                                                         </Select>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
@@ -1395,8 +1364,9 @@ export default () => {
                                                     <FormItem>
                                                         <FormLabel>Quotation No</FormLabel>
                                                         <FormControl>
-                                                            <Input {...field} placeholder="Quotation no." />
+                                                            <Input {...field} value={field.value ?? ''} placeholder="Quotation no." />
                                                         </FormControl>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
@@ -1407,8 +1377,9 @@ export default () => {
                                                     <FormItem>
                                                         <FormLabel>Quotation Date</FormLabel>
                                                         <FormControl>
-                                                            <Input type="date" {...field} />
+                                                            <Input type="date" {...field} value={field.value ?? ''} />
                                                         </FormControl>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
@@ -1422,8 +1393,9 @@ export default () => {
                                                     <FormItem>
                                                         <FormLabel>Basic Rate</FormLabel>
                                                         <FormControl>
-                                                            <Input type="number" {...field} />
+                                                            <Input type="number" {...field} value={field.value ?? ''} />
                                                         </FormControl>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
@@ -1446,6 +1418,7 @@ export default () => {
                                                                 <SelectItem value="18">18%</SelectItem>
                                                             </SelectContent>
                                                         </Select>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
@@ -1472,6 +1445,7 @@ export default () => {
                                                                 ))}
                                                             </SelectContent>
                                                         </Select>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
@@ -1484,8 +1458,9 @@ export default () => {
                                                         <FormItem>
                                                             <FormLabel>Advance %</FormLabel>
                                                             <FormControl>
-                                                                <Input type="number" placeholder="Enter % e.g. 50" {...field} min={0} max={100} />
+                                                                <Input type="number" placeholder="Enter % e.g. 50" {...field} value={field.value ?? ''} min={0} max={100} />
                                                             </FormControl>
+                                                            <FormMessage />
                                                         </FormItem>
                                                     )}
                                                 />
@@ -1500,8 +1475,9 @@ export default () => {
                                                     <FormItem>
                                                         <FormLabel>Delivery Time (Days)</FormLabel>
                                                         <FormControl>
-                                                            <Input type="number" placeholder="e.g. 4" {...field} />
+                                                            <Input type="number" placeholder="e.g. 4" {...field} value={field.value ?? ''} />
                                                         </FormControl>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
@@ -1512,8 +1488,9 @@ export default () => {
                                                     <FormItem>
                                                         <FormLabel>Make</FormLabel>
                                                         <FormControl>
-                                                            <Input placeholder="Enter make" {...field} />
+                                                            <Input placeholder="Enter make" {...field} value={field.value ?? ''} />
                                                         </FormControl>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />
@@ -1537,6 +1514,7 @@ export default () => {
                                                                 <SelectItem value="FOR">FOR</SelectItem>
                                                             </SelectContent>
                                                         </Select>
+                                                        <FormMessage />
                                                     </FormItem>
                                                 )}
                                             />

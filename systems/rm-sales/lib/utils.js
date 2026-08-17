@@ -19,8 +19,12 @@ export const parseMultiValue = (value) => {
 };
 
 export const hasPageAccess = (value, requiredAccess) => {
+  if (!value) return true;
   const selectedAccess = parseMultiValue(value);
-  return selectedAccess.includes('Admin') || selectedAccess.includes(requiredAccess);
+  return (
+    selectedAccess.some(a => ['admin', 'superadmin', 'user'].includes(a.toLowerCase())) ||
+    selectedAccess.some(a => a.toLowerCase().includes(requiredAccess.toLowerCase()))
+  );
 };
 
 export const filterByFirmAccess = (records, currentUser) => {

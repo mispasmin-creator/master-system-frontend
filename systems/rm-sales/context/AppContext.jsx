@@ -27,7 +27,7 @@ export const AppProvider = ({ children }) => {
     if (storedUser) {
       return {
         user_name: storedUser.username || '',
-        role: storedUser.role || ROLES.ADMIN,
+        role: [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || ROLES.ADMIN,
         firm_name: storedUser.firm_name || ''
       };
     }
@@ -36,8 +36,8 @@ export const AppProvider = ({ children }) => {
 
   const [userRole, setUserRole] = useState(() => {
     const storedUser = getStoredUser();
-    if (storedUser && storedUser.role) {
-      return storedUser.role;
+    if (storedUser) {
+      return [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || ROLES.ADMIN;
     }
     return ROLES.ADMIN;
   });
@@ -50,13 +50,14 @@ export const AppProvider = ({ children }) => {
     const storedUser = getStoredUser();
     const token = getToken();
     if (storedUser && token) {
+      const combinedRole = [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || ROLES.ADMIN;
       setIsAuthenticated(true);
       setCurrentUserVal({
         user_name: storedUser.username || '',
-        role: storedUser.role || ROLES.ADMIN,
+        role: combinedRole,
         firm_name: storedUser.firm_name || ''
       });
-      setUserRole(storedUser.role || ROLES.ADMIN);
+      setUserRole(combinedRole);
     } else {
       setIsAuthenticated(false);
     }

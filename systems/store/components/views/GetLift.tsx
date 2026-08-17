@@ -254,11 +254,11 @@ export default function GetPurchase() {
     // ── Process ALL records into unified flat list ──────────────────────
     const processedRecords = useMemo<ProcessedRecord[]>(() => {
         const filtered = indentRecords.filter(r =>
-            user?.firmNameMatch?.toLowerCase() === 'all' || r.firmNameMatch === user?.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === 'all' || (r.firmNameMatch || '').trim().toLowerCase() === user.firmNameMatch.trim().toLowerCase()
         );
         return filtered.map(r => {
             const relatedStoreIns = storeInRecords.filter(
-                s => s.indentNo === r.indentNumber?.toString() && s.firmNameMatch === r.firmNameMatch
+                s => String(s.indentNo || '').trim() === String(r.indentNumber || '').trim()
             );
             const liftedQty = (Number(r.receivedQuantity) || 0) + relatedStoreIns.reduce((s, x) => s + (Number(x.qty) || 0), 0);
             const orderedQty = Number(r.approvedQuantity) || Number(r.quantity) || 0;
@@ -271,7 +271,7 @@ export default function GetPurchase() {
             const rec = { plannedDate, liftingStatus: r.liftingStatus || '', liftedQty, remainingQty };
             const status = getStatus(rec);
             const lastLiftDate = relatedStoreIns.length
-                ? relatedStoreIns.sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0].timestamp
+                ? relatedStoreIns.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))[0].timestamp
                 : '';
             return {
                 indentNumber: r.indentNumber || '',
@@ -321,6 +321,7 @@ export default function GetPurchase() {
             totalQtyOrdered: processedRecords.reduce((s, r) => s + r.orderedQty, 0),
             totalQtyLifted: processedRecords.reduce((s, r) => s + r.liftedQty, 0),
             remainingQty: processedRecords.reduce((s, r) => s + r.remainingQty, 0),
+            totalPlanned: processedRecords.filter(r => r.plannedDate).length,
         };
     }, [processedRecords]);
 
@@ -330,11 +331,11 @@ export default function GetPurchase() {
     // ── Existing pending/history processing (for action modal) ──────────
     useEffect(() => {
         const filteredByFirm = indentRecords.filter(sheet =>
-            user?.firmNameMatch?.toLowerCase() === 'all' || sheet.firmNameMatch === user?.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === 'all' || (sheet.firmNameMatch || '').trim().toLowerCase() === user.firmNameMatch.trim().toLowerCase()
         );
         const processedData = filteredByFirm.map(sheet => {
             const receivedQty = (Number(sheet.receivedQuantity) || 0) + storeInRecords
-                .filter(store => store.indentNo === sheet.indentNumber?.toString() && store.firmNameMatch === sheet.firmNameMatch)
+                .filter(store => String(store.indentNo || '').trim() === String(sheet.indentNumber || '').trim())
                 .reduce((sum, store) => sum + (Number(store.qty) || 0), 0);
             const approvedQtySafe = Number(sheet.approvedQuantity) || Number(sheet.quantity) || 0;
             const pendingPoQty = approvedQtySafe - receivedQty;
@@ -342,7 +343,7 @@ export default function GetPurchase() {
         }).filter(item => {
             const hasPlanned5 = item.planned5 && item.planned5.toString().trim() !== '';
             const hasActual5 = item.actual5 && item.actual5.toString().trim() !== '';
-            const isPending = item.liftingStatus === 'Pending' || item.liftingStatus === '' || item.liftingStatus === null;
+            const isPending = item.liftingStatus === 'Pending' || item.liftingStatus === '' || item.liftingStatus === null || !item.liftingStatus;
             return isPending && hasPlanned5 && !hasActual5 && item.pendingPoQty > 0;
         });
         const groupedMap = new Map<string, any>();
@@ -383,27 +384,27 @@ export default function GetPurchase() {
 
     useEffect(() => {
         const filteredByFirm = indentRecords.filter(sheet =>
-            user?.firmNameMatch?.toLowerCase() === 'all' || sheet.firmNameMatch === user?.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === 'all' || (sheet.firmNameMatch || '').trim().toLowerCase() === user.firmNameMatch.trim().toLowerCase()
         );
         const completedIndents = filteredByFirm.filter(sheet =>
             sheet.planned5 && sheet.planned5.toString().trim() !== ''
         );
         const indentDataMap = new Map(completedIndents.map(sheet => [
-            `${sheet.indentNumber?.toString() || ''}_${sheet.firmNameMatch || ''}`,
+            String(sheet.indentNumber || '').trim(),
             { poNumber: sheet.poNumber || '', poDate: sheet.actual4 ? formatDate(parseCustomDate(sheet.actual4)) : '', deliveryDate: sheet.deliveryDate ? formatDate(parseCustomDate(sheet.deliveryDate)) : '', approvedVendorName: sheet.approvedVendorName || '', productName: sheet.productName || '', approvedQuantity: sheet.quantity || 0, pendingLiftQty: sheet.pendingQty || 0, firmNameMatch: sheet.firmNameMatch || '' },
         ]));
         const filteredStoreIn = storeInRecords.filter(sheet =>
-            user?.firmNameMatch?.toLowerCase() === 'all' || sheet.firmNameMatch === user?.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === 'all' || (sheet.firmNameMatch || '').trim().toLowerCase() === user.firmNameMatch.trim().toLowerCase()
         );
         setHistoryData(
             filteredStoreIn
-                .filter(sheet => indentDataMap.has(`${sheet.indentNo || ''}_${sheet.firmNameMatch || ''}`))
+                .filter(sheet => indentDataMap.has(String(sheet.indentNo || '').trim()))
                 .map(sheet => {
-                    const indentData = indentDataMap.get(`${sheet.indentNo || ''}_${sheet.firmNameMatch || ''}`)!;
-                    const indentRecord = completedIndents.find(i => i.indentNumber?.toString() === sheet.indentNo && i.firmNameMatch === sheet.firmNameMatch);
+                    const indentData = indentDataMap.get(String(sheet.indentNo || '').trim())!;
+                    const indentRecord = completedIndents.find(i => String(i.indentNumber || '').trim() === String(sheet.indentNo || '').trim());
                     const approvedQty = Number(indentRecord?.approvedQuantity) || 0;
                     const receivedQty = (Number(indentRecord?.receivedQuantity) || 0) + filteredStoreIn
-                        .filter(s => s.indentNo === sheet.indentNo && s.firmNameMatch === sheet.firmNameMatch)
+                        .filter(s => String(s.indentNo || '').trim() === String(sheet.indentNo || '').trim())
                         .reduce((sum, s) => sum + (Number(s.qty) || 0), 0);
                     const pendingLift = approvedQty - receivedQty;
                     return {
@@ -432,7 +433,7 @@ export default function GetPurchase() {
     // ── StoreIn pending processing ──────────────────────────────────────
     useEffect(() => {
         const filteredByFirm = siServiceRecords.filter(item =>
-            user?.firmNameMatch?.toLowerCase() === 'all' || item.firmNameMatch === user?.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === 'all' || (item.firmNameMatch || '').trim().toLowerCase() === user.firmNameMatch.trim().toLowerCase()
         );
         const latestRecords: StoreInRecord[] = [];
         const seen = new Set<string>();
@@ -473,7 +474,7 @@ export default function GetPurchase() {
     // ── StoreIn history processing ──────────────────────────────────────
     useEffect(() => {
         const filteredByFirm = siServiceRecords.filter(item =>
-            user?.firmNameMatch?.toLowerCase() === 'all' || item.firmNameMatch === user?.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === 'all' || (item.firmNameMatch || '').trim().toLowerCase() === user.firmNameMatch.trim().toLowerCase()
         );
         const latestRecords: StoreInRecord[] = [];
         const seen = new Set<string>();
@@ -534,9 +535,8 @@ export default function GetPurchase() {
             for (const item of selectedSI.originalItems) {
                 await storeApi.patch('store_in', item.liftNumber, {
                     actual6: currentDateTime,
-                    receiving_status: values.status,
                     remark: values.remark || '',
-                    hod_planned: currentDateTime,
+                    planned_hod: currentDateTime,
                     hod_status: 'Pending',
                 });
             }
@@ -797,7 +797,7 @@ export default function GetPurchase() {
 
     // ── Pending table columns ───────────────────────────────────────────
     const pendingColumns: ColumnDef<GetPurchaseData>[] = [
-        ...(user?.receiveItemAction ? [{
+        {
             header: 'Action', cell: ({ row }: { row: Row<GetPurchaseData> }) => (
                 <DialogTrigger asChild>
                     <Button variant="outline" size="sm" onClick={() => { setSelectedIndent(row.original); setShowCancelQty(false); setCancelQtyValue(''); }}>
@@ -805,7 +805,7 @@ export default function GetPurchase() {
                     </Button>
                 </DialogTrigger>
             ),
-        }] : []),
+        },
         { accessorKey: 'timestamp', header: 'Timestamp', cell: ({ getValue }) => <div className="text-xs">{getValue() ? formatDateTime(parseCustomDate(getValue())) : '-'}</div> },
         { accessorKey: 'poNumber', header: 'PO Number', cell: ({ getValue }) => <div className="font-bold text-primary">{(getValue() as string) || '-'}</div> },
         { accessorKey: 'vendorName', header: 'Vendor', cell: ({ getValue }) => <div className="min-w-[120px]">{(getValue() as string) || '-'}</div> },
@@ -842,14 +842,14 @@ export default function GetPurchase() {
 
     // ── StoreIn pending columns ──────────────────────────────────────────
     const siPendingColumns: ColumnDef<SIPendingData>[] = [
-        ...(user?.receiveItemView ? [{
+        {
             header: 'Action',
             cell: ({ row }: { row: Row<SIPendingData> }) => (
                 <Button variant="outline" size="sm" onClick={() => { setSelectedSI(row.original); setOpenSIDialog(true); }}>
                     Store In
                 </Button>
             ),
-        }] : []),
+        },
         { accessorKey: 'timestamp', header: 'Timestamp', cell: ({ getValue }) => <div className="text-xs">{getValue() ? formatDateTime(parseCustomDate(getValue())) : '-'}</div> },
         { accessorKey: 'poNumber', header: 'PO Number', cell: ({ getValue }) => <div className="font-bold text-primary">{(getValue() as string) || '-'}</div> },
         { accessorKey: 'vendorName', header: 'Vendor', cell: ({ getValue }) => <div className="min-w-[120px]">{(getValue() as string) || '-'}</div> },
@@ -935,7 +935,7 @@ export default function GetPurchase() {
             header: 'Action',
             cell: ({ row }) => {
                 const r = row.original;
-                if (r.rowType === 'lift' && user?.receiveItemAction && r.liftData) {
+                if (r.rowType === 'lift' && r.liftData) {
                     return (
                         <DialogTrigger asChild>
                             <Button variant="outline" size="sm"
@@ -945,7 +945,7 @@ export default function GetPurchase() {
                         </DialogTrigger>
                     );
                 }
-                if (r.rowType === 'storein' && user?.receiveItemView && r.siData) {
+                if (r.rowType === 'storein' && r.siData) {
                     return (
                         <Button variant="outline" size="sm"
                             onClick={() => { setSelectedSI(r.siData!); setOpenSIDialog(true); }}>
@@ -1166,7 +1166,7 @@ export default function GetPurchase() {
                                         {selectedHistory ? 'Edit History Purchase Details' : 'Update Purchase Details'}
                                     </DialogTitle>
                                 </DialogHeader>
-x
+
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-muted/50 p-4 rounded-xl border">
                                     {[['Indent Number', selectedIndent?.indentNo || selectedHistory?.indentNo],
                                         ['PO Number', selectedIndent?.poNumber || selectedHistory?.poNumber],
@@ -1327,7 +1327,7 @@ x
                                         <FormField control={form.control} name="damageOrder" render={({ field }) => (
                                             <FormItem>
                                                 <FormLabel>Physical Check <span className="text-destructive">*</span></FormLabel>
-                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                <Select onValueChange={field.onChange} value={field.value || ""}>
                                                     <FormControl><SelectTrigger className="h-10"><SelectValue placeholder="Select" /></SelectTrigger></FormControl>
                                                     <SelectContent>
                                                         <SelectItem value="Yes">OK</SelectItem>
@@ -1538,7 +1538,7 @@ x
                                             <FormField control={siForm.control} name="status" render={({ field }) => (
                                                 <FormItem className="space-y-1">
                                                     <FormLabel className="text-[10px] font-bold uppercase text-slate-400 pl-1">Receiving Status <span className="text-destructive">*</span></FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                    <Select onValueChange={field.onChange} value={field.value || ""}>
                                                         <FormControl>
                                                             <SelectTrigger className="h-10 border-slate-200">
                                                                 <SelectValue placeholder="Select status" />

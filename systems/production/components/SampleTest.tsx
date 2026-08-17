@@ -121,18 +121,26 @@ export default function SampleTestPage() {
           if (s?.costingId) sampleTestByCostingId.set(s.costingId, s)
         })
 
-      // Build one row per ProductionCosting, joined with its (optional) sample test
-      // result and its (optional) order for display info.
-      const mapped: SampleItem[] = (costingData || []).map((costing: any) => {
-        const order = costing?.orderId ? orderById.get(costing.orderId) : undefined
-        const sampleTest = sampleTestByCostingId.get(costing.id)
-        const rawStatus = sampleTest?.status || ""
+      // Filter only costings that were moved to sample test
+      const sampleEligibleCostings = (costingData || []).filter((costing: any) => {
+        const hasSampleRecord = sampleTestByCostingId.has(costing.id);
+        const isSampleStatus = String(costing.status || "").toLowerCase() === "sample test pending";
+        const hasSampleReview = Array.isArray(costing.managementReview) &&
+          costing.managementReview.some((r: any) => String(r.status || "").toLowerCase() === "sample test pending");
+        return hasSampleRecord || isSampleStatus || hasSampleReview;
+      });
 
-        // Synthesize the same workflow status labels the UI already understands.
+      // Build one row per eligible ProductionCosting
+      const mapped: SampleItem[] = sampleEligibleCostings.map((costing: any) => {
+        const order = costing?.orderId ? orderById.get(costing.orderId) : (costing.order || undefined);
+        const sampleTest = sampleTestByCostingId.get(costing.id);
+        const rawStatus = sampleTest?.status || "";
+
+        // Synthesize the workflow status labels
         const status =
           rawStatus === "OK" ? "Management Approved" :
           rawStatus === "Not OK" ? "Sample Test Failed" :
-          "Sample Test Pending"
+          "Sample Test Pending";
 
         return {
           id: sampleTest?.id || "",
@@ -148,94 +156,95 @@ export default function SampleTestPage() {
           sampleTestCompletedAt: sampleTest?.updatedAt
             ? format(new Date(sampleTest.updatedAt), "dd/MM/yy HH:mm")
             : undefined,
-          rmValues: [] // Composition breakdown (RM/QTY/COST) is not exposed by /costing yet
-        }
-      })
+          rmValues: []
+        };
+      });
 
-      setPendingItems(mapped.filter(i => i.status === "Sample Test Pending"))
-      setHistoryItems(mapped.filter(i => i.status !== "Sample Test Pending"))
+      setPendingItems(mapped.filter(i => i.status === "Sample Test Pending"));
+      setHistoryItems(mapped.filter(i => i.status !== "Sample Test Pending"));
 
     } catch (err: any) {
-      setError(`Failed to load data: ${err.message}`)
+      setError(`Failed to load data: ${err.message}`);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadData();
+  }, [loadData]);
 
   const openTestDialog = (item: SampleItem) => {
-    setSelectedItem(item)
-    // ProductionSampleTest has no remarks/image columns, so there is nothing to
-    // preload here — each test attempt starts with a clean remarks/image state.
-    setRemarks("")
-    setImageFile(null)
-    setImagePreview(null)
-    setIsDialogOpen(true)
-  }
+    setSelectedItem(item);
+    setRemarks("");
+    setImageFile(null);
+    setImagePreview(null);
+    setIsDialogOpen(true);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      setImageFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => setImagePreview(reader.result as string)
-      reader.readAsDataURL(file)
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setImagePreview(reader.result as string);
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
   const handleSubmit = async (result: "OK" | "Not OK") => {
-    if (!selectedItem) return
+    if (!selectedItem) return;
     if (!imageFile && !imagePreview) {
-      toast({ title: "Image Required", description: "Please upload a sample test image.", variant: "destructive" })
-      return
+      toast({ title: "Image Required", description: "Please upload a sample test image.", variant: "destructive" });
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     try {
-      // 1. Upload Image if new file selected. Kept as physical evidence storage;
-      // ProductionSampleTest has no column to link this URL to, so it is not
-      // attached to the record below (only status is persisted there).
       if (imageFile) {
         const uploadResponse = await fetch(`${API_URL}/upload`, {
           method: 'POST',
           body: (() => { const fd = new FormData(); fd.append('file', imageFile); return fd; })()
-        })
+        });
 
         if (!uploadResponse.ok) {
-          const errorBody = await uploadResponse.json().catch(() => null)
-          throw new Error(errorBody?.error || `Upload failed with status ${uploadResponse.status}`)
+          const errorBody = await uploadResponse.json().catch(() => null);
+          throw new Error(errorBody?.error || `Upload failed with status ${uploadResponse.status}`);
         }
       }
 
-      // 2. Find-or-create the ProductionSampleTest row for this costing.
+      // Find-or-create the ProductionSampleTest row for this costing.
       if (selectedItem.id) {
-        const { error: updateErr } = await productionApi.patch(SAMPLE_TEST_TABLE, selectedItem.id, { status: result })
-        if (updateErr) throw updateErr
+        const { error: updateErr } = await productionApi.patch(SAMPLE_TEST_TABLE, selectedItem.id, { status: result });
+        if (updateErr) throw updateErr;
       } else {
         const { error: createErr } = await productionApi.post(SAMPLE_TEST_TABLE, {
           costingId: selectedItem.costingId,
           status: result,
-        })
-        if (createErr) throw createErr
+        });
+        if (createErr) throw createErr;
       }
+
+      // Update ProductionCosting status to allow it to progress to Job Cards or be marked Failed
+      const costingNewStatus = result === "OK" ? "Management Approved" : "Sample Test Failed";
+      await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.costingId, {
+        status: costingNewStatus,
+      });
 
       toast({
         title: result === "OK" ? "Test Passed" : "Test Failed",
-        description: result === "OK" ? "Item moved to Job Cards." : "Item remains in pending list.",
+        description: result === "OK" ? "Item moved to Job Cards." : "Item marked as failed.",
         variant: result === "OK" ? "default" : "destructive"
-      })
+      });
 
-      setIsDialogOpen(false)
-      loadData()
+      setIsDialogOpen(false);
+      await loadData();
     } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" })
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <div className="p-6 space-y-6 bg-slate-50 min-h-screen max-w-full overflow-x-hidden">

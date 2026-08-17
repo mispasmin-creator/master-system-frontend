@@ -54,7 +54,7 @@ export default function FullKiting() {
 
             // Filter by firm name match
             const filteredData = data.filter(item =>
-                user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
+                !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
             );
 
             // Pending: has planned but no actual
@@ -72,7 +72,7 @@ export default function FullKiting() {
 
     useEffect(() => {
         fetchData();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const columns: ColumnDef<FullkittingRecord>[] = [
         {

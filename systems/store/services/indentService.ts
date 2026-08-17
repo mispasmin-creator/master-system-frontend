@@ -78,53 +78,51 @@ export async function fetchIndentRecords(): Promise<IndentRecord[]> {
         const response = await storeApi.get('indent');
         const data = response.data;
 
-        
-
         return (data || []).map((r: any) => ({
-            id: r.id, // Added
-            indent_number: r.indent_number || '',
-            indenter_name: r.indenter_name || '',
-            department: r.category || '',
-            product_name: r.product_name || '',
+            id: r.id,
+            indent_number: r.indent_number || r.indentNumber || '',
+            indenter_name: r.indenter_name || r.indenterName || '',
+            department: r.department || r.category || '',
+            product_name: r.product_name || r.productName || '',
             quantity: Number(r.quantity) || 0,
             uom: r.uom || '',
             attachment: r.attachment || '',
             specifications: r.specifications || '',
-            area_of_use: r.area_of_use || '', // Added
-            vendor_type: r.vendor_type || 'Pending',
-            indent_status: r.indent_status || '',
-            indent_type: r.indent_type || '',
+            area_of_use: r.area_of_use || r.areaOfUse || '',
+            vendor_type: r.vendor_type || r.vendorType || 'Pending',
+            indent_status: r.indent_status || r.indentStatus || '',
+            indent_type: r.indent_type || r.indentType || '',
             no_day: Number(r.no_day) || 0,
-            planned1: r.planned1 || '',
-            actual1: r.actual1 || '',
-            firm_name_match: r.firm_name || r.firm_name_match || '',
-            approved_quantity: Number(r.approved_quantity) || 0,
+            planned1: r.planned1 || r.planned_1 || '',
+            actual1: r.actual1 || r.actual_1 || '',
+            firm_name_match: r.firm_name_match || r.firmNameMatch || r.firm_name || r.firmName || '',
+            approved_quantity: Number(r.approved_quantity || r.approvedQuantity) || 0,
             timestamp: r.timestamp || '',
             price: Number(r.price) || 0,
             total_rate: Number(r.total_rate) || 0,
-            indent_approved_by: r.indent_approved_by || '',
-            approved_date: r.approved_date || '',
-            planned2: r.planned2 || '',
-            actual2: r.actual2 || '',
-            vendor_name: r.vendor_name || '',
+            indent_approved_by: r.indent_approved_by || r.indentApprovedBy || '',
+            approved_date: r.approved_date || r.approvedDate || '',
+            planned2: r.planned2 || r.planned_2 || '',
+            actual2: r.actual2 || r.actual_2 || '',
+            vendor_name: r.vendor_name || r.vendorName || '',
             negotiated_rate: Number(r.negotiated_rate) || 0,
-            planned3: r.planned3 || '',
-            actual3: r.actual3 || '',
+            planned3: r.planned3 || r.planned_3 || '',
+            actual3: r.actual3 || r.actual_3 || '',
             attachment3: r.attachment3 || '',
             comparative_analysis: r.comparative_analysis || '',
-            planned4: r.planned4 || '',
-            actual4: r.actual4 || '',
-            po_number: r.po_number || '',
-            po_date: r.po_date || '',
-            po_copy: r.po_copy || '',
-            planned5: r.planned5 || '',
-            actual5: r.actual5 || '',
+            planned4: r.planned4 || r.planned_4 || '',
+            actual4: r.actual4 || r.actual_4 || '',
+            po_number: r.po_number || r.poNumber || '',
+            po_date: r.po_date || r.poDate || '',
+            po_copy: r.po_copy || r.poCopy || '',
+            planned5: r.planned5 || r.planned_5 || '',
+            actual5: r.actual5 || r.actual_5 || '',
             transportation_include: r.transportation_include || '',
             tax_extra: r.tax_extra || '',
             credit_days: Number(r.credit_days) || 0,
             remarks5: r.remarks5 || '',
             status: r.status || '',
-            lifting_status: r.lifting_status || '',
+            lifting_status: r.lifting_status || r.liftingStatus || '',
             po_qty: Number(r.po_qty) || 0,
             received_quantity: Number(r.received_quantity) || 0,
             pending_qty: Number(r.pending_qty) || 0,
@@ -132,8 +130,8 @@ export async function fetchIndentRecords(): Promise<IndentRecord[]> {
             vendor2_rank: r.vendor2_rank || '',
             vendor3_rank: r.vendor3_rank || '',
             expected_req_date: r.expected_req_date || '',
-            group_head: r.group_name || '',
-            firm_name: r.firm_name || r.firm_name_match || '',
+            group_head: r.group_head || r.groupHead || r.group_name || '',
+            firm_name: r.firm_name || r.firmName || r.firm_name_match || '',
         }));
     } catch (error) {
         console.error('Error fetching indent records:', error);
@@ -156,14 +154,12 @@ export async function updateIndentApproval(
     }
 ) {
     try {
-        const response = await storeApi.patch('indent', id, {
-                actual1: updateData.actual1,
-                vendor_type: updateData.vendor_type,
-                approved_quantity: updateData.approved_quantity,
-                planned2: updateData.planned2,
-            });
-
-        
+        await storeApi.patch('indent', id, {
+            actual1: updateData.actual1,
+            vendor_type: updateData.vendor_type,
+            approved_quantity: updateData.approved_quantity,
+            planned2: updateData.planned2,
+        });
         return true;
     } catch (error) {
         console.error('Error updating indent approval:', error);
@@ -176,9 +172,7 @@ export async function updateIndentApproval(
  */
 export async function updateIndentSpecifications(id: number, specifications: string) {
     try {
-        const response = await storeApi.patch('indent', id, { specifications });
-
-        
+        await storeApi.patch('indent', id, { specifications });
         return true;
     } catch (error) {
         console.error('Error updating indent specifications:', error);
@@ -198,9 +192,7 @@ export async function updateIndentHistoryFields(
     }
 ) {
     try {
-        const response = await storeApi.patch('indent', id, updateData);
-
-        
+        await storeApi.patch('indent', id, updateData);
         return true;
     } catch (error) {
         console.error('Error updating indent history fields:', error);
@@ -221,14 +213,12 @@ export async function updateIndentVendorSelection(
     }
 ) {
     try {
-        const response = await storeApi.patch('indent', indentNumber, {
-                actual2: updateData.actual2,
-                vendor_name: updateData.vendor_name,
-                negotiated_rate: updateData.negotiated_rate,
-                planned3: updateData.planned3,
-            });
-
-        
+        await storeApi.patch('indent', indentNumber, {
+            actual2: updateData.actual2,
+            vendor_name: updateData.vendor_name,
+            negotiated_rate: updateData.negotiated_rate,
+            planned3: updateData.planned3,
+        });
         return true;
     } catch (error) {
         console.error('Error updating indent vendor selection:', error);
@@ -249,14 +239,12 @@ export async function updateIndentHODApproval(
     }
 ) {
     try {
-        const response = await storeApi.patch('indent', indentNumber, {
-                actual3: updateData.actual3,
-                comparative_analysis: updateData.comparative_analysis,
-                attachment3: updateData.attachment3,
-                planned4: updateData.planned4,
-            });
-
-        
+        await storeApi.patch('indent', indentNumber, {
+            actual3: updateData.actual3,
+            comparative_analysis: updateData.comparative_analysis,
+            attachment3: updateData.attachment3,
+            planned4: updateData.planned4,
+        });
         return true;
     } catch (error) {
         console.error('Error updating indent HOD approval:', error);
@@ -278,15 +266,13 @@ export async function updateIndentPOCreation(
     }
 ) {
     try {
-        const response = await storeApi.patch('indent', indentNumber, {
-                actual4: updateData.actual4,
-                po_number: updateData.po_number,
-                po_date: updateData.po_date,
-                po_copy: updateData.po_copy,
-                planned5: updateData.planned5,
-            });
-
-        
+        await storeApi.patch('indent', indentNumber, {
+            actual4: updateData.actual4,
+            po_number: updateData.po_number,
+            po_date: updateData.po_date,
+            po_copy: updateData.po_copy,
+            planned5: updateData.planned5,
+        });
         return true;
     } catch (error) {
         console.error('Error updating indent PO creation:', error);
@@ -308,15 +294,13 @@ export async function updateIndentPaymentTerms(
     }
 ) {
     try {
-        const response = await storeApi.patch('indent', indentNumber, {
-                actual5: updateData.actual5,
-                transportation_include: updateData.transportation_include,
-                tax_extra: updateData.tax_extra,
-                credit_days: updateData.credit_days,
-                remarks5: updateData.remarks5,
-            });
-
-        
+        await storeApi.patch('indent', indentNumber, {
+            actual5: updateData.actual5,
+            transportation_include: updateData.transportation_include,
+            tax_extra: updateData.tax_extra,
+            credit_days: updateData.credit_days,
+            remarks5: updateData.remarks5,
+        });
         return true;
     } catch (error) {
         console.error('Error updating indent payment terms:', error);
@@ -334,18 +318,15 @@ export async function updateIndentStoreOutApproval(
         approved_date: string;
         approved_quantity: number;
         status: string; // 'Approved' or 'Rejected'
-        // We might want to update notes/remarks if available in schema
     }
 ) {
     try {
-        const response = await storeApi.patch('indent', indentNumber, {
-                indent_approved_by: updateData.approved_by, // Map to correct column
-                approved_date: updateData.approved_date,
-                approved_quantity: updateData.approved_quantity,
-                indent_status: updateData.status, // Assuming this is the status column
-            });
-
-        
+        await storeApi.patch('indent', indentNumber, {
+            indent_approved_by: updateData.approved_by,
+            approved_date: updateData.approved_date,
+            approved_quantity: updateData.approved_quantity,
+            indent_status: updateData.status,
+        });
         return true;
     } catch (error) {
         console.error('Error updating Store Out Approval:', error);

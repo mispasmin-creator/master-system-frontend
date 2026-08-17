@@ -51,8 +51,9 @@ export default function POHistory() {
                 setDataLoading(true);
                 const { data: allPo } = await storeApi.get('po_master');
                 let poMasterData = allPo || [];
-                if (user?.firmNameMatch?.toLowerCase() !== 'all') {
-                    poMasterData = poMasterData.filter((r: any) => r.firm_name_match === user.firmNameMatch);
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const targetFirm = user.firmNameMatch.trim().toLowerCase();
+                    poMasterData = poMasterData.filter((r: any) => (r.firm_name_match || '').trim().toLowerCase() === targetFirm);
                 }
                 poMasterData.sort((a: any, b: any) => String(b.timestamp).localeCompare(String(a.timestamp)));
 

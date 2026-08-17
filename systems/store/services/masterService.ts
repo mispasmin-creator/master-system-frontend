@@ -2,7 +2,7 @@ import { storeApi } from '../lib/api';
 
 /**
  * Master Service
- * Handles fetching global options and master data from Supabase
+ * Handles fetching global options and master data
  */
 
 export interface MasterData {
@@ -45,75 +45,145 @@ export async function fetchMasterOptions(): Promise<MasterData> {
         const response = await storeApi.get('master');
         const data = response.data;
 
-        
-
         const records = data || [];
 
-        const departments = Array.from(new Set(records.map(r => r.category).filter(Boolean)));
-        const uoms = Array.from(new Set(records.map(r => r.uom).filter(Boolean)));
-        const firms = Array.from(new Set(records.map(r => r.firm_name).filter(Boolean)));
-        const fmsNames = Array.from(new Set(records.map(r => r.fms_name).filter(Boolean)));
-        const paymentTerms = Array.from(new Set(records.map(r => r.payment_term).filter(Boolean)));
-        const defaultTerms = Array.from(
-            new Set(
+        const departments: string[] = Array.from(
+            new Set<string>(
                 records
-                    .map(r => (typeof r.default_terms === 'string' ? r.default_terms.trim() : ''))
+                    .map((r: any) => String(r.category || r.department || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        const uoms: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => String(r.uom || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        const firms: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => String(r.firm_name || r.firmName || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        const fmsNames: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => String(r.fms_name || r.fmsName || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        const paymentTerms: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => String(r.payment_term || r.paymentTerm || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        const defaultTerms: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => {
+                        const term = r.default_terms ?? r.defaultTerms;
+                        return typeof term === 'string' ? term.trim() : '';
+                    })
                     .filter(Boolean)
             )
         );
-        const locations = Array.from(new Set(records.map(r => r.where).filter(Boolean)));
-        const allGroupHeads = Array.from(new Set(records.map(r => r.group_name).filter(Boolean))).sort();
-        const groupMasters = Array.from(new Set(records.map(r => r.department).filter(Boolean))).sort();
-        const areasOfUse = Array.from(new Set(records.map(r => r.area_of_use).filter(Boolean))).sort();
+
+        const locations: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => String(r.where || r.location || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        const allGroupHeads: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => String(r.group_name || r.groupName || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        const groupMasters: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => String(r.department || r.category || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
+
+        const areasOfUse: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => String(r.area_of_use || r.areaOfUse || ''))
+                    .filter(Boolean)
+            )
+        ).sort();
 
         // Aggregate vendors
         const vendors = records
-            .filter(r => r.vendor_name)
-            .map(r => ({
-                vendorName: r.vendor_name,
-                gstin: r.vendor_gstin || '',
-                address: r.vendor_address || '',
-                email: r.vendor_email || '',
-                paymentTerm: r.payment_term || '',
+            .filter((r: any) => (r.vendor_name || r.vendorName))
+            .map((r: any) => ({
+                vendorName: String(r.vendor_name || r.vendorName || ''),
+                gstin: String(r.vendor_gstin || r.vendorGstin || ''),
+                address: String(r.vendor_address || r.vendorAddress || ''),
+                email: String(r.vendor_email || r.vendorEmail || ''),
+                paymentTerm: String(r.payment_term || r.paymentTerm || ''),
             }));
 
         // Deduplicate vendors by name
-        const uniqueVendors = Array.from(new Map(vendors.map(v => [v.vendorName, v])).values());
-        const vendorNames = uniqueVendors.map(v => v.vendorName);
+        const uniqueVendors: MasterData['vendors'] = Array.from(new Map(vendors.map((v: any) => [v.vendorName, v])).values());
+        const vendorNames: string[] = uniqueVendors.map((v) => v.vendorName);
 
         // Map group heads to departments and products to group heads
         const groupHeads: Record<string, string[]> = {};
         const products: Record<string, string[]> = {};
-        records.forEach(r => {
-            if (r.category && r.group_name) {
-                if (!groupHeads[r.category]) {
-                    groupHeads[r.category] = [];
+        records.forEach((r: any) => {
+            const cat = String(r.category || r.department || '');
+            const grp = String(r.group_name || r.groupName || '');
+            const item = String(r.item_name || r.itemName || '');
+
+            if (cat && grp) {
+                if (!groupHeads[cat]) {
+                    groupHeads[cat] = [];
                 }
-                if (!groupHeads[r.category].includes(r.group_name)) {
-                    groupHeads[r.category].push(r.group_name);
+                if (!groupHeads[cat].includes(grp)) {
+                    groupHeads[cat].push(grp);
                 }
             }
-            if (r.group_name && r.item_name) {
-                if (!products[r.group_name]) {
-                    products[r.group_name] = [];
+            if (grp && item) {
+                if (!products[grp]) {
+                    products[grp] = [];
                 }
-                if (!products[r.group_name].includes(r.item_name)) {
-                    products[r.group_name].push(r.item_name);
+                if (!products[grp].includes(item)) {
+                    products[grp].push(item);
                 }
             }
         });
 
         // Company info (usually the first record or common values)
-        const firstWithCompany = records.find(r => r.company_name) || {};
+        const firstWithCompany = records.find((r: any) => (r.company_name || r.companyName)) || {};
 
         // Firm to Company Mapping
         const firmCompanyMap: Record<string, { companyName: string; companyAddress: string; destinationAddress: string; }> = {};
-        records.forEach(r => {
-            if (r.firm_name && r.company_name) {
-                firmCompanyMap[r.firm_name] = {
-                    companyName: r.company_name,
-                    companyAddress: r.company_address || '',
-                    destinationAddress: r.destination_address || '',
+        records.forEach((r: any) => {
+            const fName = String(r.firm_name || r.firmName || '');
+            const cName = String(r.company_name || r.companyName || '');
+            if (fName && cName) {
+                firmCompanyMap[fName] = {
+                    companyName: cName,
+                    companyAddress: String(r.company_address || r.companyAddress || ''),
+                    destinationAddress: String(r.destination_address || r.destinationAddress || ''),
                 };
             }
         });
@@ -133,13 +203,13 @@ export async function fetchMasterOptions(): Promise<MasterData> {
             locations,
             vendors: uniqueVendors,
             vendorNames,
-            companyName: firstWithCompany.company_name || '',
-            companyAddress: firstWithCompany.company_address || '',
-            companyGstin: firstWithCompany.company_gstin || '',
-            companyPhone: firstWithCompany.company_phone || '',
-            billingAddress: firstWithCompany.billing_address || '',
-            companyPan: firstWithCompany.company_pan || '',
-            destinationAddress: firstWithCompany.destination_address || '',
+            companyName: String(firstWithCompany.company_name || firstWithCompany.companyName || ''),
+            companyAddress: String(firstWithCompany.company_address || firstWithCompany.companyAddress || ''),
+            companyGstin: String(firstWithCompany.company_gstin || firstWithCompany.companyGstin || ''),
+            companyPhone: String(firstWithCompany.company_phone || firstWithCompany.companyPhone || ''),
+            billingAddress: String(firstWithCompany.billing_address || firstWithCompany.billingAddress || ''),
+            companyPan: String(firstWithCompany.company_pan || firstWithCompany.companyPan || ''),
+            destinationAddress: String(firstWithCompany.destination_address || firstWithCompany.destinationAddress || ''),
             defaultTerms,
             firmCompanyMap,
         };

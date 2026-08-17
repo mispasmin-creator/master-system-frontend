@@ -9,22 +9,24 @@ const Dashboard = dynamic(() => import('@/systems/rm-sales/components/modules/Da
 const SaleOrders = dynamic(() => import('@/systems/rm-sales/components/modules/SaleOrders'), { ssr: false });
 const Logistics = dynamic(() => import('@/systems/rm-sales/components/modules/Logistics'), { ssr: false });
 const Invoices = dynamic(() => import('@/systems/rm-sales/components/modules/Invoices'), { ssr: false });
-const Inventory = dynamic(() => import('@/systems/rm-sales/components/modules/Inventory'), { ssr: false });
-const Masters = dynamic(() => import('@/systems/rm-sales/components/modules/Masters'), { ssr: false });
-const Tracking = dynamic(() => import('@/systems/rm-sales/components/modules/Tracking'), { ssr: false });
-const Reports = dynamic(() => import('@/systems/rm-sales/components/modules/Reports'), { ssr: false });
-const Settings = dynamic(() => import('@/systems/rm-sales/components/modules/Settings'), { ssr: false });
+// Hidden temporarily - not in current scope
+// const Settings = dynamic(() => import('@/systems/rm-sales/components/modules/Settings'), { ssr: false });
+// const Inventory = dynamic(() => import('@/systems/rm-sales/components/modules/Inventory'), { ssr: false });
+// const Masters = dynamic(() => import('@/systems/rm-sales/components/modules/Masters'), { ssr: false });
+// const Tracking = dynamic(() => import('@/systems/rm-sales/components/modules/Tracking'), { ssr: false });
+// const Reports = dynamic(() => import('@/systems/rm-sales/components/modules/Reports'), { ssr: false });
 
 const rmSalesTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },
   { id: "sale-orders", label: "Sale Orders", path: "/sale-orders" },
   { id: "logistics", label: "Logistics", path: "/logistics" },
-  { id: "invoices", label: "Invoices", path: "/invoices" },
-  { id: "inventory", label: "Inventory", path: "/inventory" },
-  { id: "masters", label: "Masters", path: "/masters" },
-  { id: "tracking", label: "Tracking", path: "/tracking" },
-  { id: "reports", label: "Reports", path: "/reports" },
-  { id: "settings", label: "Settings", path: "/settings" }
+  { id: "invoices", label: "Invoices", path: "/invoices" }
+  // Hidden temporarily - not in current scope
+  // { id: "settings", label: "User Management", path: "/settings" },
+  // { id: "inventory", label: "Inventory", path: "/inventory" },
+  // { id: "masters", label: "Masters", path: "/masters" },
+  // { id: "tracking", label: "Tracking", path: "/tracking" },
+  // { id: "reports", label: "Reports", path: "/reports" }
 ];
 
 const renderRmSalesComponent = (tabId: string) => {
@@ -33,11 +35,12 @@ const renderRmSalesComponent = (tabId: string) => {
     case 'sale-orders': return <SaleOrders />;
     case 'logistics': return <Logistics />;
     case 'invoices': return <Invoices />;
-    case 'inventory': return <Inventory />;
-    case 'masters': return <Masters />;
-    case 'tracking': return <Tracking />;
-    case 'reports': return <Reports />;
-    case 'settings': return <Settings />;
+    // Hidden temporarily - not in current scope
+    // case 'settings': return <Settings />;
+    // case 'inventory': return <Inventory />;
+    // case 'masters': return <Masters />;
+    // case 'tracking': return <Tracking />;
+    // case 'reports': return <Reports />;
     default: return <Dashboard />;
   }
 };

@@ -50,7 +50,7 @@ export default function AgainAuditingTable() {
 
       // Filter by firm name and status (planned5 exists, actual5 is empty)
       const filtered = records.filter(item => {
-        const firmMatch = user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch;
+        const firmMatch = !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch;
         const stageMatch = item.planned5 && !item.actual5;
         return firmMatch && stageMatch;
       });
@@ -66,7 +66,7 @@ export default function AgainAuditingTable() {
 
   useEffect(() => {
     fetchData();
-  }, [user.firmNameMatch]);
+  }, [user?.firmNameMatch]);
 
   // Validation schema
   const schema = z.object({

@@ -108,7 +108,7 @@ const ExchangeMaterials = () => {
 
             // Filter by firm name
             const filteredByFirm = data.filter(item =>
-                user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
+                !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
             );
 
             const pending = filteredByFirm
@@ -118,34 +118,28 @@ const ExchangeMaterials = () => {
                 )
                 .map((i) => ({
                     liftNumber: i.liftNumber,
-                    indentNo: i.indentNo,
-                    poNumber: i.poNumber,
+                    indentNumber: i.indentNo,
+                    billNo: i.billNo,
                     vendorName: i.vendorName,
                     productName: i.productName,
-                    billStatus: i.billStatus,
-                    billNo: i.billNo,
                     qty: i.qty,
-                    leadTimeToLiftMaterial: i.leadTimeToLiftMaterial,
                     typeOfBill: i.typeOfBill,
                     billAmount: i.billAmount,
-                    discountAmount: i.discountAmount,
                     paymentType: i.paymentType,
                     advanceAmountIfAny: i.advanceAmountIfAny,
                     photoOfBill: i.photoOfBill,
                     transportationInclude: i.transportationInclude,
                     transporterName: i.transporterName,
                     amount: i.amount,
-                    receivingStatus: i.receivingStatus,
-                    receivedQuantity: i.receivedQuantity,
-                    photoOfProduct: i.photoOfProduct,
-                    damageOrder: i.damageOrder,
-                    quantityAsPerBill: i.quantityAsPerBill,
-                    priceAsPerPo: i.priceAsPerPo,
-                    remark: i.remark,
                     status: i.status,
                     reason: i.reason,
+                    returnQuantity: i.returnQuantity,
+                    reasonForReturn: i.reasonForReturn,
+                    receivedQuantity: i.receivedQuantity,
+                    receivedBillNo: i.receivedBillNo,
+                    receivedDate: i.receivedDate,
                     firmNameMatch: i.firmNameMatch,
-                    billNumber: i.billNumber,
+                    timestamp: i.timestamp || '',
                 }));
 
             setPendingData(pending);
@@ -157,39 +151,41 @@ const ExchangeMaterials = () => {
                 )
                 .map((i) => ({
                     liftNumber: i.liftNumber,
-                    indentNo: i.indentNo,
-                    poNumber: i.poNumber,
+                    indentNumber: i.indentNo,
+                    billNo: i.billNo,
                     vendorName: i.vendorName,
                     productName: i.productName,
-                    billStatus: i.billStatus,
-                    billNo: i.billNo,
                     qty: i.qty,
-                    leadTimeToLiftMaterial: i.leadTimeToLiftMaterial,
                     typeOfBill: i.typeOfBill,
                     billAmount: i.billAmount,
-                    discountAmount: i.discountAmount,
                     paymentType: i.paymentType,
                     advanceAmountIfAny: i.advanceAmountIfAny,
                     photoOfBill: i.photoOfBill,
                     transportationInclude: i.transportationInclude,
                     transporterName: i.transporterName,
                     amount: i.amount,
-                    receivingStatus: i.receivingStatus,
-                    receivedQuantity: i.receivedQuantity,
-                    photoOfProduct: i.photoOfProduct,
-                    damageOrder: i.damageOrder,
-                    quantityAsPerBill: i.quantityAsPerBill,
-                    priceAsPerPo: i.priceAsPerPo,
-                    remark: i.remark,
-                    status: i.status, // Using status field for history status
+                    status: i.status,
                     reason: i.reason,
+                    returnQuantity: i.returnQuantity,
+                    reasonForReturn: i.reasonForReturn,
+                    receivedQuantity: i.receivedQuantity,
+                    receivedBillNo: i.receivedBillNo,
+                    receivedDate: i.receivedDate,
+                    debitNoteNumber: i.debitNoteNumber,
+                    billDate: i.billDate,
+                    partyBillingName: i.partyBillingName,
+                    exchangeQty: i.exchangeQty,
+                    exchangeBillNo: i.exchangeBillNo,
+                    exchangeDate: i.exchangeDate,
+                    exchangePhotoOfBill: i.exchangePhotoOfBill,
+                    exchangePaymentType: i.exchangePaymentType,
                     firmNameMatch: i.firmNameMatch,
-                    billNumber: i.billNumber,
+                    timestamp: i.timestamp || '',
                 }));
 
             setHistoryData(history);
         } catch (error) {
-            console.error("Error fetching Exchange data:", error);
+            console.error("Error fetching data:", error);
             toast.error("Failed to fetch data");
         } finally {
             setDataLoading(false);
@@ -198,7 +194,7 @@ const ExchangeMaterials = () => {
 
     useEffect(() => {
         fetchData();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const pendingColumns: ColumnDef<ExchangePendingData>[] = [
         ...(user.receiveItemView

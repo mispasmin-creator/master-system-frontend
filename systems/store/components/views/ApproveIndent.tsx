@@ -56,7 +56,9 @@ export default function ApproveIndent() {
             const records = await fetchIndentRecords();
             // Filter by firm name
             const filteredByFirm = records.filter(item => {
-                return user.firmNameMatch.toLowerCase() === "all" || item.firm_name_match === user.firmNameMatch;
+                if (!user?.firmNameMatch || user.firmNameMatch.trim().toLowerCase() === "all") return true;
+                const itemFirm = (item.firm_name_match || item.firm_name || '').trim().toLowerCase();
+                return itemFirm === user.firmNameMatch.trim().toLowerCase();
             });
             setAllData(filteredByFirm);
         } catch (error) {
@@ -69,7 +71,7 @@ export default function ApproveIndent() {
 
     useEffect(() => {
         fetchData();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const pendingData = useMemo(() => {
         return allData.filter(i => i.planned1 && !i.actual1);
@@ -142,60 +144,56 @@ export default function ApproveIndent() {
 
 
     const columns = useMemo<ColumnDef<IndentRecord>[]>(() => [
-        ...(user?.indentApprovalAction
-            ? [
-                {
-                    id: 'select',
-                    header: ({ table }: { table: any }) => (
-                        <Checkbox
-                            checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
-                            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-                            aria-label="Select all"
-                        />
-                    ),
-                    cell: ({ row }: { row: any }) => (
-                        <Checkbox
-                            checked={row.getIsSelected()}
-                            onCheckedChange={(value) => row.toggleSelected(!!value)}
-                            aria-label="Select row"
-                        />
-                    ),
-                    enableSorting: false,
-                    enableHiding: false,
-                },
-                {
-                    header: 'Action',
-                    id: 'action',
-                    cell: ({ row, table }: { row: Row<IndentRecord>, table: any }) => {
-                        const id = row.original.id;
-                        const status = table.options.meta?.editedStatuses[id] ?? 'Regular';
-                        
-                        return (
-                            <div className="flex items-center gap-2">
-                                <Select
-                                    value={status}
-                                    onValueChange={(val) => table.options.meta?.updateStatus(id, val)}
-                                >
-                                    <SelectTrigger className="w-[110px] h-8 text-xs">
-                                        <SelectValue placeholder="Action" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Regular">Accept</SelectItem>
-                                        <SelectItem value="Reject">Reject</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        );
-                    },
-                },
-            ]
-            : []),
+        {
+            id: 'select',
+            header: ({ table }: { table: any }) => (
+                <Checkbox
+                    checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+                    onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                    aria-label="Select all"
+                />
+            ),
+            cell: ({ row }: { row: any }) => (
+                <Checkbox
+                    checked={row.getIsSelected()}
+                    onCheckedChange={(value) => row.toggleSelected(!!value)}
+                    aria-label="Select row"
+                />
+            ),
+            enableSorting: false,
+            enableHiding: false,
+        },
+        {
+            header: 'Action',
+            id: 'action',
+            cell: ({ row, table }: { row: Row<IndentRecord>, table: any }) => {
+                const id = row.original.id;
+                const status = table.options.meta?.editedStatuses[id] ?? 'Regular';
+                
+                return (
+                    <div className="flex items-center gap-2">
+                        <Select
+                            value={status}
+                            onValueChange={(val) => table.options.meta?.updateStatus(id, val)}
+                        >
+                            <SelectTrigger className="w-[110px] h-8 text-xs font-medium">
+                                <SelectValue placeholder="Action" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Regular">Accept</SelectItem>
+                                <SelectItem value="Reject">Reject</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                );
+            },
+        },
         { accessorKey: 'indent_number', header: 'Indent No.' },
         {
             accessorKey: 'product_name',
             header: 'Product',
             cell: ({ getValue }) => (
-                <div className="max-w-[150px] break-words whitespace-normal">
+                <div className="max-w-[150px] break-words whitespace-normal font-medium">
                     {getValue() as string}
                 </div>
             ),
@@ -205,34 +203,30 @@ export default function ApproveIndent() {
             accessorKey: 'quantity',
             header: 'Req Qty',
         },
-        ...(user?.indentApprovalAction
-            ? [
-                {
-                    header: 'Approve Qty',
-                    id: 'approve_qty',
-                    cell: ({ row, table }: { row: Row<IndentRecord>, table: any }) => {
-                        const id = row.original.id;
-                        const qty = table.options.meta?.editedQuantities[id] ?? row.original.quantity;
-                        return (
-                            <div className="flex items-center gap-1">
-                                <Input
-                                    type="number"
-                                    className="w-20 h-8"
-                                    value={qty}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        table.options.meta?.updateQuantity(id, val === '' ? 0 : Number(val));
-                                    }}
-                                />
-                                <span className="text-[10px] text-muted-foreground">{row.original.uom}</span>
-                            </div>
-                        );
-                    },
-                }
-            ]
-            : [
-                { accessorKey: 'uom', header: 'UOM' }
-            ]),
+        {
+            header: 'Approve Qty',
+            id: 'approve_qty',
+            cell: ({ row, table }: { row: Row<IndentRecord>, table: any }) => {
+                const id = row.original.id;
+                const qty = table.options.meta?.editedQuantities[id] ?? row.original.quantity;
+                const status = table.options.meta?.editedStatuses[id] ?? 'Regular';
+                return (
+                    <div className="flex items-center gap-1.5">
+                        <Input
+                            type="number"
+                            className="w-24 h-8 text-sm"
+                            value={status === 'Reject' ? 0 : qty}
+                            disabled={status === 'Reject'}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                table.options.meta?.updateQuantity(id, val === '' ? 0 : Number(val));
+                            }}
+                        />
+                        <span className="text-xs font-semibold text-muted-foreground">{row.original.uom}</span>
+                    </div>
+                );
+            },
+        },
         { accessorKey: 'firm_name_match', header: 'Firm Name' },
         { accessorKey: 'indenter_name', header: 'Indenter' },
         { accessorKey: 'department', header: 'Category' },
@@ -240,30 +234,10 @@ export default function ApproveIndent() {
             accessorKey: 'specifications',
             header: 'Specifications',
             cell: ({ getValue }) => (
-                <div className="max-w-[150px] break-words whitespace-normal">
+                <div className="max-w-[150px] break-words whitespace-normal text-xs text-muted-foreground">
                     {getValue() as string}
                 </div>
             ),
-        },
-        {
-            accessorKey: 'vendor_type',
-            header: 'Vendor Type',
-            cell: ({ row }: { row: Row<IndentRecord> }) => {
-                const status = row.original.vendor_type;
-                return (
-                    <Pill
-                        variant={
-                            status === 'Reject'
-                                ? 'reject'
-                                : status === 'Regular'
-                                    ? 'primary'
-                                    : 'secondary'
-                        }
-                    >
-                        {status}
-                    </Pill>
-                );
-            },
         },
         {
             accessorKey: 'indent_status',
@@ -272,7 +246,7 @@ export default function ApproveIndent() {
                 const status = row.original.indent_status;
                 return (
                     <Pill variant={status === 'Critical' ? 'reject' : 'secondary'}>
-                        {status}
+                        {status || 'Normal'}
                     </Pill>
                 );
             },
@@ -282,7 +256,7 @@ export default function ApproveIndent() {
             header: 'Days',
             cell: ({ getValue }) => (
                 <div className="text-center">
-                    {getValue() as number}
+                    {getValue() as number ?? '-'}
                 </div>
             ),
         },
@@ -292,7 +266,7 @@ export default function ApproveIndent() {
             cell: ({ row }: { row: Row<IndentRecord> }) => {
                 const attachment = row.original.attachment;
                 return attachment ? (
-                    <a href={attachment} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">
+                    <a href={attachment} target="_blank" rel="noopener noreferrer" className="text-green-600 font-medium hover:underline">
                         Attachment
                     </a>
                 ) : null;
@@ -308,7 +282,7 @@ export default function ApproveIndent() {
             header: 'Planned Date',
             cell: ({ row }) => row.original.planned1 ? formatDate(new Date(row.original.planned1)) : '-',
         }
-    ], [user?.indentApprovalAction]);
+    ], []);
 
     const historyColumns = useMemo<ColumnDef<IndentRecord>[]>(() => [
         { accessorKey: 'indent_number', header: 'Indent No.' },
@@ -387,10 +361,30 @@ export default function ApproveIndent() {
             },
         },
         {
+            accessorKey: 'vendor_type',
+            header: 'Status',
+            cell: ({ row }: { row: Row<IndentRecord> }) => {
+                const status = row.original.vendor_type;
+                return (
+                    <Pill
+                        variant={
+                            status === 'Reject'
+                                ? 'reject'
+                                : status === 'Regular'
+                                    ? 'primary'
+                                    : 'secondary'
+                        }
+                    >
+                        {status === 'Regular' ? 'Approved' : status === 'Reject' ? 'Rejected' : (status || 'Approved')}
+                    </Pill>
+                );
+            },
+        },
+        {
             accessorKey: 'specifications',
             header: 'Specifications',
             cell: ({ getValue }) => (
-                <div className="max-w-[150px] break-words whitespace-normal">
+                <div className="max-w-[150px] break-words whitespace-normal text-xs text-muted-foreground">
                     {getValue() as string}
                 </div>
             ),
@@ -402,7 +396,7 @@ export default function ApproveIndent() {
                 const status = row.original.indent_status;
                 return (
                     <Pill variant={status === 'Critical' ? 'reject' : 'secondary'}>
-                        {status}
+                        {status || 'Normal'}
                     </Pill>
                 );
             },
@@ -412,7 +406,7 @@ export default function ApproveIndent() {
             header: 'Days',
             cell: ({ getValue }) => (
                 <div className="text-center">
-                    {getValue() as number}
+                    {getValue() as number ?? '-'}
                 </div>
             ),
         },
@@ -431,35 +425,31 @@ export default function ApproveIndent() {
             header: 'Planned Date',
             cell: ({ row }) => row.original.planned1 ? formatDate(new Date(row.original.planned1)) : '-',
         },
-        ...(user.indentApprovalAction
-            ? [
-                {
-                    id: 'editActions',
-                    cell: ({ row, table }: { row: Row<IndentRecord>, table: any }) => {
-                        const id = row.original.id;
-                        const isEditing = table.options.meta?.editingRow === id;
-                        return isEditing ? (
-                            <div className="flex gap-2">
-                                <Button
-                                    size="sm"
-                                    onClick={() => handleSaveEdit(id)}
-                                >
-                                    Save
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleCancelEdit}
-                                >
-                                    Cancel
-                                </Button>
-                            </div>
-                        ) : null;
-                    },
-                },
-            ]
-            : []),
-    ], [user?.indentApprovalAction, handleEditClick, handleSaveEdit, handleCancelEdit]);
+        {
+            id: 'editActions',
+            cell: ({ row, table }: { row: Row<IndentRecord>, table: any }) => {
+                const id = row.original.id;
+                const isEditing = table.options.meta?.editingRow === id;
+                return isEditing ? (
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => handleSaveEdit(id)}
+                        >
+                            Save
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCancelEdit}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                ) : null;
+            },
+        },
+    ], [handleEditClick, handleSaveEdit, handleCancelEdit]);
 
     const schema = z.object({
         approval: z.enum(['Reject', 'Three Party', 'Regular'], {
@@ -547,17 +537,20 @@ export default function ApproveIndent() {
             const selectedIndents = pendingData.filter(i => selectedIds.includes(String(i.id)));
 
             for (const indent of selectedIndents) {
-                const qtyToApprove = editedQuantities[indent.id] ?? indent.quantity;
                 const status = editedStatuses[indent.id] ?? 'Regular';
+                const qtyToApprove = editedQuantities[indent.id] !== undefined
+                    ? editedQuantities[indent.id]
+                    : indent.quantity;
+
                 await updateIndentApproval(indent.id, {
                     actual1: currentDateTime,
                     vendor_type: status,
-                    approved_quantity: status === 'Reject' ? 0 : qtyToApprove,
+                    approved_quantity: status === 'Reject' ? 0 : Number(qtyToApprove),
                     ...(status !== 'Reject' && { planned2: currentDateTime }),
                 });
             }
 
-            toast.success(`Succesfully processed ${selectedIds.length} items`);
+            toast.success(`Successfully processed ${selectedIds.length} items`);
             setRowSelection({});
             setEditedStatuses({});
             setEditedQuantities({});
@@ -606,14 +599,16 @@ export default function ApproveIndent() {
                             }}
                             extraActions={
                                 <div className="flex items-center gap-3">
-                                    {user?.indentApprovalAction && Object.keys(rowSelection).length > 0 && (
-                                        <div className="flex items-center gap-2 border-r pr-4 mr-2 bg-muted p-1 rounded-md">
-                                            <span className="text-sm font-medium whitespace-nowrap">Selected: {Object.keys(rowSelection).length}</span>
+                                    {Object.keys(rowSelection).filter(id => rowSelection[id]).length > 0 && (
+                                        <div className="flex items-center gap-2 border px-3 py-1 bg-muted rounded-md shadow-sm">
+                                            <span className="text-sm font-semibold whitespace-nowrap">
+                                                Selected: {Object.keys(rowSelection).filter(id => rowSelection[id]).length}
+                                            </span>
                                             <Button
                                                 onClick={handleBulkSubmit}
                                                 disabled={bulkSubmitting}
                                                 size="sm"
-                                                className="h-9"
+                                                className="h-8 font-semibold"
                                             >
                                                 {bulkSubmitting ? "Processing..." : "Submit All Selected"}
                                             </Button>

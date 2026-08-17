@@ -1,4 +1,5 @@
 import { storeApi } from '../lib/api';
+import { API_URL, getToken } from '@/lib/auth';
 
 /**
  * Fullkitting Service
@@ -101,13 +102,13 @@ export async function updateFullkittingRecord(
 
         if (updateData.actual) mappedData.actual = updateData.actual;
         if (updateData.status) mappedData.status = updateData.status;
-        if (updateData.vehicleNumber) mappedData.vehicle_number = updateData.vehicleNumber;
+        if (updateData.vehicleNumber) mappedData.vehicle_no = updateData.vehicleNumber;
         if (updateData.from) mappedData.from = updateData.from;
         if (updateData.to) mappedData.to = updateData.to;
         if (updateData.materialLoadDetails) mappedData.material_load_details = updateData.materialLoadDetails;
         if (updateData.biltyNumber) mappedData.bilty_number = updateData.biltyNumber;
         if (updateData.rateType) mappedData.rate_type = updateData.rateType;
-        if (updateData.amount1 !== undefined) mappedData.amount1 = updateData.amount1.toString();
+        if (updateData.amount1 !== undefined) mappedData.amount1 = Number(updateData.amount1) || 0;
         if (updateData.biltyImage) mappedData.bilty_image = updateData.biltyImage;
 
         await storeApi.patch('fullkitting', indentNumber, mappedData);
@@ -143,11 +144,11 @@ export async function insertFullkittingRecord(data: {
             indent_number: data.indentNumber,
             vendor_name: data.vendorName,
             product_name: data.productName,
-            qty: String(data.qty),
+            qty: Number(data.qty) || 0,
             bill_no: data.billNo,
             transporting_include: data.transportingInclude,
             transporter_name: data.transporterName,
-            amount: String(data.amount),
+            amount: Number(data.amount) || 0,
             vehical_no: data.vehicalNo,
             driver_name: data.driverName,
             driver_mobile_no: data.driverMobileNo,
@@ -190,7 +191,36 @@ export async function createFreightPaymentEntry(data: {
     try {
         const nowIso = new Date().toISOString();
 
-        // Fetch all payments to find latest PAY-XXXX sequence number
+        // 1. Post to Freight Payment Entry API for the Freight Payment module
+        const freightPayload = {
+            uniqueNumber: `FRT-${Date.now()}`,
+            paymentNumber: `FRT-${Date.now()}`,
+            firmName: data.firmNameMatch || 'Refrasynth',
+            transporterName: data.transporterName || 'Freight Transporter',
+            vehicleNumber: data.vehicleNumber || '',
+            biltyNumber: data.biltyNumber || '',
+            amount: Number(data.freightAmount) || 0,
+            biltyImageUrl: data.biltyImage || '',
+            liftId: data.indentNumber || '',
+            partyName: data.transporterName || 'Freight Transporter',
+            materialLoadDetails: `${data.productName} (${data.poNumber || ''})`,
+            fmsName: 'Account Checking',
+        };
+
+        try {
+            await fetch(`${API_URL}/freightpayment/entry`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${getToken()}`,
+                },
+                body: JSON.stringify(freightPayload),
+            });
+        } catch (freightErr) {
+            console.error('Error posting to freightpayment entry API:', freightErr);
+        }
+
+        // 2. Fetch all payments to find latest PAY-XXXX sequence number
         const response = await storeApi.get('payments');
         const allPayments: any[] = response.data || [];
 
@@ -214,23 +244,24 @@ export async function createFreightPaymentEntry(data: {
             unique_no: uniqueNo,
             party_name: data.transporterName || 'Freight Transporter',
             po_number: data.poNumber || '',
-            total_po_amount: String(data.freightAmount),
+            total_po_amount: Number(data.freightAmount) || 0,
             internal_code: data.indentNumber,
             product: data.productName,
             delivery_date: null,
-            payment_terms: 'Partly PI',
-            number_of_days: '0',
+            payment_terms: 'Freight Payment',
+            payment_form: 'freight',
+            number_of_days: 0,
             pdf: data.biltyImage || '',
-            pay_amount: String(data.freightAmount),
+            pay_amount: Number(data.freightAmount) || 0,
             file: data.biltyImage || '',
             remark: `Freight Payment | Bilty No: ${data.biltyNumber} | Vehicle: ${data.vehicleNumber}`,
-            total_paid_amount: '0',
-            outstanding_amount: String(data.freightAmount),
+            total_paid_amount: 0,
+            outstanding_amount: Number(data.freightAmount) || 0,
             status: 'Pending',
             planned: null,
             actual: null,
-            status1: 'hod_approval_pending',
-            firm_name: data.firmNameMatch,
+            status1: 'pending',
+            firm_name_match: data.firmNameMatch,
         };
 
         await storeApi.post('payments', [paymentEntry]);

@@ -534,38 +534,27 @@ export default function CheckPage() {
 
       
       const verifiedKeys = new Set<string>();
-      // How many compositions (costing rows) exist per DO+party+product key.
-      // An order can have several identical "For Production Planning" lines
-      // (same DO/party/product) that each need their own composition. Tracking
-      // the count lets the surplus lines stay pending instead of one
-      // composition hiding all of them.
       const verifiedCountByKey = new Map<string, number>();
-      // Legacy costing rows saved before party was recorded: they can only be
-      // matched on DO + product, so they still verify every party of that pair.
       const verifiedKeysWithoutParty = new Set<string>();
       const verifiedDosWithoutProduct = new Set<string>();
+      const verifiedOrderIds = new Set<string>();
+
       (costData || []).forEach((row: any) => {
-        // costData now comes straight from the real ProductionCosting model
-        // (GET /api/production/costing), which nests the linked order under
-        // `order` and has no "Order No." / "product name" / "Party Name"
-        // bracket-string keys — those were the old Google-Sheets column names
-        // and are kept only as a fallback for any not-yet-migrated rows.
+        if (row.orderId) verifiedOrderIds.add(String(row.orderId));
+        if (row.order?.id) verifiedOrderIds.add(String(row.order.id));
+
         const orderNo = String(row.order?.deliveryOrderNo || row["Order No."] || "").trim();
         const productName = String(row.order?.productName || row["product name"] || "").trim();
         const partyName = String(row.order?.partyName || row["Party Name"] || "").trim();
         if (orderNo) {
+          verifiedDosWithoutProduct.add(normalize(orderNo));
           if (productName) {
+            verifiedKeysWithoutParty.add(makeOrderProductKey(orderNo, productName));
             if (partyName) {
               const partyKey = makeOrderPartyProductKey(orderNo, partyName, productName);
               verifiedKeys.add(partyKey);
               verifiedCountByKey.set(partyKey, (verifiedCountByKey.get(partyKey) || 0) + 1);
-            } else {
-              verifiedKeysWithoutParty.add(
-                makeOrderProductKey(orderNo, productName),
-              );
             }
-          } else {
-            verifiedDosWithoutProduct.add(normalize(orderNo));
           }
         }
       });
@@ -580,16 +569,15 @@ export default function CheckPage() {
         return String(val);
       };
 
-      const isVerified = (orderNo: any, partyName: any, productName: any) => {
+      const isVerified = (orderNo: any, partyName: any, productName: any, prodId?: any) => {
+        if (prodId && verifiedOrderIds.has(String(prodId))) return true;
+        const exactKey = makeOrderPartyProductKey(orderNo, partyName, productName);
+        const withoutParty = makeOrderProductKey(orderNo, productName);
+        const doNormalized = normalize(orderNo);
         return (
-          verifiedKeys.has(
-            makeOrderPartyProductKey(orderNo, partyName, productName),
-          ) ||
-          verifiedKeysWithoutParty.has(
-            makeOrderProductKey(orderNo, productName),
-          ) ||
-          (verifiedDosWithoutProduct.has(normalize(orderNo)) &&
-            !normalize(productName))
+          verifiedKeys.has(exactKey) ||
+          verifiedKeysWithoutParty.has(withoutParty) ||
+          verifiedDosWithoutProduct.has(doNormalized)
         );
       };
 
@@ -597,14 +585,13 @@ export default function CheckPage() {
       const matchedProdIds = new Set<any>();
 
       (allProdData || []).forEach((row: any) => {
-        // row is a real ProductionOrder from GET /api/production/orders — camelCase
-        // fields, not the old Supabase bracket-string keys.
+        // row is a real ProductionOrder from GET /api/production/orders
         const doNo = String(row["deliveryOrderNo"] || row["Delivery Order No."] || "").trim();
         const productName = String(row["productName"] || row["Product Name"] || "").trim();
         if (!doNo) return;
 
         if (row["orderCancelled"] || row["Order Cancel"]) return;
-        if (isVerified(doNo, row["partyName"] || row["Party Name"], productName)) return;
+        if (isVerified(doNo, row["partyName"] || row["Party Name"], productName, row.id)) return;
 
         const key = makeOrderProductKey(doNo, productName);
         let meta = orderMetaMap.get(key);
@@ -1178,7 +1165,11 @@ export default function CheckPage() {
         });
       }
 
-      const history: CostingHistoryItem[] = (costData || []).map((row: any) => {
+      const history: CostingHistoryItem[] = (costData || [])
+        .filter((row: any) => {
+          return row && (row.id || row.compositionNo);
+        })
+        .map((row: any) => {
         const rawMaterials: string[] = [];
         const rawMaterialQtys: string[] = [];
         const rawMaterialCosts: number[] = [];
@@ -1793,23 +1784,93 @@ export default function CheckPage() {
     try {
       const compositionNumber = await generateCompositionNumber();
 
-      // Raw material rows entered in the kitting form, mapped to the
-      // ProductionCostingMaterial relation shape (materialName/quantity/sequence).
+      const toNumberOrNull = (value: any) => {
+        if (value === null || value === undefined || String(value).trim() === "") return null;
+        const parsed = Number(value);
+        return Number.isNaN(parsed) ? null : parsed;
+      };
+
+      const toDateOrNull = (value: any) => {
+        if (!value || String(value).trim() === "" || String(value).trim() === "-") return null;
+        const text = String(value).trim();
+        const ddmmyyyy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+        if (ddmmyyyy) {
+          const [, dd, mm, yy] = ddmmyyyy;
+          const yyyy = yy.length === 2 ? `20${yy}` : yy;
+          const d = new Date(`${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}T00:00:00.000Z`);
+          return isNaN(d.getTime()) ? null : d.toISOString();
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+          const d = new Date(`${text}T00:00:00.000Z`);
+          return isNaN(d.getTime()) ? null : d.toISOString();
+        }
+        const parsed = new Date(text);
+        return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+      };
+
+      // 1. Resolve or create the ProductionOrder first so we have a valid orderId
+      let resolvedOrderId: string | null = null;
+      if (selectedCheck?.productionId && typeof selectedCheck.productionId === "string" && selectedCheck.productionId.length > 20) {
+        resolvedOrderId = selectedCheck.productionId;
+      }
+
+      const { data: prodData } = await productionApi.get(PRODUCTION_TABLE);
+      const targetRow = (prodData || []).find(
+        (r: any) =>
+          (resolvedOrderId && r.id === resolvedOrderId) ||
+          (selectedCheck?.deliveryOrderNo && r.deliveryOrderNo &&
+            String(r.deliveryOrderNo).trim().toLowerCase() === String(selectedCheck.deliveryOrderNo).trim().toLowerCase() &&
+            (!selectedCheck?.productName || !r.productName || String(r.productName).trim().toLowerCase() === String(selectedCheck.productName).trim().toLowerCase()))
+      );
+
+      const productionPayload: Record<string, any> = {
+        deliveryOrderNo: selectedCheck.deliveryOrderNo,
+        firmName: selectedCheck.firmName || targetRow?.firmName || null,
+        partyName: selectedCheck.partyName || targetRow?.partyName || null,
+        productName: selectedCheck.productName || targetRow?.productName || null,
+        orderQuantity: toNumberOrNull(selectedCheck.orderQuantity) || targetRow?.orderQuantity || null,
+        expectedDeliveryDate: toDateOrNull(selectedCheck.expectedDeliveryDate) || targetRow?.expectedDeliveryDate || null,
+        priority: selectedCheck.priority || targetRow?.priority || null,
+        crmName: selectedCheck.crmName || targetRow?.crmName || null,
+        quantityDelivered: toNumberOrNull(selectedCheck.quantityDelivered),
+        status: "Kitted",
+      };
+
+      if (targetRow?.id) {
+        await productionApi.patch(PRODUCTION_TABLE, targetRow.id, productionPayload);
+        resolvedOrderId = targetRow.id;
+      } else if (!resolvedOrderId && selectedCheck.deliveryOrderNo) {
+        const res = await productionApi.post(PRODUCTION_TABLE, productionPayload);
+        const newProd = res?.data || res;
+        resolvedOrderId = newProd?.id || (Array.isArray(newProd) ? newProd[0]?.id : null);
+      }
+
+      // Raw material rows entered in the kitting form
       const materialRows = kittingFormRows.filter((row) => row?.productName);
 
-      // NOTE: ProductionCosting (the real Prisma model) has no columns for the
-      // BD/AP composition totals or the "Expected Values" block (W/C %, Sticky/
-      // Flow, IST, FST, BD/CCS/PLC at 110C & 1100C) that the old Supabase sheet
-      // stored — there is nothing to map them onto, so they are intentionally
-      // left off this payload rather than being written to the wrong field.
+      // Expected values dictionary
+      const expMap = (propName: string) => expectedValues.find((e) => e.property.includes(propName))?.value || null;
+
       const insertPayload: Record<string, any> = {
         compositionNo: compositionNumber,
-        orderId: selectedCheck.productionId ? String(selectedCheck.productionId) : null,
+        orderId: resolvedOrderId,
         aluminaPercent: kittingTotals.al,
         ironPercent: kittingTotals.fe,
+        bdPercent: kittingTotals.bd,
+        apPercent: kittingTotals.ap,
         variableCost: kittingTotals.variableCost,
         manufacturingCost: manufacturingCost || 1500,
         sellingPrice: kittingTotals.variableCost + (manufacturingCost || 1500),
+        expectedWcPercent: expMap("W/C"),
+        expectedStickyFlow: expMap("Sticky"),
+        expectedIst: expMap("IST"),
+        expectedFst: expMap("FST"),
+        expectedBdAt110c: expMap("BD at 110"),
+        expectedBdAt1100c: expMap("BD at 1100"),
+        expectedCcsAt110c: expMap("CCS at 110"),
+        expectedCcsAt1100c: expMap("CCS at 1100"),
+        expectedPlcAt1100c: expMap("PLC"),
+        status: "PENDING",
         ...(materialRows.length > 0
           ? {
               materials: {
@@ -1824,81 +1885,7 @@ export default function CheckPage() {
       };
 
       const { error: insertErr } = await productionApi.post(COSTING_RESPONSE_TABLE, insertPayload);
-
       if (insertErr) throw insertErr;
-
-      // Update or create the production record for this exact order/product.
-      if (selectedCheck?.deliveryOrderNo) {
-        const completedAt = new Date().toISOString().slice(0, 10);
-        const toNumberOrNull = (value: any) => {
-          if (
-            value === null ||
-            value === undefined ||
-            String(value).trim() === ""
-          )
-            return null;
-          const parsed = Number(value);
-          return Number.isNaN(parsed) ? null : parsed;
-        };
-        const toDateOrNull = (value: any) => {
-          if (!value || String(value).trim() === "-") return null;
-          const text = String(value).trim();
-          if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
-
-          const ddmmyyyy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
-          if (ddmmyyyy) {
-            const [, dd, mm, yy] = ddmmyyyy;
-            const yyyy = yy.length === 2 ? `20${yy}` : yy;
-            return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
-          }
-
-          const parsed = new Date(text);
-          return Number.isNaN(parsed.getTime())
-            ? null
-            : parsed.toISOString().slice(0, 10);
-        };
-        // NOTE: ProductionOrder (the real Prisma model) has no columns for the
-        // free-text note, "Production Pending" quantity, planned date, selling
-        // rate, or uploaded SO file that the old Supabase sheet stored, so
-        // those are intentionally left off this payload. "status" is the
-        // closest real field to mark this order as having completed full
-        // kitting, replacing the old "Actual 1" completion timestamp.
-        const productionPayload: Record<string, any> = {
-          deliveryOrderNo: selectedCheck.deliveryOrderNo,
-          firmName: selectedCheck.firmName || null,
-          partyName: selectedCheck.partyName || null,
-          productName: selectedCheck.productName || null,
-          orderQuantity: toNumberOrNull(selectedCheck.orderQuantity),
-          expectedDeliveryDate: toDateOrNull(
-            selectedCheck.expectedDeliveryDate,
-          ),
-          priority: selectedCheck.priority || null,
-          crmName: selectedCheck.crmName || null,
-          quantityDelivered: toNumberOrNull(selectedCheck.quantityDelivered),
-          status: selectedCheck.status || "Kitted",
-        };
-
-        const { data: prodData, error: prodFetchErr } = await productionApi.get(PRODUCTION_TABLE);
-        if (prodFetchErr) throw prodFetchErr;
-        const targetRow = (prodData || []).find((r: any) =>
-            r.firmName === selectedCheck.firmName &&
-            r.partyName === selectedCheck.partyName &&
-            r.productName === selectedCheck.productName
-        );
-
-        let updatedRows: any[] | null = null;
-        if (targetRow?.id) {
-           const { data, error } = await productionApi.patch(PRODUCTION_TABLE, targetRow.id, productionPayload);
-           if (error) throw error;
-           updatedRows = data ? [data] : [];
-        }
-
-        if (!updatedRows || updatedRows.length === 0) {
-          const { error: insertProdErr } = await productionApi.post(PRODUCTION_TABLE, productionPayload);
-
-          if (insertProdErr) throw insertProdErr;
-        }
-      }
 
       setIsKittingDialogOpen(false);
       setSelectedCheck(null);
@@ -1906,8 +1893,8 @@ export default function CheckPage() {
       await loadData();
       toast({
         title: "Success!",
-        description: "Full Kitting data submitted successfully.",
-        duration: 2000,
+        description: `Composition ${compositionNumber} saved and moved to PI Approval.`,
+        duration: 2500,
       });
     } catch (err: any) {
       toast({

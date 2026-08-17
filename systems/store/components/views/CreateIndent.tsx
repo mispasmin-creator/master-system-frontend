@@ -117,7 +117,7 @@ export default () => {
     const form = useForm({
         resolver: zodResolver(schema),
         defaultValues: {
-            indenterName: '',
+            indenterName: user?.name || user?.username || '',
             firmName: '',
             indentStatus: undefined,
             products: [
@@ -147,24 +147,25 @@ export default () => {
     // Fetch indenter names for a selected firm and auto-fill if only one exists
     const handleFirmSelect = async (val: string) => {
         form.setValue('firmName', val);
-        form.setValue('indenterName', '');
+        const fallbackName = user?.name || user?.username || '';
+        form.setValue('indenterName', fallbackName);
         setIndenterOptions([]);
         setIndenterLoading(true);
         try {
             const res = await storeApi.get('master');
-            const data = (res.data || []).filter((r: any) => r.firm_name === val);
+            const data = (res.data || []).filter((r: any) => (r.firm_name || r.firmName) === val);
 
-            if (data) {
-                // Deduplicate indenter names
+            if (data && data.length > 0) {
+                // Deduplicate indenter names if present in master
                 const unique = Array.from(
                     new Set(
                         data
-                            .map((r: any) => r.indenter_name)
+                            .map((r: any) => r.indenter_name || r.indenterName)
                             .filter(Boolean)
                     )
                 ) as string[];
                 setIndenterOptions(unique);
-                if (unique.length === 1) {
+                if (unique.length > 0) {
                     form.setValue('indenterName', unique[0]);
                 }
             }
@@ -183,19 +184,24 @@ export default () => {
         }
     }, [options?.firms]);
 
-    // Helper: Generate next indent number from Supabase
+    // Helper: Generate next indent number
     const getNextIndentNumber = async (): Promise<string> => {
         try {
             const { data } = await storeApi.get('indent');
-            const sorted = (data || []).sort((a: any, b: any) => String(b.indent_number).localeCompare(String(a.indent_number)));
+            if (!data || data.length === 0) return 'SI-0001';
 
-            if (!sorted || sorted.length === 0) return 'SI-0001';
-
-            const lastIndent = sorted[0].indent_number;
-            if (!lastIndent || !/^SI-\d+$/.test(lastIndent)) return 'SI-0001';
-
-            const lastNumber = parseInt(lastIndent.split('-')[1], 10);
-            return `SI-${String(lastNumber + 1).padStart(4, '0')}`;
+            let maxNum = 0;
+            for (const item of data) {
+                const numStr = item.indent_number || item.indentNumber;
+                if (numStr && typeof numStr === 'string') {
+                    const match = numStr.match(/^SI-(\d+)$/i);
+                    if (match) {
+                        const num = parseInt(match[1], 10);
+                        if (num > maxNum) maxNum = num;
+                    }
+                }
+            }
+            return `SI-${String(maxNum + 1).padStart(4, '0')}`;
         } catch (error) {
             console.error('Error generating indent number:', error);
             return 'SI-0001';
@@ -242,21 +248,17 @@ export default () => {
                     planned1: new Date().toISOString(),
                     indent_number: nextIndentNumber,
                     indenter_name: data.indenterName,
-                    category: product.department,
+                    department: product.department,
                     area_of_use: product.areaOfUse,
-                    group_name: product.groupHead,
-                    department: product.groupMaster,
+                    group_head: product.groupHead,
                     product_name: product.productName,
                     quantity: product.quantity,
-                    min_stock_qty: product.minStockQty || 0,
                     uom: product.uom,
                     firm_name: data.firmName,
                     specifications: product.specifications || '',
                     indent_status: data.indentStatus,
-                    expected_req_date: product.expectedRequirementDate,
                     attachment: attachmentUrl,
-                    firm_name_match: user?.firmNameMatch || '',
-                    status: 'Pending',
+                    firm_name_match: (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') ? user.firmNameMatch : data.firmName,
                 };
 
                 rows.push(row);
@@ -300,7 +302,8 @@ export default () => {
             const { data } = await storeApi.get('indent');
             let indents = data || [];
             if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
-                indents = indents.filter((r: any) => r.firm_name_match === user.firmNameMatch);
+                const targetFirm = user.firmNameMatch.trim().toLowerCase();
+                indents = indents.filter((r: any) => (r.firm_name_match || r.firm_name || '').trim().toLowerCase() === targetFirm);
             }
             indents.sort((a: any, b: any) => String(b.timestamp).localeCompare(String(a.timestamp)));
             setHistoryData(indents);
@@ -469,11 +472,10 @@ export default () => {
                                                     </SelectContent>
                                                 </Select>
                                             ) : (
-                                                // Single or no indenter → auto-filled read-only input
+                                                // Single or no indenter → editable input with pre-filled value
                                                 <FormControl>
                                                     <Input
-                                                        placeholder={indenterOptions.length === 0 ? 'Select a Firm Name first' : 'Indenter name (auto-filled)'}
-                                                        readOnly={indenterOptions.length === 1}
+                                                        placeholder="Enter indenter name"
                                                         {...field}
                                                     />
                                                 </FormControl>
@@ -538,7 +540,12 @@ export default () => {
                                     const currentDept = products[index]?.department;
                                     const currentGroupHead = products[index]?.groupHead;
                                     const groupHeadOptions = options?.allGroupHeads || [];
-                                    const productOptions = options?.products[currentGroupHead] || [];
+                                    const matchedKey = currentGroupHead && options?.products
+                                        ? Object.keys(options.products).find(k => k.trim().toLowerCase() === currentGroupHead.trim().toLowerCase())
+                                        : null;
+                                    const productOptions = matchedKey && options?.products?.[matchedKey]
+                                        ? options.products[matchedKey]
+                                        : (options?.products?.[currentGroupHead] || []);
                                     const selectedProductName = products[index]?.productName;
                                     const availableQty = selectedProductName
                                         ? availableQtyByProduct.get(selectedProductName.trim().toLowerCase()) ?? 0

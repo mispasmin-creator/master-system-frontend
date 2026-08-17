@@ -72,7 +72,7 @@ export default () => {
 
             // Filter by firm name match
             const filteredByFirm = data.filter(item =>
-                user.firmNameMatch.toLowerCase() === "all" || item.firm_name_match === user.firmNameMatch
+                !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firm_name_match === user.firmNameMatch
             );
 
             // Filter where indentType is 'Store Out'
@@ -132,15 +132,13 @@ export default () => {
 
     useEffect(() => {
         fetchData();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     // Creating table columns
     const columns: ColumnDef<StoreOutTableData>[] = [
-        ...(user.storeOutApprovalAction
-            ? [
-                {
-                    header: 'Actions',
-                    id: 'actions',
+        {
+            header: 'Actions',
+            id: 'actions',
                     cell: ({ row }: { row: Row<StoreOutTableData> }) => {
                         const indent = row.original;
 
@@ -193,8 +191,7 @@ export default () => {
                         );
                     },
                 },
-            ]
-            : []),
+            },
         { accessorKey: 'indentNo', header: 'Indent No.' },
         { accessorKey: 'indenter', header: 'Indenter' },
         { accessorKey: 'department', header: 'Category' },

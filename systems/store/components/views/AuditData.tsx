@@ -222,8 +222,8 @@ export default function PcReportTable() {
 
     const filteredByFirm = records.filter((item) => {
       const itemFirm = (item.firmNameMatch || '').trim().toLowerCase();
-      const userFirm = (user.firmNameMatch || '').trim().toLowerCase();
-      const matchesFirm = userFirm === "all" || itemFirm === userFirm;
+      const userFirm = (user?.firmNameMatch || '').trim().toLowerCase();
+      const matchesFirm = !userFirm || userFirm === "all" || itemFirm === userFirm;
       return matchesFirm;
     });
 

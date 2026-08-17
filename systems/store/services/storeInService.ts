@@ -121,28 +121,28 @@ export async function fetchStoreInRecords() {
             amount: Number(r.amount) || 0,
             planned6: r.planned6 || '',
             actual6: r.actual6 || '',
-            receivingStatus: r.receiving_status || '',
-            receivedQuantity: Number(r.received_quantity) || 0,
-            photoOfProduct: r.photo_of_product || '',
-            damageOrder: r.damage_order || '',
-            quantityAsPerBill: r.quantity_as_per_bill || '',
+            receivingStatus: r.material_status || r.receiving_status || r.receivingStatus || '',
+            receivedQuantity: Number(r.received_quantity || r.receivedQuantity) || 0,
+            photoOfProduct: r.photo_of_product || r.photoOfProduct || '',
+            damageOrder: r.damage_order || r.damageOrder || '',
+            quantityAsPerBill: r.quantity_as_per_bill || r.quantityAsPerBill || '',
             remark: r.remark || '',
             location: r.location || '',
-            poDate: r.po_date || '',
-            poNumber: r.po_number || '',
+            poDate: r.po_date || r.poDate || '',
+            poNumber: r.po_number || r.poNumber || '',
             vendor: r.vendor || '',
-            indentNumber: r.indent_number || '',
+            indentNumber: r.indent_number || r.indentNumber || '',
             product: r.product || '',
             uom: r.uom || '',
-            poCopy: r.po_copy || '',
-            billStatus: r.bill_status || '',
-            leadTimeToLiftMaterial: Number(r.lead_time_to_lift_material) || 0,
-            discountAmount: Number(r.discount_amount) || 0,
-            firmNameMatch: r.firm_name_match || '',
+            poCopy: r.po_copy || r.poCopy || '',
+            billStatus: r.bill_status || r.billStatus || '',
+            leadTimeToLiftMaterial: Number(r.lead_time_to_lift_material || r.leadTimeToLiftMaterial) || 0,
+            discountAmount: Number(r.discount_amount || r.discountAmount) || 0,
+            firmNameMatch: r.firm_name_match || r.firmNameMatch || '',
             timestamp: r.timestamp || '',
-            billNumber: r.bill_number || '',
-            unitOfMeasurement: r.unit_of_measurement || '',
-            priceAsPerPo: Number(r.rate) || 0,
+            billNumber: r.bill_number || r.billNumber || '',
+            unitOfMeasurement: r.unit_of_measurement || r.unitOfMeasurement || '',
+            priceAsPerPo: Number(r.price_as_per_po || r.priceAsPerPo || r.rate) || 0,
             priceAsPerPoCheck: r.bill_received2 || '',
             vehicleNo: r.vehicle_no || '',
             driverName: r.driver_name || '',
@@ -156,10 +156,10 @@ export async function fetchStoreInRecords() {
             reason: r.reason || '',
             sendDebitNote: r.send_debit_note || '',
             // HOD Approval fields
-            plannedHod: r.hod_planned || '',
-            actualHod: r.hod_actual || '',
-            hodStatus: r.hod_status || 'Pending',
-            hodRemark: r.hod_remark || '',
+            plannedHod: r.planned_hod || r.plannedHod || r.hod_planned || '',
+            actualHod: r.actual_hod || r.actualHod || r.hod_actual || '',
+            hodStatus: r.hod_status || r.hodStatus || 'Pending',
+            hodRemark: r.hod_remark || r.hodRemark || '',
             paymentTerms: r.payment_terms || '',
             // Stage 8 fields
             planned8: r.planned8 || '',
@@ -268,7 +268,7 @@ export async function updateStoreInReceiving(
  * Update store-in record for HOD Approval
  */
 export async function updateStoreInHodApproval(
-    liftNumber: string,
+    idOrLiftNumber: number | string,
     updateData: {
         actualHod: string;
         hodStatus: string;
@@ -284,7 +284,7 @@ export async function updateStoreInHodApproval(
 ) {
     try {
         const updatePayload: Record<string, any> = {
-            hod_actual: updateData.actualHod,
+            actual_hod: updateData.actualHod,
             hod_status: updateData.hodStatus,
             hod_remark: updateData.hodRemark,
             transportation_include: updateData.transportationInclude || '',
@@ -292,15 +292,15 @@ export async function updateStoreInHodApproval(
             vehicle_no: updateData.vehicleNo || '',
             driver_name: updateData.driverName || '',
             driver_mobile_no: updateData.driverMobileNo || '',
-            amount: String(updateData.amount || 0),
+            amount: Number(updateData.amount) || 0,
         };
 
-        await storeApi.patch('store_in', liftNumber, updatePayload);
+        await storeApi.patch('store_in', idOrLiftNumber, updatePayload);
 
         // Trigger Stage 7 if HOD rejects or if HOD approves a record that has faults
         if (updateData.triggerStage7) {
             console.log('⚠️ Triggering Stage 7 (Reject for GRN)...');
-            await storeApi.patch('store_in', liftNumber, {
+            await storeApi.patch('store_in', idOrLiftNumber, {
                 planned7: updateData.actualHod,
             });
         }
@@ -334,9 +334,8 @@ export async function updateStoreInQuantityCheck(
             reason: updateData.reason,
         };
 
-        if (updateData.sendDebitNote === 'Yes') {
-            updatePayload.planned9 = updateData.actual7;
-        }
+        // Always populate planned9 so GRN Reject items enter Send Debit Note
+        updatePayload.planned9 = updateData.actual7;
 
         await storeApi.patch('store_in', liftNumber, updatePayload);
         return true;
@@ -361,8 +360,26 @@ export async function updateStoreInDebitNote(
         await storeApi.patch('store_in', liftNumber, {
             actual9: updateData.actual9,
             debit_note_copy: updateData.debitNoteCopy,
-            debit_note_number: updateData.debitNoteNumber,
+            debitnotenumber: updateData.debitNoteNumber,
         });
+
+        // Sync with Tally Entry (Audit Data)
+        try {
+            const { data: tallyEntries } = await storeApi.get('tally_entry');
+            const matchingTally = (tallyEntries || []).find(
+                (t: any) => String(t.lift_number || t.liftNumber).trim() === String(liftNumber).trim()
+            );
+            if (matchingTally) {
+                await storeApi.patch('tally_entry', matchingTally.id, {
+                    remarks5: `Debit Note: ${updateData.debitNoteNumber}`,
+                    actual5: updateData.actual9,
+                    status5: 'Debit Note Sent',
+                });
+            }
+        } catch (tallyErr) {
+            console.error('Error syncing debit note to tally entry:', tallyErr);
+        }
+
         return true;
     } catch (error) {
         console.error('Error updating store-in debit note:', error);

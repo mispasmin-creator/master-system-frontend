@@ -154,21 +154,11 @@ const formatTimestamp = (date: Date): string => {
     return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
 };
 
-const uploadImageToStorage = async (file: File, fileName: string): Promise<string> => {
+const uploadImageToStorage = async (file: File, _fileName?: string): Promise<string> => {
     try {
-        const extension = file.name.split('.').pop() || 'jpg';
-        const safeFileName = fileName.replace(/\.[^.]+$/, '');
-        const filePath = `Images/${safeFileName}_${Date.now()}.${extension}`;
-
-        const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: (() => { const fd = new FormData(); fd.append('file', file); return fd; })() });
-
-        if (!response.ok) throw new Error("Upload failed");
-
-        const { data } = { data: { publicUrl: `${API_URL}/uploads/${filePath}` } };
-
-        return data.publicUrl;
+        return await productionApi.upload(file);
     } catch (error) {
-        console.error('Error uploading image to Supabase Storage:', error);
+        console.error('Error uploading image:', error);
         throw error;
     }
 };

@@ -113,6 +113,9 @@ const storeTabs = [
   { id: "store-issue", label: "Store Issue", path: "/store-issue" },
   { id: "issue-data", label: "Issue Data", path: "/Issue-data" },
   { id: "inventory", label: "Inventory", path: "/inventory" },
+  { id: "master", label: "Master", path: "/master" },
+  { id: "received", label: "Received", path: "/received" },
+  { id: "stock", label: "Stock", path: "/stock" },
   { id: "create-indent", label: "Create Indent", path: "/create-indent" },
   { id: "approve-indent", label: "Group Indent Approval", path: "/approve-indent" },
   { id: "vendor-rate-update", label: "Vendor Rate Update", path: "/vendor-rate-update" },
@@ -138,12 +141,13 @@ const rmSalesTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },
   { id: "sale-orders", label: "Sale Orders", path: "/sale-orders" },
   { id: "logistics", label: "Logistics", path: "/logistics" },
-  { id: "invoices", label: "Invoices", path: "/invoices" },
-  { id: "inventory", label: "Inventory", path: "/inventory" },
-  { id: "masters", label: "Masters", path: "/masters" },
-  { id: "tracking", label: "Tracking", path: "/tracking" },
-  { id: "reports", label: "Reports", path: "/reports" },
-  { id: "settings", label: "Settings", path: "/settings" }
+  { id: "invoices", label: "Invoices", path: "/invoices" }
+  // Hidden temporarily - not in current scope
+  // { id: "inventory", label: "Inventory", path: "/inventory" },
+  // { id: "masters", label: "Masters", path: "/masters" },
+  // { id: "tracking", label: "Tracking", path: "/tracking" },
+  // { id: "reports", label: "Reports", path: "/reports" },
+  // { id: "settings", label: "Settings", path: "/settings" }
 ];
 
 const checklistTabs = [

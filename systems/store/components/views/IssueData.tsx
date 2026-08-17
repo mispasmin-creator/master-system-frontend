@@ -49,7 +49,7 @@ export default function IssueData() {
             const records = await fetchIssueRecords();
             // Filter by firm name
             const filteredByFirm = records.filter(item => {
-                return user.firmNameMatch.toLowerCase() === "all" || item.firm_name_match === user.firmNameMatch;
+                return !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || !item.firm_name_match || item.firm_name_match === user.firmNameMatch;
             });
             setAllData(filteredByFirm);
         } catch (error) {
@@ -62,7 +62,7 @@ export default function IssueData() {
 
     useEffect(() => {
         fetchData();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     // Available Qty per product: HOD Check history qty (Received only) minus
     // Issue Data history's Given Qty — same logic as the Inventory/Store Issue pages.

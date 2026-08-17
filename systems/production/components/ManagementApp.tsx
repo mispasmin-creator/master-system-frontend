@@ -233,94 +233,106 @@ export default function ManagementApp() {
       
       const kycMap = new Map();
       (kycData || []).forEach((k: any) => {
-        kycMap.set(String(k["Product name"] || "").trim().toLowerCase(), k);
+        kycMap.set(String(k.productName || k["Product name"] || "").trim().toLowerCase(), k);
       });
 
-      // 3. Fetch Costing data (PI Approved only)
+      // 3. Fetch Costing data (with joined relations: order, materials, piApproval, managementReview)
       const { data, error: dbErr } = await productionApi.get(COSTING_RESPONSE_TABLE);
 
       if (dbErr) throw dbErr;
 
       const mapped: LabItem[] = (data || []).map((row: any) => {
         const rmValues: LabItem["rmValues"] = [];
-        for (let i = 1; i <= 20; i++) {
-          const rm = row[`RM${i}`];
-          const qty = row[`QTY${i}`];
-          const cost = row[`COST${i}`];
-          if (rm && String(rm).trim()) {
-            const rmKey = String(rm).trim().toLowerCase();
-            const kycInfo = kycMap.get(rmKey);
-            rmValues.push({ 
-              rm: String(rm), 
-              qty: Number(qty || 0),
-              cost: Number(cost || 0),
-              al: kycInfo ? Number(kycInfo.Alumina || 0) : 0,
-              fe: kycInfo ? Number(kycInfo.Iron || 0) : 0,
-              bd: kycInfo ? Number(kycInfo.Bd || 0) : 0,
-              ap: kycInfo ? Number(kycInfo.Ap || 0) : 0,
-            });
+        if (Array.isArray(row.materials) && row.materials.length > 0) {
+          row.materials.forEach((m: any) => {
+            const rmName = String(m.materialName || "").trim();
+            if (rmName) {
+              const kycInfo = kycMap.get(rmName.toLowerCase());
+              rmValues.push({
+                rm: rmName,
+                qty: Number(m.quantity || 0),
+                cost: 0,
+                al: kycInfo ? Number(kycInfo.alumina || kycInfo.Alumina || 0) : 0,
+                fe: kycInfo ? Number(kycInfo.iron || kycInfo.Iron || 0) : 0,
+                bd: kycInfo ? Number(kycInfo.bd || kycInfo.Bd || 0) : 0,
+                ap: kycInfo ? Number(kycInfo.ap || kycInfo.Ap || 0) : 0,
+              });
+            }
+          });
+        } else {
+          for (let i = 1; i <= 20; i++) {
+            const rm = row[`RM${i}`];
+            const qty = row[`QTY${i}`];
+            const cost = row[`COST${i}`];
+            if (rm && String(rm).trim()) {
+              const rmKey = String(rm).trim().toLowerCase();
+              const kycInfo = kycMap.get(rmKey);
+              rmValues.push({ 
+                rm: String(rm), 
+                qty: Number(qty || 0),
+                cost: Number(cost || 0),
+                al: kycInfo ? Number(kycInfo.Alumina || 0) : 0,
+                fe: kycInfo ? Number(kycInfo.Iron || 0) : 0,
+                bd: kycInfo ? Number(kycInfo.Bd || 0) : 0,
+                ap: kycInfo ? Number(kycInfo.Ap || 0) : 0,
+              });
+            }
           }
         }
-        const expectedValues: Record<string, string> = {};
-        EXPECTED_LABELS.forEach(({ key }) => {
-          expectedValues[key] = row[key] ? String(row[key]) : "";
-        });
 
-        const orderNo = row["Order No."] || "";
-        const productName = row["product name"] || "";
-        
-        // Find matching production row with robust fallback logic
-        const prodRowMatch = findMatchingRow(
-          prodData || [],
-          orderNo,
-          productName,
-          (p: any) => String(p["Delivery Order No."] || ""),
-          (p: any) => String(p["Product Name"] || "")
-        );
-        
-        const productionMeta = prodRowMatch ? {
-          productionId: prodRowMatch.id,
-          productRate: Number(prodRowMatch.product_rate || 0),
-          firmName: String(prodRowMatch["Firm Name"] || ""),
-          partyName: String(prodRowMatch["Party Name"] || ""),
-          orderQuantity: Number(prodRowMatch["Order Quantity"] || 0)
-        } : null;
+        const expectedValues: Record<string, string> = {
+          "Expected WC %": row.expectedWcPercent || row["Expected WC %"] || "",
+          "Expected Sticky Flow": row.expectedStickyFlow || row["Expected Sticky Flow"] || "",
+          "Expected IST": row.expectedIst || row["Expected IST"] || "",
+          "Expected FST": row.expectedFst || row["Expected FST"] || "",
+          "Expected BD 110C": row.expectedBdAt110c || row["Expected BD 110C"] || "",
+          "Expected BD 1100C": row.expectedBdAt1100c || row["Expected BD 1100C"] || "",
+          "Expected CCS 110C": row.expectedCcsAt110c || row["Expected CCS 110C"] || "",
+          "Expected CCS 1100C": row.expectedCcsAt1100c || row["Expected CCS 1100C"] || "",
+          "Expected PLC 1100C": row.expectedPlcAt1100c || row["Expected PLC 1100C"] || "",
+        };
 
-        const productRate = productionMeta?.productRate || 0;
+        const order = row.order || {};
+        const orderNo = order.deliveryOrderNo || row["Order No."] || "";
+        const productName = order.productName || row["product name"] || "";
+        const partyName = order.partyName || row["Party Name"] || "";
+        const firmName = order.firmName || row["FIRM Name"] || row["Firm Name"] || "";
+        const orderQuantity = Number(order.orderQuantity || row["Quantity Of FG"] || row["Order Quantity"] || 0);
+        const productRate = Number(order.productRate || row.sellingPrice || row["SELLING PRICE"] || 0);
 
-        // GET /api/production/costing includes `managementReview` (array of
-        // ProductionManagementReview) per row now. Use it directly instead of a
-        // separate fetch to find any existing management-app decision for this costing.
         const mgmtReview = Array.isArray(row.managementReview)
-          ? row.managementReview.find((r: any) => r.reviewType === "management-app")
-          : null;
+          ? (row.managementReview.find((r: any) => r.reviewType === "management-app") || row.managementReview[0])
+          : (row.managementReview || null);
+
+        const piApproval = row.piApproval || null;
+        const piApprovalStatus = String(piApproval?.status || row["PI Approval Status"] || "").trim();
 
         return {
           id: row.id,
-          productionId: productionMeta?.productionId || "",
-          compositionNo: row["Composition No."] || "",
+          productionId: order.id || "",
+          compositionNo: row.compositionNo || row["Composition No."] || "",
           orderNo,
-          partyName: productionMeta?.partyName || "",
+          partyName,
           productName,
-          orderQuantity: productionMeta?.orderQuantity || 0,
-          sellingPrice: Number(row["SELLING PRICE"] || 0),
+          orderQuantity,
+          sellingPrice: Number(row.sellingPrice || row["SELLING PRICE"] || 0),
           productRate,
-          gpPercentage: Number(row["GP %AGE"] || 0),
-          gpActual: Number(row["GP %AGE Actual"] || 0),
-          alumina: Number(row["alumina"] || 0),
-          iron: Number(row["iron"] || 0),
-          bd: Number(row["BD"] || 0),
-          ap: Number(row["AP"] || 0),
-          variableCost: Number(row["VARIABLE COST"] || 0),
-          aluminaActual: row["Alumina Percentage %"] ? String(row["Alumina Percentage %"]) : "",
-          ironActual: row["Iron Percentage %"] ? String(row["Iron Percentage %"]) : "",
-          planned1: row["Planned 1"] ? format(new Date(row["Planned 1"]), "dd/MM/yy") : null,
-          actual2: row["Actual 2"] ? format(new Date(row["Actual 2"]), "dd/MM/yy HH:mm") : null,
-          piApprovalStatus: row["PI Approval Status"] || "",
-          piRemarks: row["PI Remarks"] || "",
-          piApprovedAt: row["PI Approved At"]
-            ? format(new Date(row["PI Approved At"]), "dd/MM/yy HH:mm")
-            : null,
+          gpPercentage: Number(row.gpPercent || row["GP %AGE"] || 0),
+          gpActual: Number(row.gpPercent || row["GP %AGE Actual"] || 0),
+          alumina: Number(row.aluminaPercent || row["alumina"] || 0),
+          iron: Number(row.ironPercent || row["iron"] || 0),
+          bd: Number(row.bdPercent || row["BD"] || 0),
+          ap: Number(row.apPercent || row["AP"] || 0),
+          variableCost: Number(row.variableCost || row["VARIABLE COST"] || 0),
+          aluminaActual: row.aluminaPercent ? String(row.aluminaPercent) : (row["Alumina Percentage %"] ? String(row["Alumina Percentage %"]) : ""),
+          ironActual: row.ironPercent ? String(row.ironPercent) : (row["Iron Percentage %"] ? String(row["Iron Percentage %"]) : ""),
+          planned1: row.createdAt ? format(new Date(row.createdAt), "dd/MM/yy") : null,
+          actual2: row.updatedAt ? format(new Date(row.updatedAt), "dd/MM/yy HH:mm") : null,
+          piApprovalStatus,
+          piRemarks: piApproval?.remarks || row["PI Remarks"] || "",
+          piApprovedAt: piApproval?.approvedAt
+            ? format(new Date(piApproval.approvedAt), "dd/MM/yy HH:mm")
+            : (piApproval?.updatedAt ? format(new Date(piApproval.updatedAt), "dd/MM/yy HH:mm") : null),
           managementReviewId: mgmtReview?.id || null,
           managementApprovalStatus: mgmtReview?.status || "",
           managementRemarks: mgmtReview?.remarks || "",
@@ -329,24 +341,28 @@ export default function ManagementApp() {
             : null,
           expectedValues,
           rmValues,
-          materialCostActual: Number(row["Material Cost Actual"] || 0),
-          manufacturingCost: Number(row["Manufacturing Cost"] || 0),
-          firmName: productionMeta?.firmName || "",
+          materialCostActual: Number(row.variableCost || row["Material Cost Actual"] || 0),
+          manufacturingCost: Number(row.manufacturingCost || row["Manufacturing Cost"] || 0),
+          firmName,
         };
       });
 
-      const userFirms = user?.firm ? user.firm.split(',').map((f: string) => f.trim()).filter(Boolean) : [];
-      const isAdmin = user?.role?.toLowerCase() === "admin";
       const filtered = filterDataByFirm(mapped, user, (item) => String(item.firmName || ""));
 
-      setPendingItems(filtered.filter((i) => !i.managementApprovalStatus));
+      // Pending = PI Approved (or status approved) AND no management decision yet
+      setPendingItems(filtered.filter((i) => {
+        const isPiApproved = i.piApprovalStatus.toLowerCase() === "approved" || i.piApprovalStatus.toLowerCase() === "ok";
+        return isPiApproved && !i.managementApprovalStatus;
+      }));
+
+      // History = has a management review decision recorded
       setHistoryItems(filtered.filter((i) => !!i.managementApprovalStatus));
     } catch (err: any) {
       setError(`Failed to load data: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     loadData();
@@ -375,7 +391,6 @@ export default function ManagementApp() {
     setTotalProfit(rate - totalCost);
   };
 
-
   const handleSubmitDecision = async (decision: "Approved" | "Rejected") => {
     if (!selectedItem) return;
     if (!remarks.trim()) {
@@ -384,12 +399,8 @@ export default function ManagementApp() {
     }
     setIsSubmitting(true);
     try {
-      // ProductionManagementReview only has {costingId, reviewType, status, remarks}.
-      // The "Approval Workflow Choice" (OK vs Sample Test) and the manual GP%/Material
-      // Cost figures shown above have no matching column on that model, so they fold
-      // into `status` (below) and are not persisted separately.
       const status = decision === "Approved"
-        ? (approvalType === "OK" ? "Management Approved" : "Sample Test Pending")
+        ? (approvalType === "OK" ? "Final Approved" : "Sample Test Pending")
         : "Rejected by Management";
 
       const reviewBody = {
@@ -407,11 +418,29 @@ export default function ManagementApp() {
 
       if (updateErr) throw updateErr;
 
+      // Update the ProductionCosting row status
+      await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.id, {
+        status,
+      });
+
+      // If moving to sample test, create or ensure a sample test record exists
+      if (status === "Sample Test Pending") {
+        try {
+          await productionApi.post("sample_test", {
+            costingId: String(selectedItem.id),
+            status: "Pending",
+          });
+        } catch (sampleErr: any) {
+          // If already exists, ignore unique constraint conflict
+          console.log("Sample test record creation info:", sampleErr?.message);
+        }
+      }
+
       toast({
-        title: decision === "Approved" ? "✅ Management Approved" : "🔴 Management Rejected",
+        title: decision === "Approved" ? `✅ ${status}` : "🔴 Management Rejected",
         description:
           decision === "Approved"
-            ? "Entry finalized and closed."
+            ? (approvalType === "OK" ? "Entry finalized and routed directly to Composition QC." : "Entry moved to Sample Test.")
             : "Entry marked as rejected and sent to history.",
       });
 
@@ -921,11 +950,11 @@ export default function ManagementApp() {
                   >
                     <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-amber-100 flex-1">
                       <RadioGroupItem value="OK" id="ok" />
-                      <Label htmlFor="ok" className="font-semibold cursor-pointer flex-1 py-1 text-sm text-emerald-800">✅ Approve & Finalize</Label>
+                      <Label htmlFor="ok" className="font-semibold cursor-pointer flex-1 py-1 text-sm text-emerald-800">✅ Final Approve (Direct to Composition QC)</Label>
                     </div>
                     <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-amber-100 flex-1">
                       <RadioGroupItem value="Make a sample Test" id="sample" />
-                      <Label htmlFor="sample" className="font-semibold cursor-pointer flex-1 py-1 text-sm text-amber-800">🧪 Move to Sample Test</Label>
+                      <Label htmlFor="sample" className="font-semibold cursor-pointer flex-1 py-1 text-sm text-amber-800">🧪 Standard Approval (Move to Sample Test)</Label>
                     </div>
                   </RadioGroup>
                 </div>

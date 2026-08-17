@@ -97,7 +97,7 @@ export default () => {
 
     useEffect(() => {
         const filteredByFirm = allData.filter(item =>
-            user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
         );
 
         setTableData(
@@ -133,7 +133,7 @@ export default () => {
                     firmNameMatch: i.firmNameMatch || '',
                 }))
         );
-    }, [allData, user.firmNameMatch]);
+    }, [allData, user?.firmNameMatch]);
 
 
     useEffect(() => {

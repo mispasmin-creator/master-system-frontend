@@ -222,7 +222,7 @@ export default () => {
                     timestamp: i.timestamp || '',
                 }))
         );
-    }, [storeInRecords, user.firmNameMatch]);
+    }, [storeInRecords, user?.firmNameMatch]);
 
     useEffect(() => {
         if (!openDialog) {

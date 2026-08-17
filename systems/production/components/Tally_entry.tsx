@@ -225,29 +225,24 @@ export default function Step4List() {
                 });
             };
 
-            const records: SemiActualRecord[] = actualTable
-                .filter((row: any) => {
-                    const serial = String(row.sNo || row.serialNo || "");
-                    return serial.startsWith("SA-") || serial.startsWith("CR-");
-                })
-                .map((row: any) => {
-                    const sfProductionNo = row.semiFinishedProductionNo || row.sfProductionNo || "";
-                    const compositeKey = `${sfProductionNo}::${String(row.productName || "").toLowerCase().trim()}`;
-                    
-                    let firmName = "";
-                    if (String(row.serialNo || row.sNo || "").startsWith("CR-")) {
-                        firmName = sfProductionNo;
-                    } else {
-                        firmName = productionFirmByNo.get(compositeKey) || productionFirmByNo.get(sfProductionNo) || "";
-                    }
+            const records: SemiActualRecord[] = actualTable.map((row: any) => {
+                const sfProductionNo = row.semiFinishedProductionNo || row.sfProductionNo || "";
+                const compositeKey = `${sfProductionNo}::${String(row.productName || "").toLowerCase().trim()}`;
+                
+                let firmName = "";
+                if (String(row.serialNo || row.sNo || "").startsWith("CR-")) {
+                    firmName = sfProductionNo;
+                } else {
+                    firmName = (row as any).semiJobCard?.semiOrder?.firmName || productionFirmByNo.get(compositeKey) || productionFirmByNo.get(sfProductionNo) || "";
+                }
 
-                    return {
-                        ...row,
-                        serialNo: row.serialNo || row.sNo || "",
-                        semiFinishedProductionNo: sfProductionNo,
-                        firmName: firmName,
-                    };
-                });
+                return {
+                    ...row,
+                    serialNo: row.serialNo || row.sNo || "",
+                    semiFinishedProductionNo: sfProductionNo,
+                    firmName: firmName,
+                };
+            });
 
             setSemiActualData(filterByFirm(records));
         } catch (err) {

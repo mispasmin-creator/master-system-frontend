@@ -77,84 +77,83 @@ export default () => {
 
             const filtered = indents.filter((row: any) => {
                 const hasPlanned4 = row.planned4 !== null && row.planned4 !== undefined && row.planned4 !== '';
-                const noApprovedVendor = row.approved_vendor_name === null || row.approved_vendor_name === undefined || row.approved_vendor_name === '';
-                const validVendorType = row.vendor_type === 'Three Party' || row.vendor_type === 'Regular';
+                const noApprovedVendor = !row.approved_vendor_name || row.approved_vendor_name === '';
+                const validVendorType = (row.vendor_type || row.vendorType) !== 'Reject';
                 
                 let matchFirm = true;
-                if (user.firmNameMatch.toLowerCase() !== 'all') {
-                    matchFirm = row.firm_name === user.firmNameMatch;
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
+                    matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
                 
                 return hasPlanned4 && noApprovedVendor && validVendorType && matchFirm;
             });
 
-            filtered.sort((a: any, b: any) => String(b.indent_number).localeCompare(String(a.indent_number)));
+            filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
 
             const rows = filtered as any[];
             setTableData(
-                rows
-                    .filter((r) => r.vendor1_rank || r.vendor2_rank || r.vendor3_rank)
-                    .map((r): RateApprovalData => ({
-                        id: r.id,
-                        indentNo: r.indent_number || '',
-                        firmNameMatch: r.firm_name_match || r.firm_name || '',
-                        indenter: r.indenter_name || '',
-                        department: r.category || '',
-                        product: r.product_name || '',
-                        comparisonSheet: r.comparison_sheet || '',
-                        date: formatDateTime(new Date(r.timestamp)).replace(/\//g, '-'),
-                        plannedDate: r.planned4 ? formatDate(new Date(r.planned4)) : 'Not Set',
-                        quantity: r.approved_quantity || r.quantity || 0,
-                        uom: r.uom || '',
-                        areaOfUse: r.area_of_use || '',
-                        vendors: [
-                            [
-                                r.vendor_name1 || '',
-                                r.rate1?.toString() || '0',
-                                r.payment_term1 || '',
-                                r.select_rate_type1 || 'With Tax',
-                                r.with_tax_or_not1 || 'Yes',
-                                r.tax_value1?.toString() || '0',
-                                r.quotation_no1 || '',
-                                r.quotation_date1 || '',
-                                r.vendor1_rank || '',
-                                r.delivery_time1 || '',
-                                r.make1 || '',
-                                r.advance_percent1 || '',
-                                r.transport_type1 || '',
-                            ],
-                            [
-                                r.vendor_name2 || '',
-                                r.rate2?.toString() || '0',
-                                r.payment_term2 || '',
-                                r.select_rate_type2 || 'With Tax',
-                                r.with_tax_or_not2 || 'Yes',
-                                r.tax_value2?.toString() || '0',
-                                r.quotation_no2 || '',
-                                r.quotation_date2 || '',
-                                r.vendor2_rank || '',
-                                r.delivery_time2 || '',
-                                r.make2 || '',
-                                r.advance_percent2 || '',
-                                r.transport_type2 || '',
-                            ],
-                            [
-                                r.vendor_name3 || '',
-                                r.rate3?.toString() || '0',
-                                r.payment_term3 || '',
-                                r.select_rate_type3 || 'With Tax',
-                                r.with_tax_or_not3 || 'Yes',
-                                r.tax_value3?.toString() || '0',
-                                r.quotation_no3 || '',
-                                r.quotation_date3 || '',
-                                r.vendor3_rank || '',
-                                r.delivery_time3 || '',
-                                r.make3 || '',
-                                r.advance_percent3 || '',
-                                r.transport_type3 || '',
-                            ],
-                        ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string, string, string][],
-                    }))
+                rows.map((r): RateApprovalData => ({
+                    id: r.id,
+                    indentNo: r.indent_number || r.indentNumber || '',
+                    firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || r.firmName || '',
+                    indenter: r.indenter_name || r.indenterName || '',
+                    department: r.category || r.department || '',
+                    product: r.product_name || r.productName || '',
+                    comparisonSheet: r.comparison_sheet || r.comparisonSheet || '',
+                    date: r.timestamp ? formatDateTime(new Date(r.timestamp)).replace(/\//g, '-') : '-',
+                    plannedDate: r.planned4 ? formatDate(new Date(r.planned4)) : 'Not Set',
+                    quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                    uom: r.uom || '',
+                    areaOfUse: r.area_of_use || r.areaOfUse || '',
+                    vendors: [
+                        [
+                            r.vendor_name1 || r.vendorName1 || '',
+                            (r.rate1 || r.approved_rate || 0).toString(),
+                            r.payment_term1 || r.paymentTerm1 || '',
+                            r.select_rate_type1 || 'Basic Rate',
+                            r.with_tax_or_not1 || 'No',
+                            (r.tax_value1 || 0).toString(),
+                            r.quotation_no1 || '',
+                            r.quotation_date1 || '',
+                            r.vendor1_rank || '',
+                            (r.delivery_time1 || '').toString(),
+                            r.make1 || '',
+                            (r.advance_percent1 || '').toString(),
+                            r.transport_type1 || '',
+                        ],
+                        [
+                            r.vendor_name2 || r.vendorName2 || '',
+                            (r.rate2 || 0).toString(),
+                            r.payment_term2 || r.paymentTerm2 || '',
+                            r.select_rate_type2 || 'Basic Rate',
+                            r.with_tax_or_not2 || 'No',
+                            (r.tax_value2 || 0).toString(),
+                            r.quotation_no2 || '',
+                            r.quotation_date2 || '',
+                            r.vendor2_rank || '',
+                            (r.delivery_time2 || '').toString(),
+                            r.make2 || '',
+                            (r.advance_percent2 || '').toString(),
+                            r.transport_type2 || '',
+                        ],
+                        [
+                            r.vendor_name3 || r.vendorName3 || '',
+                            (r.rate3 || 0).toString(),
+                            r.payment_term3 || r.paymentTerm3 || '',
+                            r.select_rate_type3 || 'Basic Rate',
+                            r.with_tax_or_not3 || 'No',
+                            (r.tax_value3 || 0).toString(),
+                            r.quotation_no3 || '',
+                            r.quotation_date3 || '',
+                            r.vendor3_rank || '',
+                            (r.delivery_time3 || '').toString(),
+                            r.make3 || '',
+                            (r.advance_percent3 || '').toString(),
+                            r.transport_type3 || '',
+                        ],
+                    ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string, string, string][],
+                }))
             );
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
@@ -166,7 +165,7 @@ export default () => {
 
     useEffect(() => {
         fetchPendingApprovals();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
 
     // Fetch completed three party approvals from Supabase
@@ -178,36 +177,36 @@ export default () => {
 
             const filtered = indents.filter((row: any) => {
                 const hasPlanned4 = row.planned4 !== null && row.planned4 !== undefined && row.planned4 !== '';
-                const hasApprovedVendor = row.approved_vendor_name !== null && row.approved_vendor_name !== undefined && row.approved_vendor_name !== '';
-                const validVendorType = row.vendor_type === 'Three Party' || row.vendor_type === 'Regular';
+                const hasApprovedVendor = Boolean(row.approved_vendor_name && row.approved_vendor_name !== '');
+                const validVendorType = (row.vendor_type || row.vendorType) !== 'Reject';
                 
                 let matchFirm = true;
-                if (user.firmNameMatch.toLowerCase() !== 'all') {
-                    matchFirm = row.firm_name === user.firmNameMatch;
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
+                    matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
                 
                 return hasPlanned4 && hasApprovedVendor && validVendorType && matchFirm;
             });
 
-            filtered.sort((a: any, b: any) => String(b.indent_number).localeCompare(String(a.indent_number)));
+            filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
 
             const rows = filtered as any[];
             setHistoryData(
-                rows.filter(r => r.approved_vendor_name)
-                    .map((r): HistoryData => ({
-                        id: r.id,
-                        indentNo: r.indent_number || '',
-                        firmNameMatch: r.firm_name_match || r.firm_name || '',
-                        indenter: r.indenter_name || '',
-                        department: r.category || '',
-                        product: r.product_name || '',
-                        date: formatDateTime(new Date(r.timestamp)).replace(/\//g, '-'),
-                        vendor: [r.approved_vendor_name || '', r.approved_rate?.toString() || '0'],
-                        rank: r.vendor_rate || '',
-                        quantity: r.approved_quantity || r.quantity || 0,
-                        uom: r.uom || '',
-                        areaOfUse: r.area_of_use || '',
-                    }))
+                rows.map((r): HistoryData => ({
+                    id: r.id,
+                    indentNo: r.indent_number || r.indentNumber || '',
+                    firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || r.firmName || '',
+                    indenter: r.indenter_name || r.indenterName || '',
+                    department: r.category || r.department || '',
+                    product: r.product_name || r.productName || '',
+                    date: r.actual4 ? formatDate(new Date(r.actual4)) : (r.timestamp ? formatDateTime(new Date(r.timestamp)).replace(/\//g, '-') : '-'),
+                    vendor: [r.approved_vendor_name || '', (r.approved_rate || 0).toString()],
+                    rank: r.vendor_rate || '',
+                    quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                    uom: r.uom || '',
+                    areaOfUse: r.area_of_use || r.areaOfUse || '',
+                }))
             );
         } catch (err) {
             console.error('Error fetching completed approvals:', err);
@@ -220,35 +219,31 @@ export default () => {
     useEffect(() => {
         fetchPendingApprovals();
         fetchCompletedApprovals();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const columns: ColumnDef<RateApprovalData>[] = [
-        ...(user.threePartyApprovalAction
-            ? [
-                {
-                    header: 'Action',
-                    id: 'action',
-                    cell: ({ row }: { row: Row<RateApprovalData> }) => {
-                        const indent = row.original;
+        {
+            header: 'Action',
+            id: 'action',
+            cell: ({ row }: { row: Row<RateApprovalData> }) => {
+                const indent = row.original;
 
-                        return (
-                            <div>
-                                <DialogTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => {
-                                            setSelectedIndent(indent);
-                                        }}
-                                    >
-                                        Approve
-                                    </Button>
-                                </DialogTrigger>
-                            </div>
-                        );
-                    },
-                },
-            ]
-            : []),
+                return (
+                    <div>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setSelectedHistory(null);
+                                setSelectedIndent(indent);
+                                setOpenDialog(true);
+                            }}
+                        >
+                            Approve
+                        </Button>
+                    </div>
+                );
+            },
+        },
         { accessorKey: 'date', header: 'Timestamp' },
         { accessorKey: 'indentNo', header: 'Indent No.' },
         { accessorKey: 'firmNameMatch', header: 'Firm Name' },
@@ -291,29 +286,27 @@ export default () => {
     ];
 
     const historyColumns: ColumnDef<HistoryData>[] = [
-        ...(user.updateVendorAction ? [
-            {
-                header: 'Action',
-                cell: ({ row }: { row: Row<HistoryData> }) => {
-                    const indent = row.original;
+        {
+            header: 'Action',
+            cell: ({ row }: { row: Row<HistoryData> }) => {
+                const indent = row.original;
 
-                    return (
-                        <div>
-                            <DialogTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setSelectedHistory(indent);
-                                    }}
-                                >
-                                    Update
-                                </Button>
-                            </DialogTrigger>
-                        </div>
-                    );
-                },
+                return (
+                    <div>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setSelectedIndent(null);
+                                setSelectedHistory(indent);
+                                setOpenDialog(true);
+                            }}
+                        >
+                            Update
+                        </Button>
+                    </div>
+                );
             },
-        ] : []),
+        },
         { accessorKey: 'date', header: 'Timestamp' },
         { accessorKey: 'indentNo', header: 'Indent No.' },
         { accessorKey: 'firmNameMatch', header: ' Firm Name' },
@@ -364,19 +357,13 @@ export default () => {
 
             const rate = parseFloat(selectedVendor[1]) || 0;
             const tax = parseFloat(selectedVendor[5]) || 0;
-            const finalRate = selectedVendor[3] === 'Basic Rate' ? rate * (1 + tax / 100) : rate;
 
             const updates = {
-                po_requred: 'Yes', // Automatically set PO Required to Yes
+                approved_date: new Date().toISOString(),
+                po_required: 'Yes',
                 approved_vendor_name: selectedVendor[0] || '',
-                approved_rate: rate.toString(), // Store base rate, not final rate
+                approved_rate: rate,
                 approved_payment_term: selectedVendor[2] || '',
-                approved_advance_percent: selectedVendor[11] || '',
-                with_tax_or_not4: selectedVendor[3] === 'Basic Rate' ? 'No' : 'Yes', // Map Basic Rate to No, With Tax to Yes
-                tax_value4: selectedVendor[5] || '0',
-                approved_quotation_no: selectedVendor[6] || '',
-                approved_quotation_date: selectedVendor[7] || '',
-                vendor_rate: selectedVendor[8] || '',  // Store pre-assigned rank (T1/T2/T3)
             };
 
             await storeApi.patch('indent', selectedIndent?.id!, updates);
@@ -388,9 +375,9 @@ export default () => {
             // Refresh both tables
             fetchPendingApprovals();
             fetchCompletedApprovals();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error approving vendor:', error);
-            toast.error('Failed to update vendor');
+            toast.error(error?.message || 'Failed to update vendor');
         }
     }
 
@@ -413,7 +400,7 @@ export default () => {
 
     async function onSubmitHistoryUpdate(values: z.infer<typeof historyUpdateSchema>) {
         try {
-            await storeApi.patch('indent', selectedHistory?.id!, { approved_rate: values.rate.toString() });
+            await storeApi.patch('indent', selectedHistory?.id!, { approved_rate: Number(values.rate || 0) });
 
             toast.success(`Updated rate of ${selectedHistory?.indentNo}`);
             setOpenDialog(false);
@@ -421,9 +408,9 @@ export default () => {
 
             // Refresh history table
             fetchCompletedApprovals();
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error updating rate:', err);
-            toast.error('Failed to update vendor');
+            toast.error(err?.message || 'Failed to update vendor');
         }
     }
 

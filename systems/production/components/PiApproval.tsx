@@ -276,11 +276,10 @@ export default function PIApprovalPage() {
           planned1: null,
           actual2: null,
           piApprovalStatus: piApproval?.status || "",
-          // ProductionPiApproval only has {id, costingId, status} - no remarks or
-          // approvedAt columns, so these stay blank (remarks are captured in the
-          // review dialog UI for reviewer confirmation only, not persisted).
-          piRemarks: "",
-          piApprovedAt: null,
+          piRemarks: piApproval?.remarks || "",
+          piApprovedAt: piApproval?.approvedAt
+            ? format(new Date(piApproval.approvedAt), "dd/MM/yy HH:mm")
+            : (piApproval?.updatedAt ? format(new Date(piApproval.updatedAt), "dd/MM/yy HH:mm") : null),
           expectedValues,
           rmValues,
           firmName: order.firmName || "",
@@ -288,15 +287,17 @@ export default function PIApprovalPage() {
       });
 
       const userFirms = user?.firm ? user.firm.split(',').map((f: string) => f.trim()).filter(Boolean) : [];
-      const isAdmin = user?.role?.toLowerCase() === "admin";
+      const roleLower = String(user?.role || "").toLowerCase();
+      const isAdmin = !user?.role || roleLower === "admin" || roleLower === "super admin" || roleLower === "superadmin";
       const filtered = mapped.filter((r) => {
         if (isAdmin) return true;
         if (userFirms.length === 0) return true;
+        if (!r.firmName) return true;
         const fName = r.firmName.toLowerCase();
         return userFirms.some((uf: string) => {
           const firmSearch = uf.toLowerCase();
           const mappedFirmLower = (FIRM_MAP[uf] || uf).toLowerCase();
-          return fName.includes(firmSearch) || fName.includes(mappedFirmLower);
+          return fName.includes(firmSearch) || fName.includes(mappedFirmLower) || firmSearch.includes(fName) || mappedFirmLower.includes(fName);
         });
       });
 
@@ -390,38 +391,31 @@ export default function PIApprovalPage() {
 
   const handleSubmitDecision = async (decision: "Approved" | "Rejected") => {
     if (!selectedItem) return;
-    if (!remarks.trim()) {
-      setRemarksError("Remarks are mandatory.");
-      return;
-    }
+    const finalRemarks = remarks.trim() || (decision === "Approved" ? "Approved by PI" : "Rejected by PI");
     setIsSubmitting(true);
     try {
-      // ProductionPiApproval only stores {costingId, status} - there are no
-      // remarks/approvedAt columns, so `remarks` above is kept purely as a UI
-      // confirmation step for the reviewer and is not persisted anywhere.
-      //
-      // NOTE: the old Supabase-era "Reject" flow deleted the costing row and rolled
-      // the linked production row back to Full Kitting via ad-hoc bracket-string
-      // fields ("Actual 1"/"Status") that don't exist on the real schema. There is no
-      // equivalent dedicated "send back to composition" feature on the backend yet, so
-      // Reject here simply records the decision rather than deleting/mutating other
-      // records by guesswork.
+      const costingUpdate: Record<string, any> = {
+        status: decision,
+      };
       if (decision === "Approved") {
-        // Persist the reviewer's final manufacturing cost / GP% onto the real
-        // ProductionCosting columns (both exist on the schema).
-        const costingUpdate: Record<string, any> = {
-          gpPercent: typeof manualGP === 'number' ? Number(manualGP.toFixed(2)) : null,
-          manufacturingCost: typeof manualMfgCost === 'number' ? Number(manualMfgCost.toFixed(2)) : null,
-        };
-        const { error: costingErr } = await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.id, costingUpdate);
-        if (costingErr) throw costingErr;
+        costingUpdate.gpPercent = typeof manualGP === 'number' ? Number(manualGP.toFixed(2)) : null;
+        costingUpdate.manufacturingCost = typeof manualMfgCost === 'number' ? Number(manualMfgCost.toFixed(2)) : null;
       }
+      const { error: costingErr } = await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.id, costingUpdate);
+      if (costingErr) throw costingErr;
+
+      const piApprovalPayload = {
+        costingId: selectedItem.id,
+        status: decision,
+        remarks: finalRemarks,
+        approvedAt: new Date().toISOString(),
+      };
 
       if (selectedItem.piApprovalId) {
-        const { error: patchErr } = await productionApi.patch(PI_APPROVAL_TABLE, selectedItem.piApprovalId, { status: decision });
+        const { error: patchErr } = await productionApi.patch(PI_APPROVAL_TABLE, selectedItem.piApprovalId, piApprovalPayload);
         if (patchErr) throw patchErr;
       } else {
-        const { error: postErr } = await productionApi.post(PI_APPROVAL_TABLE, { costingId: selectedItem.id, status: decision });
+        const { error: postErr } = await productionApi.post(PI_APPROVAL_TABLE, piApprovalPayload);
         if (postErr) throw postErr;
       }
 
@@ -431,7 +425,7 @@ export default function PIApprovalPage() {
           description: `Composition for order “${selectedItem.orderNo}” marked as rejected.`,
         });
       } else {
-        toast({ title: "✅ Approved", description: "Item approved and moved to the next stage." });
+        toast({ title: "✅ Approved", description: "Item approved and moved to Management Approval." });
       }
 
       setActionMode(null);

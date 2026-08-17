@@ -239,7 +239,7 @@ export default function MakePayment() {
                     actual: r.actual,
                     delay: r.delay,
                     paymentForm: r.payment_form,
-                    firmNameMatch: r.firm_name,
+                    firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || '',
                     paymentDone: r.payment_done || false,
                     billImageStatus: storeInMap.get(r.internal_code)?.billImageStatus || '',
                     billNo: storeInMap.get(r.internal_code)?.billNo || '',

@@ -83,7 +83,7 @@ export default () => {
 
             // Filter by firm name
             const filteredByFirm = data.filter(item =>
-                user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
+                !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
             );
 
             const pending = filteredByFirm
@@ -144,7 +144,7 @@ export default () => {
 
     useEffect(() => {
         fetchData();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const pendingColumns: ColumnDef<StoreInPendingData>[] = [
         ...(user.receiveItemView

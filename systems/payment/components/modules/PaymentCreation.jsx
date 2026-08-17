@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { paymentApi } from '../../lib/api';
 import { 
   PlusCircle, FileText, Search, Eye, Check, X, ExternalLink, 
-  Clock, ShieldAlert, Sparkles, Building2, Upload, AlertCircle
+  Clock, ShieldAlert, Sparkles, Building2, Upload, AlertCircle, CheckCircle2
 } from 'lucide-react';
 
 const formatCurrency = (amount) => {
@@ -37,9 +37,14 @@ export default function PaymentCreation() {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
-  // Selected Payment Preview Modal
+  // Selected Payment Action Modal State
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [actionRemarks, setActionRemarks] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+
 
   const loadAll = async () => {
     try {
@@ -123,6 +128,52 @@ export default function PaymentCreation() {
       setAttachmentUrl(url);
     } catch (err) {
       setFormError('File upload failed: ' + err.message);
+    }
+  };
+
+  const openActionModal = (p) => {
+    setSelectedPayment(p);
+    setActionRemarks(p.remarks || '');
+    setActionError('');
+    setActionSuccess('');
+    setModalOpen(true);
+  };
+
+  const handlePaymentAction = async (nextStatus, isRejection = false) => {
+    if (isRejection && !actionRemarks.trim()) {
+      setActionError('Please enter a remark or reason for rejection.');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      setActionError('');
+      setActionSuccess('');
+
+      const res = await paymentApi.post(`requests/${selectedPayment.id}/action`, {
+        status: nextStatus,
+        remarks: actionRemarks.trim(),
+        checkerRemarks: actionRemarks.trim(),
+        isRejection
+      });
+
+      if (res.success) {
+        setActionSuccess(
+          isRejection 
+            ? `Payment Request '${selectedPayment.paymentNumber}' rejected.`
+            : `Payment Request '${selectedPayment.paymentNumber}' approved for funding and sent to Channel Funding!`
+        );
+        setTimeout(() => {
+          setModalOpen(false);
+          loadAll();
+        }, 600);
+      } else {
+        setActionError(res.error || 'Failed to process action.');
+      }
+    } catch (err) {
+      setActionError(err.message || 'Server error processing action.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -406,14 +457,11 @@ export default function PaymentCreation() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
-                        onClick={() => {
-                          setSelectedPayment(p);
-                          setModalOpen(true);
-                        }}
-                        className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg font-bold text-zinc-700 dark:text-zinc-300 transition-colors inline-flex items-center gap-1"
+                        onClick={() => openActionModal(p)}
+                        className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-lg font-bold transition-all inline-flex items-center gap-1.5 border border-indigo-200 dark:border-indigo-800/80 shadow-xs"
                       >
-                        <Eye className="h-3.5 w-3.5 text-blue-500" />
-                        <span>Preview</span>
+                        <ShieldAlert className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                        <span>Action</span>
                       </button>
                     </td>
                   </tr>
@@ -424,53 +472,102 @@ export default function PaymentCreation() {
         </div>
       </div>
 
-      {/* Preview Dialog Modal */}
+      {/* Action Dialog Modal */}
       {modalOpen && selectedPayment && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">
             <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 pb-3">
               <div>
-                <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100">{selectedPayment.paymentNumber}</h3>
+                <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <span>Action Payment Request:</span>
+                  <span className="text-indigo-600 dark:text-indigo-400 font-mono">{selectedPayment.paymentNumber}</span>
+                </h3>
                 <p className="text-xs text-zinc-400">Created by {selectedPayment.maker || 'Maker'} on {new Date(selectedPayment.createdAt).toLocaleDateString()}</p>
               </div>
-              <button onClick={() => setModalOpen(false)} className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+              <button 
+                onClick={() => !actionLoading && setModalOpen(false)} 
+                disabled={actionLoading}
+                className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 disabled:opacity-50"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-xs">
+            {actionSuccess && (
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs flex items-center gap-2 font-medium">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>{actionSuccess}</span>
+              </div>
+            )}
+
+            {actionError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 rounded-xl text-xs flex items-center gap-2 font-medium">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                <span>{actionError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3 text-xs bg-zinc-50 dark:bg-zinc-950 p-3.5 rounded-2xl border border-zinc-100 dark:border-zinc-800/80">
               <div>
-                <span className="text-zinc-400 block font-semibold">Pay To:</span>
+                <span className="text-zinc-400 block font-medium text-[11px]">Pay To:</span>
                 <span className="font-bold text-zinc-900 dark:text-zinc-100">{selectedPayment.payTo}</span>
               </div>
               <div>
-                <span className="text-zinc-400 block font-semibold">Amount:</span>
-                <span className="font-bold font-mono text-emerald-600">{formatCurrency(selectedPayment.amount)}</span>
+                <span className="text-zinc-400 block font-medium text-[11px]">Amount:</span>
+                <span className="font-bold font-mono text-emerald-600 text-sm">{formatCurrency(selectedPayment.amount)}</span>
               </div>
               <div>
-                <span className="text-zinc-400 block font-semibold">FMS Category:</span>
-                <span>{selectedPayment.fmsName}</span>
+                <span className="text-zinc-400 block font-medium text-[11px]">FMS Category:</span>
+                <span className="font-medium text-zinc-800 dark:text-zinc-200">{selectedPayment.fmsName}</span>
               </div>
               <div>
-                <span className="text-zinc-400 block font-semibold">Firm Name:</span>
-                <span>{selectedPayment.firmName}</span>
+                <span className="text-zinc-400 block font-medium text-[11px]">Firm Name:</span>
+                <span className="font-medium text-zinc-800 dark:text-zinc-200">{selectedPayment.firmName}</span>
               </div>
               <div>
-                <span className="text-zinc-400 block font-semibold">Current Status:</span>
-                <span className="font-bold text-blue-600">{selectedPayment.status}</span>
+                <span className="text-zinc-400 block font-medium text-[11px]">Department:</span>
+                <span className="text-zinc-700 dark:text-zinc-300">{selectedPayment.department || 'IT'}</span>
               </div>
               <div>
-                <span className="text-zinc-400 block font-semibold">Remarks:</span>
-                <span>{selectedPayment.remarks || 'No remarks provided.'}</span>
+                <span className="text-zinc-400 block font-medium text-[11px]">Current Status:</span>
+                <span className="inline-flex px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                  {selectedPayment.status}
+                </span>
               </div>
+              {selectedPayment.attachmentUrl && (
+                <div className="col-span-2 pt-1 border-t border-zinc-200/50 dark:border-zinc-800">
+                  <span className="text-zinc-400 block font-medium text-[11px]">Attachment:</span>
+                  <a href={selectedPayment.attachmentUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1 font-semibold mt-0.5">
+                    View Uploaded Document <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              )}
+              <div className="col-span-2">
+                <span className="text-zinc-400 block font-medium text-[11px]">Maker Remarks:</span>
+                <span className="text-zinc-600 dark:text-zinc-400 italic">{selectedPayment.remarks || 'No remarks provided.'}</span>
+              </div>
+            </div>
+
+            {/* Checker Remarks / Comment Input */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                Action Remarks / Notes <span className="text-zinc-400 font-normal">(Recorded in Audit History)</span>
+              </label>
+              <textarea
+                value={actionRemarks}
+                onChange={(e) => setActionRemarks(e.target.value)}
+                rows={2}
+                placeholder="Enter approval justification or rejection reason..."
+                className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500 text-zinc-900 dark:text-zinc-100"
+              />
             </div>
 
             {/* Timeline */}
             <div className="space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
               <h4 className="font-bold text-xs text-zinc-700 dark:text-zinc-300">Audit History Log</h4>
-              <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+              <div className="max-h-32 overflow-y-auto space-y-2 pr-1">
                 {(selectedPayment.history || []).map((h, idx) => (
-                  <div key={idx} className="p-2 bg-zinc-50 dark:bg-zinc-950 rounded-xl text-[11px] space-y-0.5">
+                  <div key={idx} className="p-2 bg-zinc-50 dark:bg-zinc-950 rounded-xl text-[11px] space-y-0.5 border border-zinc-100 dark:border-zinc-850">
                     <div className="flex justify-between font-semibold">
                       <span className="text-zinc-900 dark:text-zinc-100">{h.title}</span>
                       <span className="text-zinc-400 text-[10px]">{new Date(h.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -481,9 +578,39 @@ export default function PaymentCreation() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
-              <button onClick={() => setModalOpen(false)} className="px-4 py-1.5 bg-zinc-100 dark:bg-zinc-800 font-bold rounded-xl text-xs">Close</button>
+            {/* Modal Bottom Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                type="button"
+                onClick={() => handlePaymentAction('Rejected', true)}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 border border-rose-200 dark:border-rose-800 disabled:opacity-50 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+                <span>Reject</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setModalOpen(false)} 
+                  disabled={actionLoading}
+                  className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePaymentAction('Approved for Funding', false)}
+                  disabled={actionLoading}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Approval for Funding</span>
+                </button>
+              </div>
             </div>
+
           </div>
         </div>
       )}

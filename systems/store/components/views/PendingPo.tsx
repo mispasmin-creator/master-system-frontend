@@ -72,9 +72,10 @@ export default function ApprovedPOs() {
             );
 
             const { data: allIndents } = await storeApi.get('indent');
-            let indentData = (allIndents || []).filter((r: any) => r.po_requred === 'Yes');
-            if (user?.firmNameMatch?.toLowerCase() !== 'all') {
-                indentData = indentData.filter((r: any) => r.firm_name === user.firmNameMatch);
+            let indentData = (allIndents || []).filter((r: any) => (r.po_required === 'Yes' || r.po_requred === 'Yes' || r.poRequired === 'Yes'));
+            if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                const targetFirm = user.firmNameMatch.trim().toLowerCase();
+                indentData = indentData.filter((r: any) => (r.firm_name_match || r.firm_name || '').trim().toLowerCase() === targetFirm);
             }
 
             const filteredData = (indentData || []).filter((sheet) => {
@@ -107,7 +108,7 @@ export default function ApprovedPOs() {
                         vendorName: sheet.approved_vendor_name || sheet.vendor_name1 || '',
                         paymentTerm: sheet.approved_payment_term || sheet.payment_term1 || '',
                         specifications: sheet.specifications || '',
-                        poRequired: sheet.po_requred?.toString() || '',
+                        poRequired: (sheet.po_required || sheet.po_requred)?.toString() || 'Yes',
                         poRequiredStatus: 'Yes' as const,
                         expectedReqDateRaw: rawExpected,
                         expectedReqDate: formattedExpectedDate,
@@ -132,8 +133,9 @@ export default function ApprovedPOs() {
             // Fetch all po_master records
             const { data: allPo } = await storeApi.get('po_master');
             let poData = allPo || [];
-            if (user?.firmNameMatch?.toLowerCase() !== 'all') {
-                poData = poData.filter((r: any) => r.firm_name_match === user.firmNameMatch);
+            if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                const targetFirm = user.firmNameMatch.trim().toLowerCase();
+                poData = poData.filter((r: any) => (r.firm_name_match || '').trim().toLowerCase() === targetFirm);
             }
             poData.sort((a: any, b: any) => String(b.timestamp).localeCompare(String(a.timestamp)));
 

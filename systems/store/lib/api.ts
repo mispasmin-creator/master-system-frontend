@@ -13,7 +13,8 @@ const tableRouteMap: Record<string, string> = {
   "fullkitting": "fullkitting",
   "pc_report": "pc-report",
   "payment_history": "payment-history",
-  "received": "store-in",
+  "received": "received",
+  "stock": "stock",
 };
 
 const getRoute = (table: string): string => tableRouteMap[table] || table;
@@ -65,7 +66,7 @@ export const toSnake = (obj: any): any => {
     return obj.map(v => toSnake(v));
   } else if (obj !== null && obj !== undefined && obj.constructor === Object) {
     return Object.keys(obj).reduce((result, key) => {
-      let snakeKey = key.replace(/([A-Z0-9])/g, (match, char, index) => {
+      let snakeKey = key.replace(/([A-Z])/g, (match, char, index) => {
         // Avoid prefixing underscore if uppercase is at the beginning
         return (index === 0 ? "" : "_") + match.toLowerCase();
       }).replace(/_+/g, "_"); // Clean up any duplicate underscores

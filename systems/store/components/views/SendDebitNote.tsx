@@ -140,7 +140,7 @@ export default () => {
 
     useEffect(() => {
         const filteredByFirm = storeInRecords.filter((item) =>
-            user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
         );
 
         setPendingData(
@@ -197,7 +197,7 @@ export default () => {
                     timestamp: i.timestamp || '',
                 }))
         );
-    }, [storeInRecords, user.firmNameMatch]);
+    }, [storeInRecords, user?.firmNameMatch]);
 
     useEffect(() => {
         if (!openDialog) {

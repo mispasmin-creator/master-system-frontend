@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  FileText, 
-  Search, 
-  AlertTriangle, 
-  CheckCircle, 
-  UploadCloud, 
-  Eye, 
+import {
+  Plus,
+  FileText,
+  Search,
+  AlertTriangle,
+  CheckCircle,
+  UploadCloud,
+  Eye,
   Trash,
   RotateCcw,
   Sparkles
@@ -25,11 +25,12 @@ export const SaleOrders = () => {
   const [parties, setParties] = useState([]);
   const [products, setProducts] = useState([]);
   const [firms, setFirms] = useState([]);
+  const [transportTypes, setTransportTypes] = useState(['FOR Destination', 'Ex Factory Depot']);
   const [activeSubTab, setActiveSubTab] = useState('active'); // 'active' | 'history'
-  
+
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [stockWarningModal, setStockWarningModal] = useState({ open: false, data: null });
@@ -45,7 +46,7 @@ export const SaleOrders = () => {
   const [formRate, setFormRate] = useState('');
   const [formTransport, setFormTransport] = useState('FOR');
   const [formDispatchDate, setFormDispatchDate] = useState('');
-  
+
   // File Upload State
   const [uploadedFile, setUploadedFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -62,30 +63,83 @@ export const SaleOrders = () => {
   const fetchOrdersAndMasters = async () => {
     try {
       setLoading(true);
-      const [orderRes, partyRes, prodRes] = await Promise.all([
-        rmSalesApi.get('order'),
-        rmSalesApi.get('party'),
-        rmSalesApi.get('product')
+      const [orderRes, partyRes, prodRes, masterRes] = await Promise.all([
+        rmSalesApi.get('order').catch(() => ({ success: false, data: [] })),
+        rmSalesApi.get('party').catch(() => ({ success: false, data: [] })),
+        rmSalesApi.get('product').catch(() => ({ success: false, data: [] })),
+        rmSalesApi.get('master').catch(() => ({ success: false, data: {} }))
       ]);
       const orderList = orderRes.data || [];
-      const partyList = partyRes.data || [];
-      const prodList = prodRes.data || [];
-      
-      const visibleOrders = filterByFirmAccess(orderList, currentUser);
+      const masterData = masterRes.data || {};
+
+      // Parse & consolidate Parties (from rmsales_master and rmsales_party)
+      const rawMasterParties = masterData.parties || [];
+      const rawApiParties = partyRes.data || [];
+      const partyMap = new Map();
+      [...rawMasterParties, ...rawApiParties].forEach(p => {
+        if (!p) return;
+        const nameStr = typeof p === 'string'
+          ? p.trim()
+          : (p.name || p.party_name || p.partyName || '').toString().trim();
+        if (nameStr) {
+          const key = nameStr.toLowerCase();
+          if (!partyMap.has(key)) {
+            partyMap.set(key, {
+              id: typeof p === 'object' && p.id ? p.id : nameStr,
+              name: nameStr,
+              firm_name: typeof p === 'object' ? (p.firm_name || p.firmName || null) : null
+            });
+          }
+        }
+      });
+      const partyList = Array.from(partyMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+      // Parse & consolidate Products (from rmsales_master and rmsales_product)
+      const rawMasterProds = masterData.products || [];
+      const rawApiProds = prodRes.data || [];
+      const prodMap = new Map();
+      [...rawMasterProds, ...rawApiProds].forEach(p => {
+        if (!p) return;
+        const nameStr = typeof p === 'string'
+          ? p.trim()
+          : (p.name || p.product_name || p.productName || '').toString().trim();
+        if (nameStr) {
+          const key = nameStr.toLowerCase();
+          if (!prodMap.has(key)) {
+            prodMap.set(key, {
+              id: typeof p === 'object' && p.id ? p.id : nameStr,
+              name: nameStr,
+              unit: typeof p === 'object' && p.unit ? p.unit : 'MT'
+            });
+          }
+        }
+      });
+      const prodList = Array.from(prodMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+      // Calculate Firm Names
+      const defaultFirms = ['PMMPL', 'PURAB', 'RKl', 'Refrasynth'];
+      const masterFirms = (masterData.firms || []).filter(Boolean);
+      const partyFirms = partyList.map(p => p.firm_name).filter(Boolean);
       const assignedFirms = parseMultiValue(currentUser?.firm_name);
-      const firmList = Array.from(new Set(partyList.map(p => p.firm_name).filter(Boolean)));
-      const availableFirms = Array.from(new Set([...firmList, ...assignedFirms])).sort();
-      const visibleFirms = hasPageAccess(userRole, 'Admin') || assignedFirms.length === 0
+      
+      const availableFirms = Array.from(new Set([...defaultFirms, ...masterFirms, ...partyFirms, ...assignedFirms])).sort();
+      const visibleOrders = filterByFirmAccess(orderList, currentUser);
+      
+      const visibleFirms = (hasPageAccess(userRole, 'Admin') || assignedFirms.length === 0)
         ? availableFirms
         : availableFirms.filter(firm =>
-            assignedFirms.some(assigned => assigned.toLowerCase() === firm.toLowerCase())
-          );
+          assignedFirms.some(assigned => assigned.toLowerCase() === firm.toLowerCase())
+        );
+
+      const rawTransports = masterData.transport_types || masterData.transportTypes || ['FOR Destination', 'Ex Factory Depot'];
+      const availableTransports = Array.from(new Set(['FOR Destination', 'Ex Factory Depot', ...rawTransports])).sort();
 
       setOrders(visibleOrders);
       setParties(partyList);
       setProducts(prodList);
-      setFirms(visibleFirms);
-      
+      setFirms(visibleFirms.length > 0 ? visibleFirms : defaultFirms);
+      setTransportTypes(availableTransports);
+
       const num = orderList.length + 1;
       setNextOrderNo(`RM-${String(num).padStart(4, '0')}`);
     } catch (e) {
@@ -209,13 +263,13 @@ export const SaleOrders = () => {
     }
     if (!formParty) return setFormError('Please select a Party.');
     if (!formProduct) return setFormError('Please select a Product.');
-    
+
     const qtyVal = parseFloat(formQty);
     if (isNaN(qtyVal) || qtyVal <= 0) return setFormError('Tonnage Quantity must be greater than 0.');
-    
+
     const rateVal = parseFloat(formRate);
     if (isNaN(rateVal) || rateVal < 0) return setFormError('Rate must be a positive number.');
-    
+
     if (!formDispatchDate) return setFormError('Dispatch date is required.');
     if (!uploadedFile) return setFormError('Please upload PO copy file.');
 
@@ -260,12 +314,12 @@ export const SaleOrders = () => {
 
   // Filters
   const filteredOrders = orders
-    .filter(o => 
-      activeSubTab === 'active' 
-        ? o.status === 'Pending Approval' 
+    .filter(o =>
+      activeSubTab === 'active'
+        ? o.status === 'Pending Approval'
         : o.status !== 'Pending Approval'
     )
-    .filter(o => 
+    .filter(o =>
       o.order_no.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.party_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -277,7 +331,7 @@ export const SaleOrders = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      
+
       {/* Title */}
       <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
         <div>
@@ -290,12 +344,14 @@ export const SaleOrders = () => {
         </div>
 
         {/* Create button */}
-        {hasPageAccess(userRole, 'Sales') && (
-          <Button onClick={handleOpenCreateModal} className="gap-1.5 shadow-xs">
-            <Plus className="h-4.5 w-4.5" />
-            Create Sale Order
-          </Button>
-        )}
+        <Button
+          type="button"
+          onClick={handleOpenCreateModal}
+          className="gap-1.5 shadow-sm bg-[#657036] hover:bg-[#4b5b29] text-white px-4 py-2 rounded-lg font-medium cursor-pointer"
+        >
+          <Plus className="h-4.5 w-4.5 text-white" />
+          <span>Create Sale Order</span>
+        </Button>
       </div>
 
       {/* Filter and Search */}
@@ -392,7 +448,7 @@ export const SaleOrders = () => {
                       <td className="p-4">
                         <span className={cn(
                           "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold",
-                          order.transport_type === 'FOR' 
+                          order.transport_type === 'FOR'
                             ? "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
                             : "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300"
                         )}>
@@ -402,7 +458,7 @@ export const SaleOrders = () => {
                       <td className="p-4 font-medium text-slate-navy-500">{new Date(order.dispatch_date).toLocaleDateString()}</td>
                       <td className="p-4">
                         {order.po_copy_url ? (
-                          <button 
+                          <button
                             type="button"
                             onClick={() => openDocument(order.po_copy_url, `PO-${order.order_no}.pdf`, 'PO', order.order_no)}
                             className="font-semibold text-brand-650 hover:underline hover:text-brand-700 truncate max-w-[120px] block text-left"
@@ -454,7 +510,7 @@ export const SaleOrders = () => {
         title={`Register New Sale Contract (${nextOrderNo})`}
       >
         <form onSubmit={handleSubmitOrder} className="space-y-4">
-          
+
           {/* Draft restored indicator */}
           {draftRestoredAlert && (
             <div className="bg-brand-50 text-brand-700 p-3 rounded-lg border border-brand-200 text-xs flex justify-between items-center">
@@ -479,32 +535,31 @@ export const SaleOrders = () => {
             label="Firm Name"
             value={formFirmName}
             onChange={(e) => setFormFirmName(e.target.value)}
-          >
-            <option value="">Choose Firm</option>
-            {firms.map(f => <option key={f} value={f}>{f}</option>)}
-          </Select>
+            options={[
+              { value: '', label: 'Choose Firm' },
+              ...firms.map(f => ({ value: f, label: f }))
+            ]}
+          />
 
           <Select
             label="Party Name"
             value={formParty}
             onChange={(e) => setFormParty(e.target.value)}
-          >
-            <option value="">Choose Party</option>
-            {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
+            options={[
+              { value: '', label: 'Choose Party' },
+              ...parties.map(p => ({ value: String(p.id || p.name), label: p.name }))
+            ]}
+          />
 
           <Select
             label="Product Name"
             value={formProduct}
             onChange={(e) => setFormProduct(e.target.value)}
-          >
-            <option value="">Choose Product</option>
-            {products.map(p => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </Select>
+            options={[
+              { value: '', label: 'Choose Product' },
+              ...products.map(p => ({ value: String(p.id || p.name), label: p.name }))
+            ]}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -541,10 +596,10 @@ export const SaleOrders = () => {
               label="Type Of Transporting"
               value={formTransport}
               onChange={(e) => setFormTransport(e.target.value)}
-              options={[
-                { value: 'FOR', label: 'FOR Destination' },
-                { value: 'Ex Factory', label: 'Ex Factory Depot' }
-              ]}
+              options={transportTypes.map(t => ({
+                value: t,
+                label: t
+              }))}
             />
 
             <Input
@@ -560,10 +615,10 @@ export const SaleOrders = () => {
             <label className="text-xs font-semibold text-slate-navy-700 dark:text-slate-navy-300">
               Upload Purchase Order (PO) Copy
             </label>
-            
+
             <div>
               {!uploadedFile && !uploading && (
-                <label 
+                <label
                   htmlFor="po-upload-input"
                   className="border-2 border-dashed border-slate-navy-200 rounded-xl p-6 text-center bg-slate-50/50 dark:border-slate-navy-800 dark:bg-slate-navy-900/30 block cursor-pointer hover:bg-slate-100/50 dark:hover:bg-slate-900/50 transition-colors"
                 >
@@ -576,12 +631,12 @@ export const SaleOrders = () => {
                       <p className="text-[10px] text-slate-navy-450 mt-1">Accepts PDF, JPG, PNG</p>
                     </div>
                   </div>
-                  <input 
+                  <input
                     id="po-upload-input"
-                    type="file" 
-                    accept="application/pdf,image/*" 
+                    type="file"
+                    accept="application/pdf,image/*"
                     onChange={handleFileUploadSimulate}
-                    className="hidden" 
+                    className="hidden"
                   />
                 </label>
               )}
@@ -595,7 +650,7 @@ export const SaleOrders = () => {
                     </div>
                     {/* Progress bar wrapper */}
                     <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden dark:bg-slate-navy-800">
-                      <div 
+                      <div
                         className="bg-brand-600 h-full rounded-full transition-all duration-150"
                         style={{ width: `${uploadProgress}%` }}
                       />
@@ -621,11 +676,11 @@ export const SaleOrders = () => {
                       <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 dark:bg-emerald-950/20">
                         <CheckCircle className="h-3 w-3" /> Ready
                       </span>
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => setUploadedFile(null)} 
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setUploadedFile(null)}
                         className="h-8 w-8 text-red-500 hover:bg-red-50"
                       >
                         <Trash className="h-3.5 w-3.5" />
@@ -638,9 +693,9 @@ export const SaleOrders = () => {
           </div>
 
           <div className="flex justify-end gap-2 border-t pt-4 mt-6">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => setCreateModalOpen(false)}
             >
               Cancel
@@ -667,7 +722,7 @@ export const SaleOrders = () => {
                   Insufficient Stock for {stockWarningModal.data.prodName}
                 </h4>
                 <p className="text-xs text-amber-700 dark:text-amber-500 mt-1 leading-normal font-medium">
-                  The requested order quantity is <span className="font-extrabold text-amber-900 dark:text-amber-300">{formatNumber(stockWarningModal.data.requested, 3)} MT</span>, 
+                  The requested order quantity is <span className="font-extrabold text-amber-900 dark:text-amber-300">{formatNumber(stockWarningModal.data.requested, 3)} MT</span>,
                   but the current available inventory balance is only <span className="font-extrabold text-amber-900 dark:text-amber-300">{formatNumber(stockWarningModal.data.available, 3)} MT</span>.
                 </p>
               </div>
@@ -678,14 +733,14 @@ export const SaleOrders = () => {
             </p>
 
             <div className="flex justify-end gap-2.5 border-t pt-4 mt-6">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setStockWarningModal({ open: false, data: null })}
               >
                 No, Revise Quantity
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleProceedWithStockWarning}
               >
                 Yes, Force Save Order
@@ -790,20 +845,20 @@ export const SaleOrders = () => {
               <span className="text-[10px] font-bold text-slate-navy-450 uppercase">
                 Access Level: {userRole}
               </span>
-              
+
               <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => setViewModalOpen(false)}
                 >
                   Close
                 </Button>
-                
+
                 {(() => {
                   const isApproved = selectedOrder.status !== 'Pending Approval';
                   const isLocked = selectedOrder.status === 'Pending Invoice' || selectedOrder.status === 'Completed';
-                  
+
                   if (isLocked) {
                     return (
                       <span className="text-xs text-slate-navy-450 font-bold italic py-2 px-1">
@@ -811,7 +866,7 @@ export const SaleOrders = () => {
                       </span>
                     );
                   }
-                  
+
                   return (
                     <>
                       {isApproved ? (

@@ -97,76 +97,76 @@ export default () => {
             const filtered = indents.filter((row: any) => {
                 const hasPlanned3 = row.planned3 !== null && row.planned3 !== undefined && row.planned3 !== '';
                 const noActual3 = row.actual3 === null || row.actual3 === undefined || row.actual3 === '';
-                const validVendorType = row.vendor_type === 'Three Party' || row.vendor_type === 'Regular';
+                const validVendorType = (row.vendor_type || row.vendorType) !== 'Reject';
                 
                 let matchFirm = true;
-                if (user.firmNameMatch.toLowerCase() !== 'all') {
-                    matchFirm = row.firm_name === user.firmNameMatch;
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
+                    matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
                 
                 return hasPlanned3 && noActual3 && validVendorType && matchFirm;
             });
 
-            filtered.sort((a: any, b: any) => String(b.indent_number).localeCompare(String(a.indent_number)));
+            filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
 
             const rows = filtered as any[];
             setTableData(
-                rows.filter(r => !r.vendor1_rank && !r.vendor2_rank && !r.vendor3_rank)
-                    .map((r): RateApprovalData => ({
-                        id: r.id,
-                        indentNo: r.indent_number || '',
-                        firmNameMatch: r.firm_name_match || r.firm_name || '',
-                        indenter: r.indenter_name || '',
-                        department: r.category || '',
-                        product: r.product_name || '',
-                        comparisonSheet: r.comparison_sheet || '',
-                        date: formatDateTime(new Date(r.timestamp)).replace(/\//g, '-'),
-                        plannedDate: r.planned3 ? formatDate(new Date(r.planned3)) : 'Not Set',
-                        quantity: r.approved_quantity || r.quantity || 0,
-                        uom: r.uom || '',
-                        areaOfUse: r.area_of_use || '',
-                        vendors: [
-                            [
-                                r.vendor_name1 || '',
-                                r.rate1?.toString() || '0',
-                                r.payment_term1 || '',
-                                r.select_rate_type1 || 'With Tax',
-                                r.with_tax_or_not1 || 'Yes',
-                                r.tax_value1?.toString() || '0',
-                                r.quotation_no1 || '',
-                                r.quotation_date1 || '',
-                                r.vendor1_rank || '',
-                                r.delivery_time1 || '',
-                                r.make1 || ''
-                            ],
-                            [
-                                r.vendor_name2 || '',
-                                r.rate2?.toString() || '0',
-                                r.payment_term2 || '',
-                                r.select_rate_type2 || 'With Tax',
-                                r.with_tax_or_not2 || 'Yes',
-                                r.tax_value2?.toString() || '0',
-                                r.quotation_no2 || '',
-                                r.quotation_date2 || '',
-                                r.vendor2_rank || '',
-                                r.delivery_time2 || '',
-                                r.make2 || ''
-                            ],
-                            [
-                                r.vendor_name3 || '',
-                                r.rate3?.toString() || '0',
-                                r.payment_term3 || '',
-                                r.select_rate_type3 || 'With Tax',
-                                r.with_tax_or_not3 || 'Yes',
-                                r.tax_value3?.toString() || '0',
-                                r.quotation_no3 || '',
-                                r.quotation_date3 || '',
-                                r.vendor3_rank || '',
-                                r.delivery_time3 || '',
-                                r.make3 || ''
-                            ],
-                        ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string][],
-                    }))
+                rows.map((r): RateApprovalData => ({
+                    id: r.id,
+                    indentNo: r.indent_number || r.indentNumber || '',
+                    firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || r.firmName || '',
+                    indenter: r.indenter_name || r.indenterName || '',
+                    department: r.category || r.department || '',
+                    product: r.product_name || r.productName || '',
+                    comparisonSheet: r.comparison_sheet || r.comparisonSheet || '',
+                    date: r.timestamp ? formatDateTime(new Date(r.timestamp)).replace(/\//g, '-') : '-',
+                    plannedDate: r.planned3 ? formatDate(new Date(r.planned3)) : 'Not Set',
+                    quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                    uom: r.uom || '',
+                    areaOfUse: r.area_of_use || r.areaOfUse || '',
+                    vendors: [
+                        [
+                            r.vendor_name1 || r.vendorName1 || '',
+                            (r.rate1 || r.approved_rate || 0).toString(),
+                            r.payment_term1 || r.paymentTerm1 || '',
+                            r.select_rate_type1 || 'Basic Rate',
+                            r.with_tax_or_not1 || 'No',
+                            (r.tax_value1 || 0).toString(),
+                            r.quotation_no1 || '',
+                            r.quotation_date1 || '',
+                            r.vendor1_rank || '',
+                            (r.delivery_time1 || '').toString(),
+                            r.make1 || ''
+                        ],
+                        [
+                            r.vendor_name2 || r.vendorName2 || '',
+                            (r.rate2 || 0).toString(),
+                            r.payment_term2 || r.paymentTerm2 || '',
+                            r.select_rate_type2 || 'Basic Rate',
+                            r.with_tax_or_not2 || 'No',
+                            (r.tax_value2 || 0).toString(),
+                            r.quotation_no2 || '',
+                            r.quotation_date2 || '',
+                            r.vendor2_rank || '',
+                            (r.delivery_time2 || '').toString(),
+                            r.make2 || ''
+                        ],
+                        [
+                            r.vendor_name3 || r.vendorName3 || '',
+                            (r.rate3 || 0).toString(),
+                            r.payment_term3 || r.paymentTerm3 || '',
+                            r.select_rate_type3 || 'Basic Rate',
+                            r.with_tax_or_not3 || 'No',
+                            (r.tax_value3 || 0).toString(),
+                            r.quotation_no3 || '',
+                            r.quotation_date3 || '',
+                            r.vendor3_rank || '',
+                            (r.delivery_time3 || '').toString(),
+                            r.make3 || ''
+                        ],
+                    ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string][],
+                }))
             );
         } catch (err) {
             console.error('Error fetching pending approvals:', err);
@@ -178,7 +178,7 @@ export default () => {
 
     useEffect(() => {
         fetchPendingApprovals();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
 
     // Fetch completed three party approvals from Supabase
@@ -190,74 +190,75 @@ export default () => {
 
             const filtered = indents.filter((row: any) => {
                 const hasPlanned3 = row.planned3 !== null && row.planned3 !== undefined && row.planned3 !== '';
-                const validVendorType = row.vendor_type === 'Three Party' || row.vendor_type === 'Regular';
+                const hasActual3 = row.actual3 !== null && row.actual3 !== undefined && row.actual3 !== '';
+                const validVendorType = (row.vendor_type || row.vendorType) !== 'Reject';
                 
                 let matchFirm = true;
-                if (user.firmNameMatch.toLowerCase() !== 'all') {
-                    matchFirm = row.firm_name === user.firmNameMatch;
+                if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
+                    const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
+                    matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
                 
-                return hasPlanned3 && validVendorType && matchFirm;
+                return hasPlanned3 && hasActual3 && validVendorType && matchFirm;
             });
 
-            filtered.sort((a: any, b: any) => String(b.indent_number).localeCompare(String(a.indent_number)));
+            filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
 
             const rows = filtered as any[];
             setHistoryData(
-                rows.filter(r => r.vendor1_rank || r.vendor2_rank || r.vendor3_rank)
-                    .map((r): HistoryData => ({
-                        id: r.id,
-                        indentNo: r.indent_number || '',
-                        firmNameMatch: r.firm_name_match || r.firm_name || '',
-                        indenter: r.indenter_name || '',
-                        department: r.category || '',
-                        product: r.product_name || '',
-                        date: r.actual3 ? formatDate(new Date(r.actual3)) : formatDate(new Date(r.timestamp)),
-                        quantity: r.approved_quantity || r.quantity || 0,
-                        uom: r.uom || '',
-                        areaOfUse: r.area_of_use || '',
-                        vendors: [
-                            [
-                                r.vendor_name1 || '',
-                                r.rate1?.toString() || '0',
-                                r.payment_term1 || '',
-                                r.select_rate_type1 || 'With Tax',
-                                r.with_tax_or_not1 || 'Yes',
-                                r.tax_value1?.toString() || '0',
-                                r.quotation_no1 || '',
-                                r.quotation_date1 || '',
-                                r.vendor1_rank || '',
-                                r.delivery_time1 || '',
-                                r.make1 || ''
-                            ],
-                            [
-                                r.vendor_name2 || '',
-                                r.rate2?.toString() || '0',
-                                r.payment_term2 || '',
-                                r.select_rate_type2 || 'With Tax',
-                                r.with_tax_or_not2 || 'Yes',
-                                r.tax_value2?.toString() || '0',
-                                r.quotation_no2 || '',
-                                r.quotation_date2 || '',
-                                r.vendor2_rank || '',
-                                r.delivery_time2 || '',
-                                r.make2 || ''
-                            ],
-                            [
-                                r.vendor_name3 || '',
-                                r.rate3?.toString() || '0',
-                                r.payment_term3 || '',
-                                r.select_rate_type3 || 'With Tax',
-                                r.with_tax_or_not3 || 'Yes',
-                                r.tax_value3?.toString() || '0',
-                                r.quotation_no3 || '',
-                                r.quotation_date3 || '',
-                                r.vendor3_rank || '',
-                                r.delivery_time3 || '',
-                                r.make3 || ''
-                            ],
-                        ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string][],
-                    }))
+                rows.map((r): HistoryData => ({
+                    id: r.id,
+                    indentNo: r.indent_number || r.indentNumber || '',
+                    firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || r.firmName || '',
+                    indenter: r.indenter_name || r.indenterName || '',
+                    department: r.category || r.department || '',
+                    product: r.product_name || r.productName || '',
+                    date: r.actual3 ? formatDate(new Date(r.actual3)) : formatDate(new Date(r.timestamp)),
+                    quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                    uom: r.uom || '',
+                    areaOfUse: r.area_of_use || r.areaOfUse || '',
+                    vendors: [
+                        [
+                            r.vendor_name1 || r.vendorName1 || '',
+                            (r.rate1 || r.approved_rate || 0).toString(),
+                            r.payment_term1 || r.paymentTerm1 || '',
+                            r.select_rate_type1 || 'Basic Rate',
+                            r.with_tax_or_not1 || 'No',
+                            (r.tax_value1 || 0).toString(),
+                            r.quotation_no1 || '',
+                            r.quotation_date1 || '',
+                            r.vendor1_rank || '',
+                            (r.delivery_time1 || '').toString(),
+                            r.make1 || ''
+                        ],
+                        [
+                            r.vendor_name2 || r.vendorName2 || '',
+                            (r.rate2 || 0).toString(),
+                            r.payment_term2 || r.paymentTerm2 || '',
+                            r.select_rate_type2 || 'Basic Rate',
+                            r.with_tax_or_not2 || 'No',
+                            (r.tax_value2 || 0).toString(),
+                            r.quotation_no2 || '',
+                            r.quotation_date2 || '',
+                            r.vendor2_rank || '',
+                            (r.delivery_time2 || '').toString(),
+                            r.make2 || ''
+                        ],
+                        [
+                            r.vendor_name3 || r.vendorName3 || '',
+                            (r.rate3 || 0).toString(),
+                            r.payment_term3 || r.paymentTerm3 || '',
+                            r.select_rate_type3 || 'Basic Rate',
+                            r.with_tax_or_not3 || 'No',
+                            (r.tax_value3 || 0).toString(),
+                            r.quotation_no3 || '',
+                            r.quotation_date3 || '',
+                            r.vendor3_rank || '',
+                            (r.delivery_time3 || '').toString(),
+                            r.make3 || ''
+                        ],
+                    ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string][],
+                }))
             );
         } catch (err) {
             console.error('Error fetching completed approvals:', err);
@@ -270,31 +271,28 @@ export default () => {
     useEffect(() => {
         fetchPendingApprovals();
         fetchCompletedApprovals();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const columns: ColumnDef<RateApprovalData>[] = [
-        ...(user.threePartyApprovalAction
-            ? [
-                {
-                    header: 'Action',
-                    id: 'action',
-                    cell: ({ row }: { row: Row<RateApprovalData> }) => {
-                        const indent = row.original;
-                        return (
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                    setSelectedIndent(indent);
-                                    setOpenDialog(true);
-                                }}
-                            >
-                                Approve
-                            </Button>
-                        );
-                    },
-                },
-            ]
-            : []),
+        {
+            header: 'Action',
+            id: 'action',
+            cell: ({ row }: { row: Row<RateApprovalData> }) => {
+                const indent = row.original;
+                return (
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setSelectedHistory(null);
+                            setSelectedIndent(indent);
+                            setOpenDialog(true);
+                        }}
+                    >
+                        Approve
+                    </Button>
+                );
+            },
+        },
         { accessorKey: 'date', header: 'Timestamp' },
         { accessorKey: 'indentNo', header: 'Indent No.' },
         { accessorKey: 'firmNameMatch', header: 'Firm Name' },
@@ -337,26 +335,25 @@ export default () => {
     ];
 
     const historyColumns: ColumnDef<HistoryData>[] = [
-        ...(user.updateVendorAction ? [
-            {
-                header: 'Action',
-                cell: ({ row }: { row: Row<HistoryData> }) => {
-                    const indent = row.original;
+        {
+            header: 'Action',
+            cell: ({ row }: { row: Row<HistoryData> }) => {
+                const indent = row.original;
 
-                    return (
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setSelectedHistory(indent);
-                                setOpenDialog(true);
-                            }}
-                        >
-                            Update
-                        </Button>
-                    );
-                },
+                return (
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setSelectedIndent(null);
+                            setSelectedHistory(indent);
+                            setOpenDialog(true);
+                        }}
+                    >
+                        Update
+                    </Button>
+                );
             },
-        ] : []),
+        },
         { accessorKey: 'date', header: 'Timestamp' },
         { accessorKey: 'indentNo', header: 'Indent No.' },
         { accessorKey: 'firmNameMatch', header: ' Firm Name' },
@@ -495,9 +492,18 @@ export default () => {
 
             Object.entries(ranking).forEach(([rank, vendorIdx]) => {
                 if (vendorIdx === null) return;
-                if (vendorIdx === 0) updates.vendor1_rank = rank;
-                if (vendorIdx === 1) updates.vendor2_rank = rank;
-                if (vendorIdx === 2) updates.vendor3_rank = rank;
+                if (rank === 'T1' && selectedIndent) {
+                    const idx = vendorIdx + 1;
+                    const vName = (selectedIndent as any)[`vendorName${idx}`] || (selectedIndent as any)[`vendor_name${idx}`];
+                    const vRate = (selectedIndent as any)[`rate${idx}`];
+                    const vTerm = (selectedIndent as any)[`paymentTerm${idx}`] || (selectedIndent as any)[`payment_term${idx}`];
+                    if (vName) {
+                        updates.approved_vendor_name = vName;
+                        if (vRate !== undefined && vRate !== null) updates.approved_rate = Number(vRate);
+                        if (vTerm) updates.approved_payment_term = vTerm;
+                        updates.approved_date = new Date().toISOString();
+                    }
+                }
             });
 
             await storeApi.patch('indent', selectedIndent?.id!, updates);
@@ -563,12 +569,22 @@ export default () => {
             const updates: any = {};
             orderedHistoryIndices.forEach((originalIdx, position) => {
                 const rankVal = `T${position + 1}`;
-                if (originalIdx === 0) updates.vendor1_rank = rankVal;
-                if (originalIdx === 1) updates.vendor2_rank = rankVal;
-                if (originalIdx === 2) updates.vendor3_rank = rankVal;
+                if (rankVal === 'T1' && selectedHistory) {
+                    const idx = originalIdx + 1;
+                    const vName = (selectedHistory as any)[`vendorName${idx}`] || (selectedHistory as any)[`vendor_name${idx}`];
+                    const vRate = (selectedHistory as any)[`rate${idx}`];
+                    const vTerm = (selectedHistory as any)[`paymentTerm${idx}`] || (selectedHistory as any)[`payment_term${idx}`];
+                    if (vName) {
+                        updates.approved_vendor_name = vName;
+                        if (vRate !== undefined && vRate !== null) updates.approved_rate = Number(vRate);
+                        if (vTerm) updates.approved_payment_term = vTerm;
+                    }
+                }
             });
 
-            await storeApi.patch('indent', selectedHistory?.id!, updates);
+            if (Object.keys(updates).length > 0) {
+                await storeApi.patch('indent', selectedHistory?.id!, updates);
+            }
 
             toast.success(`Updated ranks for ${selectedHistory?.indentNo}`);
             setOpenDialog(false);

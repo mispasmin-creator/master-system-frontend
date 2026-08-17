@@ -14,7 +14,7 @@ export const Button = React.forwardRef(({
   const baseStyles = "inline-flex items-center justify-center font-medium rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-98 disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100";
   
   const variants = {
-    default: "bg-brand-600 text-white hover:bg-brand-700 shadow-sm focus:ring-brand-500",
+    default: "bg-[#657036] hover:bg-[#4b5b29] bg-brand-600 text-white hover:bg-brand-700 shadow-sm focus:ring-brand-500",
     secondary: "bg-slate-navy-100 text-slate-navy-900 hover:bg-slate-navy-200 dark:bg-slate-navy-800 dark:text-slate-navy-100 dark:hover:bg-slate-navy-700 focus:ring-slate-navy-500",
     outline: "border border-slate-navy-200 text-slate-navy-700 hover:bg-slate-navy-50 dark:border-slate-navy-700 dark:text-slate-navy-300 dark:hover:bg-slate-navy-900 focus:ring-slate-navy-500",
     ghost: "text-slate-navy-600 hover:bg-slate-navy-50 hover:text-slate-navy-900 dark:text-slate-navy-400 dark:hover:bg-slate-navy-900 dark:hover:text-slate-navy-100",

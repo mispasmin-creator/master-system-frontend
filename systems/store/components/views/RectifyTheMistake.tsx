@@ -46,7 +46,7 @@ export default function RectifyTheMistake() {
             const records = await fetchTallyEntryRecords();
             // Filter by firm name
             const filteredByFirm = records.filter(item => {
-                return user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch;
+                return !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch;
             });
             setAllData(filteredByFirm);
         } catch (error) {
@@ -59,7 +59,7 @@ export default function RectifyTheMistake() {
 
     useEffect(() => {
         fetchData();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const pendingData = useMemo(() => {
         return allData.filter(i => i.planned2 && !i.actual2);

@@ -898,26 +898,41 @@ export default function PIApprovals() {
                 unique_no: uniqueNo,
                 party_name: selectedItem.partyName,
                 po_number: selectedItem.poNumber,
-                total_po_amount: String(selectedItem.totalPoAmount || ''),
+                total_po_amount: Number(selectedItem.totalPoAmount) || 0,
                 internal_code: selectedItem.internalCode,
                 product: selectedItem.product,
                 delivery_date: selectedItem.deliveryDate || null,
                 payment_terms: selectedItem.paymentTerms || '',
-                number_of_days: String(selectedItem.numberOfDays || '0'),
+                number_of_days: Number(selectedItem.numberOfDays) || 0,
                 pdf: selectedItem.pdf || '',
-                pay_amount: String(payAmount),
+                pay_amount: Number(payAmount) || 0,
                 file: values.file || '',
                 remark: finalRemark,
-                total_paid_amount: String((selectedItem.totalPaidAmount || 0) + payAmount),
-                outstanding_amount: String(newOutstanding),
+                total_paid_amount: (Number(selectedItem.totalPaidAmount) || 0) + payAmount,
+                outstanding_amount: Number(newOutstanding) || 0,
                 status: newStatus,
                 planned: isoNow.split('T')[0],
                 actual: null,
-                firm_name: selectedItem.firmNameMatch || user?.firmNameMatch || '',
+                firm_name_match: selectedItem.firmNameMatch || user?.firmNameMatch || '',
                 status1: 'pending',
+                payment_form: selectedItem.paymentForm || (isFreight ? 'freight' : ''),
             };
 
-            await storeApi.post('payments', [paymentData]);
+            const existingPaymentId = selectedItem.rowIds?.[0] || selectedItem.rowIndex;
+            if (selectedItem.paymentForm && existingPaymentId) {
+                await storeApi.patch('payments', existingPaymentId, {
+                    planned: isoNow.split('T')[0],
+                    pay_amount: Number(payAmount) || 0,
+                    file: values.file || '',
+                    remark: finalRemark,
+                    total_paid_amount: (Number(selectedItem.totalPaidAmount) || 0) + payAmount,
+                    outstanding_amount: Number(newOutstanding) || 0,
+                    status: newStatus,
+                    firm_name_match: selectedItem.firmNameMatch || user?.firmNameMatch || '',
+                });
+            } else {
+                await storeApi.post('payments', [paymentData]);
+            }
 
             toast.success(`✅ Payment queued for: ${selectedItem.partyName}`);
             setOpenDialog(false);

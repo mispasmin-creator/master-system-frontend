@@ -158,7 +158,7 @@ export default () => {
 
     useEffect(() => {
         const filteredByFirm = storeInRecords.filter((item) =>
-            user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
         );
 
         const latestRecords: any[] = [];
@@ -218,11 +218,11 @@ export default () => {
         });
 
         setTableData(Array.from(groupedMap.values()));
-    }, [storeInRecords, user.firmNameMatch]);
+    }, [storeInRecords, user?.firmNameMatch]);
 
     useEffect(() => {
         const filteredByFirm = storeInRecords.filter((item) =>
-            user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
         );
 
         const latestRecords: any[] = [];
@@ -278,7 +278,7 @@ export default () => {
                     planned6Date: i.planned6 || '',
                 }))
         );
-    }, [storeInRecords, user.firmNameMatch]);
+    }, [storeInRecords, user?.firmNameMatch]);
 
     const textWrapCell = ({ getValue }: { getValue: () => any }) => {
         const value = getValue();
@@ -286,18 +286,16 @@ export default () => {
     };
 
     const columns: ColumnDef<RecieveItemsData>[] = [
-        ...(user.receiveItemView
-            ? [{
-                header: 'Action',
-                cell: ({ row }: { row: Row<RecieveItemsData> }) => (
-                    <DialogTrigger asChild>
-                        <Button variant="outline" onClick={() => setSelectedIndent(row.original)}>
-                            Store In
-                        </Button>
-                    </DialogTrigger>
-                ),
-            }]
-            : []),
+        {
+            header: 'Action',
+            cell: ({ row }: { row: Row<RecieveItemsData> }) => (
+                <DialogTrigger asChild>
+                    <Button variant="outline" onClick={() => setSelectedIndent(row.original)}>
+                        Store In
+                    </Button>
+                </DialogTrigger>
+            ),
+        },
         {
             accessorKey: 'timestamp',
             header: 'Timestamp',
@@ -464,18 +462,18 @@ export default () => {
                 // Received: go to Transporting Update (hod_planned), no planned7
                 const updatePayload: Record<string, any> = {
                     actual6: currentDateTime,
-                    receiving_status: values.status,
                     remark: values.remark || '',
                 };
                 if (isRejected) {
                     updatePayload.planned7 = currentDateTime;
                     updatePayload.hod_status = 'Rejected';
-                    updatePayload.hod_actual = currentDateTime;
+                    updatePayload.actual_hod = currentDateTime;
                 } else {
-                    updatePayload.hod_planned = currentDateTime;
+                    updatePayload.planned_hod = currentDateTime;
                     updatePayload.hod_status = 'Pending';
                 }
-                await storeApi.patch('store_in', item.id, updatePayload);
+                const targetId = item.id || item.liftNumber || item.lift_number;
+                await storeApi.patch('store_in', targetId, updatePayload);
             }
             toast.success(`Store In completed for ${(selectedIndent.originalItems || []).length} item(s)!`);
             setOpenDialog(false);
@@ -657,7 +655,7 @@ export default () => {
                                             <FormField control={form.control} name="status" render={({ field }) => (
                                                 <FormItem className="space-y-1">
                                                     <FormLabel className="text-[10px] font-bold uppercase text-slate-400 pl-1">Receiving Status <span className="text-destructive">*</span></FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                    <Select onValueChange={field.onChange} value={field.value || ""}>
                                                         <FormControl>
                                                             <SelectTrigger className="h-10 border-slate-200">
                                                                 <SelectValue placeholder="Select status" />

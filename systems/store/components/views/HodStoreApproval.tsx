@@ -11,7 +11,7 @@ import {
     type StoreInRecord,
 } from '@/services/storeInService';
 import { createTallyEntryRecord } from '@/services/tallyEntryService';
-import { insertFullkittingRecord } from '@/services/fullkittingService';
+import { insertFullkittingRecord, createFreightPaymentEntry } from '@/services/fullkittingService';
 import { useSheets } from '@/context/SheetsContext';
 
 import {
@@ -38,6 +38,7 @@ import { formatDateTime, parseCustomDate } from '@/lib/utils';
 import { Pill } from '../ui/pill';
 
 interface HodPendingData {
+    id?: number;
     liftNumber: string;
     indentNo: string;
     vendorName: string;
@@ -185,13 +186,14 @@ export default () => {
 
     useEffect(() => {
         const filteredByFirm = storeInRecords.filter((item) =>
-            user.firmNameMatch?.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
+            !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch
         );
 
         setPendingData(
             filteredByFirm
                 .filter((i) => i.plannedHod !== '' && i.actualHod === '')
                 .map((i) => ({
+                    id: i.id,
                     liftNumber: i.liftNumber || '',
                     indentNo: i.indentNo || '',
                     vendorName: i.vendorName || '',
@@ -237,7 +239,7 @@ export default () => {
                     amount: Number(i.amount) || 0,
                 }))
         );
-    }, [storeInRecords, user.firmNameMatch]);
+    }, [storeInRecords, user?.firmNameMatch]);
 
     async function onSubmit(values: FormValues) {
         if (!selectedItem || isSubmitting) return;
@@ -245,8 +247,8 @@ export default () => {
         setIsSubmitting(true);
         try {
             const currentDateTime = new Date().toISOString();
-
-            await updateStoreInHodApproval(selectedItem.liftNumber, {
+            const targetId = selectedItem.id || selectedItem.liftNumber;
+            await updateStoreInHodApproval(targetId, {
                 actualHod: currentDateTime,
                 hodStatus: 'Approved',
                 hodRemark: '',
@@ -258,6 +260,22 @@ export default () => {
                 driverMobileNo: values.driverMobileNo || '',
                 amount: values.amount || 0,
             });
+
+            // ✅ Create Freight Payment Entry if transportation is included
+            if (values.transportationInclude === 'Yes' && values.amount && values.amount > 0) {
+                console.log('🚚 Creating freight payment entry from Transporting Update...');
+                await createFreightPaymentEntry({
+                    indentNumber: selectedItem.indentNo || '',
+                    transporterName: values.transporterName || 'Freight Transporter',
+                    poNumber: selectedItem.poNumber || '',
+                    freightAmount: values.amount || 0,
+                    biltyImage: selectedItem.photoOfBill || '',
+                    productName: selectedItem.productName || '',
+                    firmNameMatch: selectedItem.firmNameMatch || '',
+                    biltyNumber: selectedItem.billNo || '',
+                    vehicleNumber: values.vehicleNo || '',
+                });
+            }
 
             // ✅ Create Payment Entry ONLY if transportation is not included
             const terms = (selectedItem.paymentTerms || '').toString().toLowerCase();

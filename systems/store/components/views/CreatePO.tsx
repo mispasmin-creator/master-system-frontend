@@ -328,7 +328,7 @@ const CreatePO = () => {
             return hasVendor &&
                 i.approvedVendorName !== '' &&
                 i.planned4 !== '' &&
-                i.actual4 === '' &&
+                (!i.actual4 || i.actual4 === '') &&
                 normalizedVendorName === normalizedSelectedVendor;
         });
         const firmName = matchingIndents[0]?.firmName?.trim();
@@ -818,9 +818,9 @@ const CreatePO = () => {
                     packagingAndForwarding: (v.packaging || 0) + (v.forwarding || 0),
                     pdf: url,
                     quotationNumber: v.quotationNumber || '',
-                    quotationDate: '',
+                    quotationDate: null,
                     enquiryNumber: values.ourEnqNo || '',
-                    enquiryDate: values.enquiryDate ? formatDateTime(values.enquiryDate) : '',
+                    enquiryDate: values.enquiryDate || null,
                     term1: values.terms[0],
                     term2: values.terms[1],
                     term3: values.terms[2],
@@ -833,7 +833,7 @@ const CreatePO = () => {
                     term10: values.terms[9],
                     discountPercent: v.discount || 0,
                     gstPercent: v.gst,
-                    deliveryDate: formatDateTime(values.deliveryDate),
+                    deliveryDate: values.deliveryDate,
                     paymentTerms: values.paymentTerms,
                     numberOfDays: values.numberOfDays || 0,
                     deliveryDays: values.deliveryDays || 0,

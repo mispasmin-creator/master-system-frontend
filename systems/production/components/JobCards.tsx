@@ -28,9 +28,9 @@ import { Checkbox } from "@/systems/production/components/ui/checkbox"
 
 // Type Definitions
 interface Order {
-  key: number
-  _rowIndex: number
-  costingResponseId: number
+  key: number | string
+  _rowIndex: number | string
+  costingResponseId: number | string
   productionId?: number | string
   deliveryOrderNo: string
   firmName: string
@@ -38,21 +38,22 @@ interface Order {
   productName: string
   orderQuantity: number
   expectedDeliveryDate: string
+  plannedDate?: string
   productRate?: number
   priority: string
   note: string
   totalMade?: number
   pending?: number
-  id?: number
+  id?: number | string
   orderCancel?: boolean
 }
 
 
 interface JobCard {
-  key: number
-  id: number
+  key: number | string
+  id: number | string
   productionId?: number | string
-  _rowIndex: number
+  _rowIndex: number | string
   jobCardNo: string
   firmName: string
   supervisorName: string
@@ -190,76 +191,118 @@ export default function JobCardsPage() {
         throw new Error("Failed to fetch one or more tables")
       }
 
+      // Build fast lookup of production orders by id
+      const orderById = new Map<string, any>()
+      ;(allProductionData || []).forEach((p: any) => {
+        if (p.id) orderById.set(String(p.id), p)
+      })
+
       // Process pending orders from Costing Response
-      // Logic: has Planned 2 date and missing Actual 3 date
-      const filteredRows = allCostingData.filter((row: any) => {
-        const status = String(row.Status || row["Status"] || "").trim().toLowerCase()
-        const isApproved = status === "management approved"
-        const emptyActual3 = !row["Actual 3"] || String(row["Actual 3"]).trim() === ""
-        return isApproved && emptyActual3
+      // Only include orders routed for Job Card (standard approval / passed sample test), skip Final Approved orders
+      const filteredRows = (allCostingData || []).filter((row: any) => {
+        const status = String(row.status || row.Status || row["Status"] || "").trim().toLowerCase()
+        const isApproved = status === "management approved" || status === "job card pending"
+        const isFinalApproved = status === "final approved" || status.includes("final")
+        const emptyActual3 = !row["Actual 3"] && !row.actual3
+        return isApproved && !isFinalApproved && emptyActual3
       })
 
       const findProductionRow = (deliveryOrderNo: string, partyName: string, productName: string) => {
         return findMatchingRow(
-          allProductionData,
+          allProductionData || [],
           deliveryOrderNo,
           productName,
-          (p: any) => String(p["Delivery Order No."] || ""),
-          (p: any) => String(p["Product Name"] || ""),
+          (p: any) => String(p.deliveryOrderNo || p["Delivery Order No."] || ""),
+          (p: any) => String(p.productName || p["Product Name"] || ""),
           partyName,
-          (p: any) => String(p["Party Name"] || "")
+          (p: any) => String(p.partyName || p["Party Name"] || "")
         );
       }
 
       const processedOrders: Order[] = filteredRows.map((row: any) => {
-        const deliveryOrderNo = String(row["Order No."] || "").trim()
-        const productName = String(row["product name"] || "").trim()
-        const partyName = String(row["Party Name"] || "").trim()
-        const prodRow = findProductionRow(deliveryOrderNo, partyName, productName)
-        const orderQty = prodRow ? Number(prodRow["Order Quantity"] || 0) : 0
+        const order = row.order || (row.orderId ? orderById.get(String(row.orderId)) : null) || findProductionRow(
+          String(row["Order No."] || row.orderNo || row.deliveryOrderNo || "").trim(),
+          String(row["Party Name"] || row.partyName || "").trim(),
+          String(row["product name"] || row.productName || "").trim()
+        ) || {}
+
+        const deliveryOrderNo = String(order.deliveryOrderNo || order["Delivery Order No."] || row["Order No."] || row.orderNo || row.deliveryOrderNo || "").trim()
+        const productName = String(order.productName || order["Product Name"] || row["product name"] || row.productName || "").trim()
+        const partyName = String(order.partyName || order["Party Name"] || row["Party Name"] || row.partyName || "").trim()
+        const firmName = String(order.firmName || order["Firm Name"] || row["Firm Name"] || row.firmName || "").trim()
+        const orderQty = Number(order.orderQuantity ?? order["Order Quantity"] ?? row["Order Quantity"] ?? 0)
+        const productionId = order.id || row.orderId || ""
 
         const normalizedDo = deliveryOrderNo.toLowerCase()
         const normalizedProduct = productName.toLowerCase()
         const normalizedParty = partyName.toLowerCase()
-        const matchingJobCards = allJobCardsData.filter((jc: any) => {
-          const jcDo = String(jc["Delivery Order No."] || "").trim().toLowerCase()
-          const jcProduct = String(jc["Product Name"] || "").trim().toLowerCase()
-          const jcParty = String(jc["Party Name"] || "").trim().toLowerCase()
-          const jcStatus = String(jc["Status"] || "active").toLowerCase()
-          return jcDo === normalizedDo && jcProduct === normalizedProduct && (!normalizedParty || jcParty === normalizedParty) && jcStatus !== "cancelled"
+
+        const matchingJobCards = (allJobCardsData || []).filter((jc: any) => {
+          const jcStatus = String(jc.status || jc["Status"] || "active").toLowerCase()
+          if (jcStatus === "cancelled") return false
+
+          if (productionId && jc.orderId && String(jc.orderId) === String(productionId)) {
+            return true
+          }
+
+          const jcDo = String(jc.order?.deliveryOrderNo || jc["Delivery Order No."] || jc.deliveryOrderNo || "").trim().toLowerCase()
+          const jcProduct = String(jc.order?.productName || jc["Product Name"] || jc.productName || "").trim().toLowerCase()
+          const jcParty = String(jc.order?.partyName || jc["Party Name"] || jc.partyName || "").trim().toLowerCase()
+
+          return (
+            Boolean(normalizedDo) &&
+            jcDo === normalizedDo &&
+            (!normalizedProduct || !jcProduct || jcProduct === normalizedProduct) &&
+            (!normalizedParty || !jcParty || jcParty === normalizedParty)
+          )
         })
+
         const rawTotalMadeSum = matchingJobCards.reduce(
-          (sum: number, jc: any) => sum + Number(jc["Total Made"] || jc["Quantity"] || 0),
+          (sum: number, jc: any) => sum + Number(jc.quantity || jc.totalMade || jc["Total Made"] || jc["Quantity"] || 0),
           0
         )
         const totalMadeSum = Number(rawTotalMadeSum.toFixed(2))
+        const pendingQty = Number((orderQty - totalMadeSum).toFixed(2))
 
-        const rawQuantitySum = matchingJobCards.reduce(
-          (sum: number, jc: any) => sum + Number(jc["Quantity"] || 0),
-          0
-        )
-        const quantitySum = Number(rawQuantitySum.toFixed(2))
-        const pendingQty = Number((orderQty - quantitySum).toFixed(2))
+        let expDateStr = ""
+        const rawExpDate = order.expectedDeliveryDate || order["Expected Delivery Date"]
+        if (rawExpDate) {
+          try {
+            expDateStr = format(new Date(rawExpDate), "dd/MM/yyyy")
+          } catch {
+            expDateStr = String(rawExpDate)
+          }
+        }
+
+        let plannedDateStr = ""
+        const rawPlannedDate = order.plannedDate || order["Planned Date"] || row["Planned 2"]
+        if (rawPlannedDate) {
+          try {
+            plannedDateStr = format(new Date(rawPlannedDate), "dd/MM/yyyy")
+          } catch {
+            plannedDateStr = String(rawPlannedDate)
+          }
+        }
 
         return {
           key: row.id,
           id: row.id,
-          productionId: prodRow?.id ?? "",
+          productionId,
           _rowIndex: row.id,
           costingResponseId: row.id,
           deliveryOrderNo,
-          firmName: prodRow ? String(prodRow["Firm Name"] || "") : "",
-          partyName: prodRow ? String(prodRow["Party Name"] || "") : "",
+          firmName,
+          partyName,
           productName,
           orderQuantity: orderQty,
-          expectedDeliveryDate: prodRow && prodRow["Expected Delivery Date"] ? format(new Date(prodRow["Expected Delivery Date"]), "dd/MM/yyyy") : "",
-          productRate: prodRow && prodRow["product_rate"] ? Number(prodRow["product_rate"]) : Number(row["SELLING PRICE"] || 0),
-          plannedDate: row["Planned 2"] ? format(new Date(row["Planned 2"]), "dd/MM/yy") : "",
-          priority: prodRow ? String(prodRow["Priority"] || "") : "",
+          expectedDeliveryDate: expDateStr,
+          productRate: Number(order.productRate ?? order["product_rate"] ?? row.sellingPrice ?? row["SELLING PRICE"] ?? 0),
+          plannedDate: plannedDateStr,
+          priority: String(order.priority || order["Priority"] || ""),
           totalMade: totalMadeSum,
           pending: pendingQty,
           note: "",
-          orderCancel: prodRow ? !!prodRow["Order Cancel"] : false,
+          orderCancel: Boolean(order.orderCancelled || order["Order Cancel"]),
         }
       }).filter((order: any) => {
         if (order.orderCancel) return false;
@@ -270,28 +313,26 @@ export default function JobCardsPage() {
         return true;
       })
 
-      // Process job cards history. GET /api/production/job-cards now includes
-      // the real `order` relation on each row (ProductionOrder), so we read
-      // firm/party/product/priority/expected-delivery straight off that
-      // instead of separately fetching + string-matching production rows.
-      const processedHistory: JobCard[] = allJobCardsData
+      // Process job cards history. GET /api/production/job-cards includes
+      // the real `order` relation on each row (ProductionOrder)
+      const processedHistory: JobCard[] = (allJobCardsData || [])
         .map((row: any) => {
           const prodDate = row.dateOfProduction ? new Date(row.dateOfProduction) : null
           const createdAt = row.createdAt ? new Date(row.createdAt) : null
-          const order = row.order || null
+          const order = row.order || (row.orderId ? orderById.get(String(row.orderId)) : null) || {}
 
           return {
             key: row.id,
             id: row.id,
-            productionId: order?.id ?? "",
+            productionId: order?.id ?? row.orderId ?? "",
             _rowIndex: row.id,
             jobCardNo: String(row.jobCardNo || ""),
-            firmName: String(order?.firmName || ""),
+            firmName: String(order?.firmName || row.firmName || ""),
             supervisorName: String(row.supervisorName || ""),
-            deliveryOrderNo: String(order?.deliveryOrderNo || ""),
-            partyName: String(order?.partyName || ""),
-            productName: String(order?.productName || ""),
-            orderQuantity: Number(row.quantity || 0),
+            deliveryOrderNo: String(order?.deliveryOrderNo || row.deliveryOrderNo || ""),
+            partyName: String(order?.partyName || row.partyName || ""),
+            productName: String(order?.productName || row.productName || ""),
+            orderQuantity: Number(order?.orderQuantity ?? row.quantity ?? 0),
             dateOfProduction: prodDate ? format(prodDate, "dd/MM/yyyy") : "",
             shift: String(row.shift || ""),
             totalMade: Number(row.quantity || 0),
@@ -304,7 +345,11 @@ export default function JobCardsPage() {
             status: String(row.status || "active").toLowerCase(),
           }
         })
-        .sort((a: any, b: any) => b.id - a.id)
+        .sort((a: any, b: any) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          return timeB - timeA || String(b.id || "").localeCompare(String(a.id || ""))
+        })
 
       // Filter by Firm
       const filterByFirm = (data: any[]) => filterDataByFirm(data, user, (item) => String(item.firmName || ""));
@@ -441,20 +486,31 @@ export default function JobCardsPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const getNextJobCardNumber = (firmName: string) => {
-    const normalizedFirmName = firmName.trim().toLowerCase()
+  const getNextJobCardNumber = (firmName?: string) => {
+    const normalizedFirmName = (firmName || "").trim().toLowerCase()
     const firmJobCards = historyJobCards.filter(
-      (card) => card.firmName.trim().toLowerCase() === normalizedFirmName
+      (card) => !normalizedFirmName || (card.firmName || "").trim().toLowerCase() === normalizedFirmName
     )
 
-    if (firmJobCards.length === 0) return 1
+    if (firmJobCards.length === 0) {
+      if (!normalizedFirmName && historyJobCards.length > 0) {
+        const allNumbers = historyJobCards
+          .map(card => {
+            const match = String(card.jobCardNo || "").match(/JC-(\d+)/i)
+            return match ? parseInt(match[1], 10) : 0
+          })
+          .filter(num => !isNaN(num) && num > 0)
+        return allNumbers.length > 0 ? Math.max(...allNumbers) + 1 : 1
+      }
+      return 1
+    }
     
     const numbers = firmJobCards
       .map(card => {
-        const match = card.jobCardNo.match(/JC-(\d+)/)
+        const match = String(card.jobCardNo || "").match(/JC-(\d+)/i)
         return match ? parseInt(match[1], 10) : 0
       })
-      .filter(num => !isNaN(num))
+      .filter(num => !isNaN(num) && num > 0)
     
     return numbers.length > 0 ? Math.max(...numbers) + 1 : 1
   }

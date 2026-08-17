@@ -216,17 +216,15 @@ export default function SFJobCardPage() {
 
             setProductionData(filterByFirm(patchedProductions).sort((a, b) => b._rowIndex - a._rowIndex));
 
-            const jobCards: SemiJobCardRecord[] = semiJobCardTable
-                .filter((row: any) => row.sjcSrNo && /^SJC-\d+/.test(row.sjcSrNo))
-                .map((row: any) => {
-                    const compositeKey = `${row.sfSrNo}::${String(row.productName || "").toLowerCase().trim()}`;
-                    return {
-                        ...row,
-                        firmName: productionFirmByNo.get(compositeKey) || productionFirmByNo.get(row.sfSrNo) || ""
-                    };
-                });
+            const jobCards: SemiJobCardRecord[] = semiJobCardTable.map((row: any) => {
+                const compositeKey = `${row.sfSrNo}::${String(row.productName || "").toLowerCase().trim()}`;
+                return {
+                    ...row,
+                    firmName: (row as any).semiOrder?.firmName || productionFirmByNo.get(compositeKey) || productionFirmByNo.get(row.sfSrNo) || ""
+                };
+            });
 
-            setJobCardData(filterByFirm(jobCards).sort((a, b) => b._rowIndex - a._rowIndex));
+            setJobCardData(filterByFirm(jobCards));
 
             // ── Process Master data for supervisors ──
             const supSet = new Set<string>();
@@ -255,7 +253,10 @@ export default function SFJobCardPage() {
     const getNextSJCNo = (): string => {
         if (jobCardData.length === 0) return 'SJC-381';
         const nums = jobCardData
-            .map(j => parseInt(j.sjcSrNo.replace('SJC-', ''), 10))
+            .map(j => {
+                const match = String(j.sjcSrNo || '').match(/\d+/);
+                return match ? parseInt(match[0], 10) : NaN;
+            })
             .filter(n => !isNaN(n));
         const max = nums.length > 0 ? Math.max(...nums) : 380;
         return `SJC-${max + 1}`;
@@ -288,8 +289,8 @@ export default function SFJobCardPage() {
                 semiOrderId: selectedProd._rowIndex,
                 supervisorName: formData.supervisorName,
                 qty: plannedQty,
-                dateOfProduction: toSupabaseDate(formData.dateOfProduction),
-                status: "",
+                dateOfProduction: formData.dateOfProduction ? new Date(formData.dateOfProduction).toISOString() : new Date().toISOString(),
+                status: "PENDING",
             });
 
             if (insertError) throw insertError;

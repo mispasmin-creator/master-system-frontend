@@ -2,7 +2,7 @@ import { storeApi } from '../lib/api';
 
 /**
  * Issue Service
- * Handles all Supabase operations for the Issue component
+ * Handles all database operations for the Issue component
  */
 
 // ==================== INTERFACES ====================
@@ -27,14 +27,12 @@ export interface IssueRecord {
 // ==================== FETCH FUNCTIONS ====================
 
 /**
- * Fetch all issue records from Supabase
+ * Fetch all issue records from database
  */
 export async function fetchIssueRecords(): Promise<IssueRecord[]> {
     try {
         const response = await storeApi.get('issue');
         const data = response.data;
-
-        
 
         return (data || []).map((r: any) => ({
             issue_no: r.issue_no || '',
@@ -75,12 +73,10 @@ export async function updateIssueApproval(
 ) {
     try {
         const response = await storeApi.patch('issue', issue_no, {
-                actual1: updateData.actual1,
-                status: updateData.status,
-                given_qty: updateData.given_qty,
-            });
-
-        
+            actual1: updateData.actual1,
+            status: updateData.status,
+            given_qty: updateData.given_qty !== undefined && updateData.given_qty !== null ? Number(updateData.given_qty) : null,
+        });
 
         return true;
     } catch (error) {
@@ -88,8 +84,9 @@ export async function updateIssueApproval(
         throw error;
     }
 }
+
 /**
- * Create new issue records in Supabase
+ * Create new issue records in database
  * @param rows - Array of issue records to insert
  */
 export async function createIssueRecords(rows: Partial<IssueRecord>[]) {
@@ -100,20 +97,19 @@ export async function createIssueRecords(rows: Partial<IssueRecord>[]) {
             issue_to: r.issue_to,
             uom: r.uom,
             product_name: r.product_name,
-            quantity: String(r.quantity),
+            quantity: Number(r.quantity) || 0,
             category: r.department,
             group_name: r.group_head,
             planned1: r.planned1,
             actual1: r.actual1,
             status: r.status || 'Pending',
-            given_qty: r.given_qty ? String(r.given_qty) : '0'
+            given_qty: r.given_qty !== undefined && r.given_qty !== null ? Number(r.given_qty) : 0,
+            location: r.location || '',
+            firm_name_match: r.firm_name_match || '',
         }));
 
         const response = await storeApi.post('issue', mappedRows);
-        const data = response.data;
-
-        
-        return data;
+        return response.data;
     } catch (error) {
         console.error('Error creating issue records:', error);
         throw error;

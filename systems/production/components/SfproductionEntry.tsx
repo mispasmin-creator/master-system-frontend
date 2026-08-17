@@ -121,27 +121,22 @@ const formatDisplayDate = (val: any): string => {
 };
 
 const isSJCPending = (record: SemiJobCardRecord): boolean => {
-    const hasPlanned = Boolean(record.planned && record.planned !== '' && record.planned !== 'null');
-    const hasActual = Boolean(record.actual && record.actual !== '' && record.actual !== 'null');
-    return hasPlanned && !hasActual;
+    if (!record) return false;
+    const status = String(record.status || '').toUpperCase().trim();
+    if (status === 'COMPLETED' || status === 'CANCELLED') return false;
+    if (record.pending !== undefined && record.pending !== null && Number(record.pending) <= 0) {
+        return false;
+    }
+    return true;
 };
 
-const uploadImageToStorage = async (file: File, fileName: string): Promise<string> => {
-    const extension = file.name.split('.').pop() || 'jpg';
-    const safeFileName = fileName.replace(/\.[^.]+$/, '');
-    const filePath = `${SEMI_FINISHED_FOLDER}/${safeFileName}.${extension}`;
-
-    const { error: uploadError } = await fetch(`${API_URL}/upload`, { method: "POST" }) // stub
-        .from(SEMI_FINISHED_BUCKET)
-        .upload(filePath, file, {
-            contentType: file.type || 'image/jpeg'
-        });
-
-    if (uploadError) throw uploadError;
-
-    const { data } = { data: { publicUrl: "" } }; // stub
-
-    return data.publicUrl;
+const uploadImageToStorage = async (file: File, _fileName?: string): Promise<string> => {
+    try {
+        return await productionApi.upload(file);
+    } catch (error) {
+        console.error('Error uploading image:', error);
+        throw error;
+    }
 };
 
 // ==================== MAIN COMPONENT ====================
@@ -251,27 +246,23 @@ export default function SemiActualProductionPage() {
                 });
             };
 
-            const jobCards: SemiJobCardRecord[] = sjcTable
-                .filter((row: any) => row.sjcSrNo && row.sjcSrNo.startsWith('SJC-'))
-                .map((row: any) => {
-                    const compositeKey = `${row.sfSrNo}::${String(row.productName || "").toLowerCase().trim()}`;
-                    return {
-                        ...row,
-                        firmName: productionFirmByNo.get(compositeKey) || productionFirmByNo.get(row.sfSrNo) || ""
-                    };
-                });
-            setJobCardData(filterByFirm(jobCards).sort((a, b) => b._rowIndex - a._rowIndex));
+            const jobCards: SemiJobCardRecord[] = sjcTable.map((row: any) => {
+                const compositeKey = `${row.sfSrNo}::${String(row.productName || "").toLowerCase().trim()}`;
+                return {
+                    ...row,
+                    firmName: (row as any).semiOrder?.firmName || productionFirmByNo.get(compositeKey) || productionFirmByNo.get(row.sfSrNo) || ""
+                };
+            });
+            setJobCardData(filterByFirm(jobCards));
 
-            const actuals: SemiActualRecord[] = actualTable
-                .filter((row: any) => row.sNo && row.sNo.startsWith('SA-'))
-                .map((row: any) => {
-                    const compositeKey = `${row.sfProductionNo}::${String(row.productName || "").toLowerCase().trim()}`;
-                    return {
-                        ...row,
-                        firmName: productionFirmByNo.get(compositeKey) || productionFirmByNo.get(row.sfProductionNo) || ""
-                    };
-                });
-            setSemiActualData(filterByFirm(actuals).sort((a, b) => b._rowIndex - a._rowIndex));
+            const actuals: SemiActualRecord[] = actualTable.map((row: any) => {
+                const compositeKey = `${row.sfProductionNo}::${String(row.productName || "").toLowerCase().trim()}`;
+                return {
+                    ...row,
+                    firmName: (row as any).semiJobCard?.semiOrder?.firmName || productionFirmByNo.get(compositeKey) || productionFirmByNo.get(row.sfProductionNo) || ""
+                };
+            });
+            setSemiActualData(filterByFirm(actuals));
 
             const rmSet = new Set<string>();
             masterTable.forEach((row: any) => {
@@ -284,7 +275,10 @@ export default function SemiActualProductionPage() {
 
             // Generate next SA serial
             const saNumbers = actuals
-                .map(a => parseInt(a.sNo.replace('SA-', ''), 10))
+                .map(a => {
+                    const match = String(a.sNo || '').match(/\d+/);
+                    return match ? parseInt(match[0], 10) : NaN;
+                })
                 .filter(n => !isNaN(n));
             const maxSA = saNumbers.length > 0 ? Math.max(...saNumbers) : 1000;
             setNextSerialNo(`SA-${maxSA + 1}`);

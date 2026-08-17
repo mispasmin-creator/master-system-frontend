@@ -203,30 +203,65 @@ export async function fetchMasterData() {
     }
 }
 
+function toSafeIsoString(val: any): string | null {
+    if (!val) return null;
+    if (val instanceof Date) {
+        return isNaN(val.getTime()) ? null : val.toISOString();
+    }
+    if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (!trimmed) return null;
+
+        // Try direct Date parse
+        const d = new Date(trimmed);
+        if (!isNaN(d.getTime())) return d.toISOString();
+
+        // Try "DD-MM-YYYY HH:mm:ss A" or "DD-MM-YYYY"
+        const match = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?(?:\s*(AM|PM))?)?$/i);
+        if (match) {
+            const day = parseInt(match[1], 10);
+            const month = parseInt(match[2], 10) - 1;
+            const year = parseInt(match[3], 10);
+            let hour = match[4] ? parseInt(match[4], 10) : 0;
+            const min = match[5] ? parseInt(match[5], 10) : 0;
+            const sec = match[6] ? parseInt(match[6], 10) : 0;
+            const ampm = match[7] ? match[7].toUpperCase() : null;
+
+            if (ampm === 'PM' && hour < 12) hour += 12;
+            if (ampm === 'AM' && hour === 12) hour = 0;
+
+            const parsed = new Date(Date.UTC(year, month, day, hour, min, sec));
+            if (!isNaN(parsed.getTime())) return parsed.toISOString();
+        }
+    }
+    return null;
+}
+
 /**
  * Insert new PO records
  */
 export async function insertPoRecords(poRecords: any[]) {
     try {
         const mappedRecords = poRecords.map((record) => ({
-            timestamp: record.timestamp,
             party_name: record.partyName || '',
             po_number: record.poNumber || '',
             internal_code: record.internalCode || '',
             product: record.product || '',
             description: record.description || '',
-            quantity: String(record.quantity || 0),
+            quantity: Number(record.quantity) || 0,
             unit: record.unit || '',
-            rate: String(record.rate || 0),
-            gst: String(record.gstPercent || record.gst || 0),
-            discount: String(record.discountPercent || record.discount || 0),
-            amount: String(record.amount || 0),
-            total_po_amount: String(record.totalPoAmount || 0),
+            rate: Number(record.rate) || 0,
+            gst: Number(record.gstPercent ?? record.gst) || 0,
+            gst_percent: Number(record.gstPercent ?? record.gst) || 0,
+            discount: Number(record.discountPercent ?? record.discount) || 0,
+            discount_percent: Number(record.discountPercent ?? record.discount) || 0,
+            amount: Number(record.amount) || 0,
+            total_po_amount: Number(record.totalPoAmount) || 0,
             pdf: record.pdf || '',
             quotation_number: record.quotationNumber || '',
-            quotation_date: record.quotationDate || '',
+            quotation_date: toSafeIsoString(record.quotationDate),
             enquiry_number: record.enquiryNumber || '',
-            enquiry_date: record.enquiryDate || '',
+            enquiry_date: toSafeIsoString(record.enquiryDate),
             term1: record.term1 || '',
             term2: record.term2 || '',
             term3: record.term3 || '',
@@ -237,17 +272,14 @@ export async function insertPoRecords(poRecords: any[]) {
             term8: record.term8 || '',
             term9: record.term9 || '',
             term10: record.term10 || '',
-            delivery_date: record.deliveryDate || '',
+            delivery_date: toSafeIsoString(record.deliveryDate),
             payment_terms: record.paymentTerms || '',
-            number_of_days: String(record.numberOfDays || 0),
-            delivery_days: String(record.deliveryDays || 0),
+            delivery_days: Number(record.deliveryDays) || 0,
             delivery_type: record.deliveryType || '',
             firm_name_match: record.firmNameMatch || '',
-            company_email: record.companyEmail || '',
-            advance_percent: record.advancePercent || 0,
-            advance_amount: record.advanceAmount || 0,
-            packaging: String(record.packaging || 0),
-            forwarding: String(record.forwarding || 0),
+            packaging: Number(record.packaging) || 0,
+            forwarding: Number(record.forwarding) || 0,
+            packaging_and_forwarding: (Number(record.packaging) || 0) + (Number(record.forwarding) || 0),
         }));
 
         const response = await storeApi.post('po_master', mappedRecords);
@@ -269,7 +301,6 @@ export async function updateIndentsAfterPoCreation(ids: number[], deliveryDate?:
             actual4: now,
             planned5: now,
         };
-        if (deliveryDate) updateData.delivery_date = deliveryDate;
         if (poNumber) updateData.po_number = poNumber;
         if (poCopy) updateData.po_copy = poCopy;
 

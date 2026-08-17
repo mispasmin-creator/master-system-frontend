@@ -49,7 +49,7 @@ export default function TallyEntry() {
             const records = await fetchTallyEntryRecords();
             // Filter by firm name
             const filteredByFirm = records.filter(item => {
-                return user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch;
+                return !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === "all" || item.firmNameMatch === user.firmNameMatch;
             });
             setAllData(filteredByFirm);
         } catch (error) {
@@ -62,7 +62,7 @@ export default function TallyEntry() {
 
     useEffect(() => {
         fetchData();
-    }, [user.firmNameMatch]);
+    }, [user?.firmNameMatch]);
 
     const pendingData = useMemo(() => {
         return allData.filter(i => i.planned4 && !i.actual4);

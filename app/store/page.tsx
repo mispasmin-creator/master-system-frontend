@@ -12,6 +12,9 @@ const IndentTrackerDashboard = dynamic(() => import('@/systems/store/components/
 const StoreIssue = dynamic(() => import('@/systems/store/components/views/StoreIssue'), { ssr: false });
 const IssueData = dynamic(() => import('@/systems/store/components/views/IssueData'), { ssr: false });
 const Inventory = dynamic(() => import('@/systems/store/components/views/Inventory'), { ssr: false });
+const StoreMaster = dynamic(() => import('@/systems/store/components/views/Master'), { ssr: false });
+const StoreReceived = dynamic(() => import('@/systems/store/components/views/Received'), { ssr: false });
+const StoreStock = dynamic(() => import('@/systems/store/components/views/Stock'), { ssr: false });
 const CreateIndent = dynamic(() => import('@/systems/store/components/views/CreateIndent'), { ssr: false });
 const ApproveIndent = dynamic(() => import('@/systems/store/components/views/ApproveIndent'), { ssr: false });
 const VendorUpdate = dynamic(() => import('@/systems/store/components/views/VendorUpdate'), { ssr: false });
@@ -38,6 +41,9 @@ const storeTabs = [
   { id: "store-issue", label: "Store Issue", path: "/store-issue" },
   { id: "issue-data", label: "Issue Data", path: "/Issue-data" },
   { id: "inventory", label: "Inventory", path: "/inventory" },
+  { id: "master", label: "Master", path: "/master" },
+  { id: "received", label: "Received", path: "/received" },
+  { id: "stock", label: "Stock", path: "/stock" },
   { id: "create-indent", label: "Create Indent", path: "/create-indent" },
   { id: "approve-indent", label: "Group Indent Approval", path: "/approve-indent" },
   { id: "vendor-rate-update", label: "Vendor Rate Update", path: "/vendor-rate-update" },
@@ -66,6 +72,9 @@ const renderStoreComponent = (tabId: string) => {
     case 'store-issue': return <StoreIssue />;
     case 'issue-data': return <IssueData />;
     case 'inventory': return <Inventory />;
+    case 'master': return <StoreMaster />;
+    case 'received': return <StoreReceived />;
+    case 'stock': return <StoreStock />;
     case 'create-indent': return <CreateIndent />;
     case 'approve-indent': return <ApproveIndent />;
     case 'vendor-rate-update': return <VendorUpdate />;

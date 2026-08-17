@@ -62,21 +62,29 @@ export const mapSemiProduction = (row: any) => ({
   reason: String(row.notes || ""),
 });
 
-export const mapSemiJobCard = (row: any) => ({
-  _rowIndex: row.id,
-  timestamp: toDisplayTimestamp(row.createdAt),
-  sjcSrNo: String(row.id || ""),
-  sfSrNo: String(row.semiOrderId || ""),
-  supervisorName: String(row.supervisorName || ""),
-  productName: String(row.semiOrder?.semiGoodName || ""),
-  qty: toNumber(row.qty),
-  dateOfProduction: toDisplayDate(row.dateOfProduction),
-  planned: toDisplayDate(row.createdAt),
-  actual: toDisplayDate(row.updatedAt),
-  actualMade: toNumber(row.actualMade),
-  pending: toNumber(row.pending ?? row.qty),
-  status: String(row.status || ""),
-});
+export const mapSemiJobCard = (row: any) => {
+  const actualRuns = Array.isArray(row.actualRuns) ? row.actualRuns : [];
+  const actualMade = actualRuns.reduce((sum: number, r: any) => sum + toNumber(r.qtyProduced), 0);
+  const qty = toNumber(row.qty);
+  const pending = Math.max(qty - actualMade, 0);
+
+  return {
+    _rowIndex: row.id,
+    timestamp: toDisplayTimestamp(row.createdAt),
+    sjcSrNo: String(row.id || ""),
+    sfSrNo: String(row.semiOrderId || ""),
+    supervisorName: String(row.supervisorName || ""),
+    productName: String(row.semiOrder?.semiGoodName || ""),
+    qty,
+    dateOfProduction: toDisplayDate(row.dateOfProduction),
+    planned: toDisplayDate(row.createdAt),
+    actual: actualMade > 0 ? toDisplayDate(row.updatedAt) : "",
+    actualMade,
+    pending,
+    status: String(row.status || (pending <= 0 ? "COMPLETED" : "PENDING")),
+    semiOrder: row.semiOrder,
+  };
+};
 
 export const mapSemiActual = (row: any) => {
   const mats = Array.isArray(row.materials) ? row.materials : [];
