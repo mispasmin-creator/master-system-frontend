@@ -2,21 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
 import { getStoredUser, getToken } from "@/lib/auth";
+import { parseUserPermissions } from "@/systems/core/config/systemRegistry";
 
 export const FIRM_MAP: Record<string, string> = {
   "Purab": "PURAB ORDER",
   "Pmmpl": "PMMPL ORDER",
   "Rkl": "RKL ORDER"
-};
-
-// Map rawUser.page_access string (e.g. "orders, job-cards") into an array of allowed steps
-const parsePagePermissions = (pageAccess: string | undefined | null) => {
-  if (!pageAccess) return [];
-  if (pageAccess === "all" || pageAccess === "super admin") return ["admin"];
-  return String(pageAccess)
-    .split(",")
-    .map((p) => p.trim().toLowerCase())
-    .filter(Boolean);
 };
 
 // Create context
@@ -27,6 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [allowedSteps, setAllowedSteps] = useState<string[]>([]);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [permissionParser, setPermissionParser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -34,12 +26,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = getToken();
 
     if (rawUser && token) {
-      const steps = parsePagePermissions(rawUser.page_access);
+      const parsed = parseUserPermissions(rawUser.page_access, rawUser.role);
+      const steps = parsed.isAdmin ? ["admin"] : parsed.allowedPages.map((p) => p.toLowerCase());
       
       // Construct pageAccess object for Production components that still expect it
       const pageAccessObj: Record<string, "view" | "full"> = {};
       steps.forEach(step => {
-        pageAccessObj[step] = "full"; // Defaulting to full, can enhance later
+        pageAccessObj[step] = parsed.isViewOnly ? "view" : "full";
       });
 
       const mappedUser = {
@@ -49,14 +42,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         permissions: steps,
         pageAccess: pageAccessObj,
         firm: rawUser.firm_name || "",
-        // Adding Purchase-like properties just in case
         firmName: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map((f: string) => f.trim()).filter(Boolean),
       };
 
       setUser(mappedUser);
       setAllowedSteps(steps);
-      setIsReadOnly(rawUser.page_access === "viewonly");
-      setIsSuperAdmin(rawUser.role === "admin" || rawUser.page_access === "super admin");
+      setIsReadOnly(parsed.isViewOnly);
+      setIsSuperAdmin(parsed.isAdmin);
+      setPermissionParser(() => parsed);
     }
     setIsLoading(false);
   }, []);
@@ -64,6 +57,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasPageFirmAccess = (pageName: string, firmName: string) => {
     if (!user) return false;
     if (isSuperAdmin || allowedSteps.includes("admin")) return true;
+    if (permissionParser) {
+      return permissionParser.hasPageAccess(pageName, firmName);
+    }
     const searchFirm = String(firmName || "").toLowerCase().trim();
     const firms = Array.isArray(user.firmName) ? user.firmName : [user.firmName];
     return firms.some((f: string) => String(f).toLowerCase().trim() === "all" || String(f).toLowerCase().trim() === searchFirm);

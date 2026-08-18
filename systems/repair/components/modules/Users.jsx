@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { repairApi } from '../../lib/api';
+import { ChevronDown, ChevronRight, Check } from 'lucide-react';
+import {
+  SYSTEM_REGISTRY,
+  ALL_FIRMS,
+  getVisiblePages,
+  buildAllSystemPermissions,
+} from '@/systems/core/config/systemRegistry';
 
-const REPAIR_PAGE_OPTIONS = [
-  { id: 'Repair_Dashboard', label: 'Dashboard' },
-  { id: 'Repair_Indent', label: 'Indent' },
-  { id: 'Repair_SentToVendor', label: 'Sent to Vendor' },
-  { id: 'Repair_CheckMachine', label: 'Check Machine' },
-  { id: 'Repair_StoreIn', label: 'Store In' },
-  { id: 'Repair_MakePayment', label: 'Make Payment' },
-  { id: 'Repair_Accounts', label: 'Accounts' },
-  { id: 'Repair_Users', label: 'User Management' }
-];
+const REPAIR_PAGE_OPTIONS = getVisiblePages("repair").map((p) => ({
+  id: p.key,
+  label: p.label,
+}));
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -88,16 +89,28 @@ export default function Users() {
     });
   };
 
+  const [expandedSystems, setExpandedSystems] = useState({});
+
+  const toggleSystemExpand = (sysKey) => {
+    setExpandedSystems((prev) => ({ ...prev, [sysKey]: !prev[sysKey] }));
+  };
+
   const handleSaveUser = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
+      let accessValue = formData.accessList.join(', ');
+      if (formData.role === 'admin') {
+        const { generatedPageFirms } = buildAllSystemPermissions(false);
+        accessValue = JSON.stringify(generatedPageFirms);
+      }
+
       const payload = {
         username: formData.username,
         password: formData.password,
         role: formData.role,
-        firmName: formData.firmName,
-        access: formData.accessList.join(', ')
+        firmName: formData.role === 'admin' ? 'all' : formData.firmName,
+        access: accessValue,
       };
 
       let res;
@@ -281,41 +294,92 @@ export default function Users() {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Firm Scoping</label>
-                  <select
-                    value={formData.firmName}
-                    onChange={(e) => setFormData({ ...formData, firmName: e.target.value })}
-                    className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                  >
-                    <option value="Pmmpl">PMMPL</option>
-                    <option value="Purab">Purab</option>
-                    <option value="Rkl">RKL</option>
-                    <option value="Refrasynth">Refrasynth</option>
-                    <option value="Refratech">Refratech</option>
-                    <option value="all">All Firms</option>
-                  </select>
-                </div>
+                {formData.role !== 'admin' && (
+                  <div>
+                    <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Firm Scoping</label>
+                    <select
+                      value={formData.firmName}
+                      onChange={(e) => setFormData({ ...formData, firmName: e.target.value })}
+                      className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
+                    >
+                      {ALL_FIRMS.map((f) => (
+                        <option key={f} value={f}>{f}</option>
+                      ))}
+                      <option value="all">All Firms</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Repair Page Access Permissions</label>
-                <div className="grid grid-cols-2 gap-2 bg-zinc-50 dark:bg-zinc-800/40 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                  {REPAIR_PAGE_OPTIONS.map((page) => {
-                    const checked = formData.accessList.includes(page.id);
-                    return (
-                      <label key={page.id} className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => togglePageAccess(page.id)}
-                          className="rounded text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span>{page.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+                {formData.role === 'admin' ? (
+                  <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 bg-zinc-50 dark:bg-zinc-800/40 space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-700 dark:text-zinc-300">
+                      <span className="font-semibold">Admin Mode: Full access across all 11 systems and 9 firms</span>
+                      <span className="text-[10px] font-mono text-zinc-500">All 9 Firms Included</span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                      {Object.entries(SYSTEM_REGISTRY).map(([sysKey, sysConfig]) => {
+                        const isExpanded = !!expandedSystems[sysKey];
+                        const visiblePages = getVisiblePages(sysKey);
+
+                        return (
+                          <div key={sysKey} className="border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleSystemExpand(sysKey)}
+                              className="w-full flex items-center justify-between p-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />}
+                                <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{sysConfig.label}</span>
+                                <span className="text-[10px] text-zinc-400">({visiblePages.length} pages)</span>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Full Access
+                              </span>
+                            </button>
+
+                            {isExpanded && (
+                              <div className="px-2.5 pb-2.5 pt-1 border-t border-zinc-100 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/50">
+                                <div className="grid grid-cols-2 gap-1">
+                                  {visiblePages.map((page) => (
+                                    <div
+                                      key={page.key}
+                                      className="flex items-center gap-1.5 p-1 rounded bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-[11px] text-zinc-600 dark:text-zinc-400"
+                                    >
+                                      <Check className="h-3 w-3 text-emerald-500 shrink-0" />
+                                      <span className="truncate">{page.label || page.key}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 bg-zinc-50 dark:bg-zinc-800/40 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
+                    {REPAIR_PAGE_OPTIONS.map((page) => {
+                      const checked = formData.accessList.includes(page.id);
+                      return (
+                        <label key={page.id} className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => togglePageAccess(page.id)}
+                            className="rounded text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span>{page.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">

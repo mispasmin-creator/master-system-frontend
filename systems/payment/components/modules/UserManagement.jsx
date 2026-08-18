@@ -2,11 +2,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { paymentApi } from '../../lib/api';
 import { 
   Users, Plus, Search, Edit2, Trash2, ShieldAlert, AlertCircle, 
-  CheckCircle2, Building2, Key, Shield, UserPlus, X, Check
+  CheckCircle2, Building2, Key, Shield, UserPlus, X, Check, ChevronDown, ChevronRight
 } from 'lucide-react';
+import {
+  SYSTEM_REGISTRY,
+  ALL_FIRMS,
+  getVisiblePages,
+  buildAllSystemPermissions,
+} from '@/systems/core/config/systemRegistry';
 
-const FIRM_OPTIONS = ["PMMPL", "PMM Logisol", "PMM Retail", "PMM Infra", "PMM Ventures"];
-const PAGE_OPTIONS = ["Dashboard", "Payment Creation", "Channel Funding", "Payment Approval", "Posting", "Make Payment", "User Management"];
+const FIRM_OPTIONS = ALL_FIRMS;
+const PAGE_OPTIONS = getVisiblePages("payment").map((p) => p.key);
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -114,6 +120,12 @@ export default function UserManagement() {
     }
   };
 
+  const [expandedSystems, setExpandedSystems] = useState({});
+
+  const toggleSystemExpand = (sysKey) => {
+    setExpandedSystems((prev) => ({ ...prev, [sysKey]: !prev[sysKey] }));
+  };
+
   const handleSaveUser = async (e) => {
     e.preventDefault();
     setError('');
@@ -142,13 +154,22 @@ export default function UserManagement() {
 
     try {
       setIsSubmitting(true);
+
+      let pagesValue;
+      if (role === 'Admin') {
+        const { generatedPageFirms } = buildAllSystemPermissions(false);
+        pagesValue = JSON.stringify(generatedPageFirms);
+      } else {
+        pagesValue = selectedPages.join(', ');
+      }
+
       const payload = {
         username: username.trim(),
         name: name.trim(),
         role: role,
         status: status,
-        firms: role === 'Admin' ? firmsList.join(', ') : selectedFirms.join(', '),
-        pages: role === 'Admin' ? PAGE_OPTIONS.join(', ') : selectedPages.join(', ')
+        firms: role === 'Admin' ? 'all' : selectedFirms.join(', '),
+        pages: pagesValue,
       };
 
       if (password) payload.password = password;
@@ -413,45 +434,98 @@ export default function UserManagement() {
               </div>
 
               {/* Firm Selection */}
-              <div>
-                <label className="block font-bold text-zinc-600 dark:text-zinc-400 mb-1">Assigned Firms</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-                  {firmsList.map((f, idx) => {
-                    const isChecked = selectedFirms.includes(f);
-                    return (
-                      <label key={idx} className="flex items-center gap-2 cursor-pointer text-zinc-700 dark:text-zinc-300 font-medium">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => toggleFirm(f)}
-                          className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span>{f}</span>
-                      </label>
-                    );
-                  })}
+              {role !== 'Admin' && (
+                <div>
+                  <label className="block font-bold text-zinc-600 dark:text-zinc-400 mb-1">Assigned Firms</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                    {firmsList.map((f, idx) => {
+                      const isChecked = selectedFirms.includes(f);
+                      return (
+                        <label key={idx} className="flex items-center gap-2 cursor-pointer text-zinc-700 dark:text-zinc-300 font-medium text-xs">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleFirm(f)}
+                            className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span>{f}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Page Access Selection */}
               <div>
                 <label className="block font-bold text-zinc-600 dark:text-zinc-400 mb-1">Permitted Pages</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-                  {PAGE_OPTIONS.map((p, idx) => {
-                    const isChecked = selectedPages.includes(p);
-                    return (
-                      <label key={idx} className="flex items-center gap-2 cursor-pointer text-zinc-700 dark:text-zinc-300 font-medium">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => togglePage(p)}
-                          className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span>{p}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+                {role === 'Admin' ? (
+                  <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 bg-zinc-50 dark:bg-zinc-950 space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-xs text-zinc-700 dark:text-zinc-300">
+                      <span className="font-semibold">Admin Mode: Full access across all 11 systems and 9 firms</span>
+                      <span className="text-[10px] font-mono text-zinc-500">All 9 Firms Included</span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar">
+                      {Object.entries(SYSTEM_REGISTRY).map(([sysKey, sysConfig]) => {
+                        const isExpanded = !!expandedSystems[sysKey];
+                        const visiblePages = getVisiblePages(sysKey);
+
+                        return (
+                          <div key={sysKey} className="border border-zinc-200 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleSystemExpand(sysKey)}
+                              className="w-full flex items-center justify-between p-2.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-zinc-500" /> : <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />}
+                                <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{sysConfig.label}</span>
+                                <span className="text-[10px] text-zinc-400">({visiblePages.length} pages)</span>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Full Access
+                              </span>
+                            </button>
+
+                            {isExpanded && (
+                              <div className="px-3 pb-3 pt-1 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50">
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  {visiblePages.map((page) => (
+                                    <div
+                                      key={page.key}
+                                      className="flex items-center gap-1.5 p-1 rounded bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 text-[11px] text-zinc-600 dark:text-zinc-400"
+                                    >
+                                      <Check className="h-3 w-3 text-emerald-500 shrink-0" />
+                                      <span className="truncate">{page.label || page.key}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+                    {PAGE_OPTIONS.map((p, idx) => {
+                      const isChecked = selectedPages.includes(p);
+                      return (
+                        <label key={idx} className="flex items-center gap-2 cursor-pointer text-zinc-700 dark:text-zinc-300 font-medium text-xs">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => togglePage(p)}
+                            className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span>{p}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">

@@ -7,13 +7,22 @@ import {
   Eye,
   EyeOff,
   UserPlus,
-  Users
+  Users,
+  ChevronDown,
+  ChevronRight,
+  Check
 } from 'lucide-react';
 import { useApp, ROLES } from '../../context/AppContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { cn, parseMultiValue, hasPageAccess } from '../../lib/utils';
 import { API_URL, getToken } from '@/lib/auth';
+import {
+  SYSTEM_REGISTRY,
+  ALL_FIRMS,
+  getVisiblePages,
+  buildAllSystemPermissions,
+} from '@/systems/core/config/systemRegistry';
 
 const PAGE_ACCESS_OPTIONS = [
   { value: ROLES.ADMIN, label: 'Admin (All actions)' },
@@ -78,7 +87,10 @@ export const SettingsModule = () => {
       firm_name: user.firm_name || ''
     });
     setModalError('');
-    setShowModal(true);
+  const [expandedSystems, setExpandedSystems] = useState({});
+
+  const toggleSystemExpand = (sysKey) => {
+    setExpandedSystems((prev) => ({ ...prev, [sysKey]: !prev[sysKey] }));
   };
 
   const handleSaveUser = async (e) => {
@@ -101,13 +113,27 @@ export const SettingsModule = () => {
       const method = editingUser ? 'PUT' : 'POST';
       const url = editingUser ? `${API_URL}/users/manage/${editingUser.id}` : `${API_URL}/users/manage`;
 
+      let pageAccessValue = formUser.page_access;
+      const isAdminRole = (Array.isArray(formUser.role) ? formUser.role : [formUser.role]).includes(ROLES.ADMIN);
+      if (isAdminRole) {
+        const { generatedPageFirms } = buildAllSystemPermissions(false);
+        pageAccessValue = JSON.stringify(generatedPageFirms);
+      }
+
+      const payload = {
+        ...formUser,
+        username: uName,
+        page_access: pageAccessValue,
+        firm_name: isAdminRole ? 'all' : (Array.isArray(formUser.firm_name) ? formUser.firm_name.join(', ') : formUser.firm_name),
+      };
+
       const res = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify(formUser),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -368,43 +394,96 @@ export const SettingsModule = () => {
                     </label>
                   ))}
                 </div>
+
+                {formUser.role.includes(ROLES.ADMIN) && (
+                  <div className="mt-2 border border-slate-200 dark:border-slate-800 rounded-xl p-3 bg-slate-50 dark:bg-slate-900 space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-700 dark:text-slate-300">
+                      <span className="font-semibold">Admin Mode: Full access across all 11 systems and 9 firms</span>
+                      <span className="text-[10px] font-mono text-slate-500">All 9 Firms Included</span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                      {Object.entries(SYSTEM_REGISTRY).map(([sysKey, sysConfig]) => {
+                        const isExpanded = !!expandedSystems[sysKey];
+                        const visiblePages = getVisiblePages(sysKey);
+
+                        return (
+                          <div key={sysKey} className="border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleSystemExpand(sysKey)}
+                              className="w-full flex items-center justify-between p-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? <ChevronDown className="h-3 w-3 text-slate-400" /> : <ChevronRight className="h-3 w-3 text-slate-400" />}
+                                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{sysConfig.label}</span>
+                                <span className="text-[10px] text-slate-400">({visiblePages.length} pages)</span>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Full Access
+                              </span>
+                            </button>
+
+                            {isExpanded && (
+                              <div className="px-2.5 pb-2.5 pt-1 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                                <div className="grid grid-cols-2 gap-1">
+                                  {visiblePages.map((page) => (
+                                    <div
+                                      key={page.key}
+                                      className="flex items-center gap-1.5 p-1 rounded bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-400"
+                                    >
+                                      <Check className="h-3 w-3 text-emerald-500 shrink-0" />
+                                      <span className="truncate">{page.label || page.key}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-navy-600 dark:text-slate-navy-400">
-                  Firm Name
-                </label>
-                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-navy-200 bg-white p-3 dark:border-slate-navy-800 dark:bg-slate-navy-900">
-                  <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold text-slate-navy-700 hover:bg-slate-50 dark:text-slate-navy-300 dark:hover:bg-slate-navy-800">
-                    <input
-                      type="checkbox"
-                      checked={formUser.firm_name.length === 0}
-                      onChange={() => setFormUser({ ...formUser, firm_name: [] })}
-                      className="h-4 w-4 rounded border-slate-navy-300 text-brand-600 focus:ring-brand-500"
-                    />
-                    <span>No Firm Assignment</span>
+              {!formUser.role.includes(ROLES.ADMIN) && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-navy-600 dark:text-slate-navy-400">
+                    Firm Name
                   </label>
-                  {firms.map(f => (
-                    <label
-                      key={f}
-                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold text-slate-navy-700 hover:bg-slate-50 dark:text-slate-navy-300 dark:hover:bg-slate-navy-800"
-                    >
+                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-slate-navy-200 bg-white p-3 dark:border-slate-navy-800 dark:bg-slate-navy-900">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold text-slate-navy-700 hover:bg-slate-50 dark:text-slate-navy-300 dark:hover:bg-slate-navy-800">
                       <input
                         type="checkbox"
-                        checked={formUser.firm_name.includes(f)}
-                        onChange={() => setFormUser({
-                          ...formUser,
-                          firm_name: formUser.firm_name.includes(f)
-                            ? formUser.firm_name.filter(value => value !== f)
-                            : [...formUser.firm_name, f]
-                        })}
+                        checked={formUser.firm_name.length === 0}
+                        onChange={() => setFormUser({ ...formUser, firm_name: [] })}
                         className="h-4 w-4 rounded border-slate-navy-300 text-brand-600 focus:ring-brand-500"
                       />
-                      <span>{f}</span>
+                      <span>No Firm Assignment</span>
                     </label>
-                  ))}
+                    {ALL_FIRMS.map(f => (
+                      <label
+                        key={f}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-semibold text-slate-navy-700 hover:bg-slate-50 dark:text-slate-navy-300 dark:hover:bg-slate-navy-800"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formUser.firm_name.includes(f)}
+                          onChange={() => setFormUser({
+                            ...formUser,
+                            firm_name: formUser.firm_name.includes(f)
+                              ? formUser.firm_name.filter(value => value !== f)
+                              : [...formUser.firm_name, f]
+                          })}
+                          className="h-4 w-4 rounded border-slate-navy-300 text-brand-600 focus:ring-brand-500"
+                        />
+                        <span>{f}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex gap-3 justify-end pt-3 border-t dark:border-slate-navy-800">
                 <Button 

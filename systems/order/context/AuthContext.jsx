@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect } from "react";
 import { getStoredUser, getToken } from "@/lib/auth";
+import { parseUserPermissions } from "@/systems/core/config/systemRegistry";
 
 export const AuthContext = createContext(undefined);
 
@@ -9,34 +10,28 @@ export function AuthProvider({ children }) {
   const [allowedSteps, setAllowedSteps] = useState([]);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [permissionParser, setPermissionParser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const rawUser = getStoredUser();
     const token = getToken();
     if (rawUser && token) {
-      // Map properties to fit Order System requirements — identical shape to
-      // systems/purchase/context/AuthContext.jsx since both read the same
-      // shared `login` table payload.
+      const parsed = parseUserPermissions(rawUser.page_access, rawUser.role);
+
       const mappedUser = {
         username: rawUser.username,
         firmName: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map(f => f.trim()).filter(Boolean),
         globalFirms: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map(f => f.trim()).filter(Boolean),
-        isReadOnly: rawUser.page_access === "viewonly",
-        isSuperAdmin: rawUser.role === "admin" || rawUser.page_access === "super admin"
+        isReadOnly: parsed.isViewOnly,
+        isSuperAdmin: parsed.isAdmin
       };
 
-      let steps = [];
-      if (rawUser.page_access === "all" || rawUser.page_access === "super admin" || rawUser.role === "admin") {
-        steps = ["admin"];
-      } else if (rawUser.page_access) {
-        steps = rawUser.page_access.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-      }
-
       setUser(mappedUser);
-      setAllowedSteps(steps);
-      setIsReadOnly(rawUser.page_access === "viewonly");
-      setIsSuperAdmin(rawUser.role === "admin" || rawUser.page_access === "super admin");
+      setAllowedSteps(parsed.isAdmin ? ["admin"] : parsed.allowedPages.map(p => p.toLowerCase()));
+      setIsReadOnly(parsed.isViewOnly);
+      setIsSuperAdmin(parsed.isAdmin);
+      setPermissionParser(() => parsed);
     }
     setIsLoading(false);
   }, []);
@@ -44,6 +39,9 @@ export function AuthProvider({ children }) {
   const hasPageFirmAccess = (pageName, firmName) => {
     if (!user) return false;
     if (isSuperAdmin || allowedSteps.includes("admin")) return true;
+    if (permissionParser) {
+      return permissionParser.hasPageAccess(pageName, firmName);
+    }
     const searchFirm = String(firmName || "").toLowerCase().trim();
     const firms = Array.isArray(user.firmName) ? user.firmName : [user.firmName];
     return firms.some(f => String(f).toLowerCase().trim() === "all" || String(f).toLowerCase().trim() === searchFirm);

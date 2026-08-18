@@ -1,22 +1,80 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { API_URL, getToken, AuthUser as LoginUser } from "@/lib/auth";
+import { API_URL, getToken } from "@/lib/auth";
+import {
+  SYSTEM_REGISTRY,
+  ALL_FIRMS,
+  getVisiblePages,
+  buildAllSystemPermissions,
+} from "@/systems/core/config/systemRegistry";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import {
+  Users,
+  UserPlus,
+  CheckCircle2,
+  AlertCircle,
+  Search,
+  X,
+  Filter,
+  ChevronDown,
+  Loader2,
+  Shield,
+  Building2,
+  Edit2,
+  Trash2,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+/* ─── Interfaces ─── */
+export interface UserItem {
+  id?: number;
+  Username?: string;
+  Role?: string;
+  "Firm Name"?: string;
+  "Page Access"?: string;
+  Password?: string;
+  Page?: string;
+}
 
 /* ─── Constants ─── */
-const FIRM_OPTIONS = ["Pmmpl", "Rkl", "Purab", "Refrasynth", "Refratech"];
+const FIRM_OPTIONS = ALL_FIRMS;
 const ROLE_OPTIONS = ["Admin", "User", "Viewer"];
 
-const ALL_PAGES = [
-  { key: "Dashboard", label: "Dashboard", icon: "📊" },
-  { key: "Account Checking", label: "Account Checking", icon: "📦" },
-  { key: "Account Audit", label: "Account Audit", icon: "📄" },
-  { key: "Posting", label: "Posting", icon: "💰" },
-  { key: "Freight", label: "Freight Payments", icon: "🚚" },
-  { key: "Users", label: "User Management", icon: "👥" },
-];
+const ALL_PAGES = getVisiblePages("freight-payment").map((p) => ({
+  key: p.key,
+  label: p.label,
+  icon: "📄",
+}));
 
 /* ─── Helper ─── */
-const getRoleBadgeClass = (role: string) => {
+const getRoleBadgeClass = (role?: string) => {
   const r = role?.toLowerCase();
   if (r === "admin") return "bg-amber-50 text-amber-700 border-amber-200/50";
   if (r === "viewer") return "bg-slate-50 text-slate-600 border-slate-200/50";
@@ -27,15 +85,15 @@ const getRoleBadgeClass = (role: string) => {
 export function UserManagement() {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<any | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<UserItem | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [firmFilter, setFirmFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
 
-  const { data: users = [], isLoading, error, refetch } = useQuery({
+  const { data: users = [], isLoading, error, refetch } = useQuery<UserItem[]>({
     queryKey: ["login-users"],
     queryFn: async () => {
       const res = await fetch(`${API_URL}/users/manage`, {
@@ -83,16 +141,16 @@ export function UserManagement() {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
-        (u) =>
+        (u: UserItem) =>
           u.Username?.toLowerCase().includes(term) ||
           u["Firm Name"]?.toLowerCase().includes(term)
       );
     }
     if (roleFilter !== "all") {
-      filtered = filtered.filter((u) => u.Role?.toLowerCase() === roleFilter.toLowerCase());
+      filtered = filtered.filter((u: UserItem) => u.Role?.toLowerCase() === roleFilter.toLowerCase());
     }
     if (firmFilter !== "all") {
-      filtered = filtered.filter((u) => u["Firm Name"] === firmFilter);
+      filtered = filtered.filter((u: UserItem) => u["Firm Name"] === firmFilter);
     }
     return filtered;
   }, [users, searchTerm, roleFilter, firmFilter]);
@@ -102,12 +160,12 @@ export function UserManagement() {
     setIsFormOpen(true);
   };
 
-  const handleEdit = (user: LoginUser) => {
+  const handleEdit = (user: UserItem) => {
     setEditingUser(user);
     setIsFormOpen(true);
   };
 
-  const handleDeleteClick = (user: LoginUser) => {
+  const handleDeleteClick = (user: UserItem) => {
     setDeleteConfirm(user);
   };
 
@@ -175,7 +233,7 @@ export function UserManagement() {
             <Input
               placeholder="Search by username or firm..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
               className="pl-9 h-10 bg-white border-slate-200 rounded-xl text-sm"
             />
             {searchTerm && (
@@ -216,7 +274,7 @@ export function UserManagement() {
               <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
                 Role
               </Label>
-              <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value || "all")}>
+              <Select value={roleFilter} onValueChange={(value: string) => setRoleFilter(value || "all")}>
                 <SelectTrigger className="h-9 bg-slate-50 border-slate-200 rounded-lg text-sm">
                   <SelectValue placeholder="All roles" />
                 </SelectTrigger>
@@ -234,7 +292,7 @@ export function UserManagement() {
               <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
                 Firm
               </Label>
-              <Select value={firmFilter} onValueChange={(value) => setFirmFilter(value || "all")}>
+              <Select value={firmFilter} onValueChange={(value: string) => setFirmFilter(value || "all")}>
                 <SelectTrigger className="h-9 bg-slate-50 border-slate-200 rounded-lg text-sm">
                   <SelectValue placeholder="All firms" />
                 </SelectTrigger>
@@ -303,7 +361,7 @@ export function UserManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((u) => (
+                {filteredUsers.map((u: UserItem) => (
                   <TableRow key={u.id} className="border-b border-slate-50 table-row-hover group">
                     <TableCell className="py-3.5 pl-6">
                       <div className="flex items-center gap-3">
@@ -337,7 +395,7 @@ export function UserManagement() {
                     </TableCell>
                     <TableCell className="py-3.5">
                       <div className="flex flex-wrap gap-1 max-w-[300px]">
-                        {((u as any)["Page Access"] || "")
+                        {(u["Page Access"] || "")
                           .split(",")
                           .filter(Boolean)
                           .map((page: string, i: number) => (
@@ -348,7 +406,7 @@ export function UserManagement() {
                               {page.trim()}
                             </span>
                           ))}
-                        {!(u as any)["Page Access"] && <span className="text-[10px] text-slate-300">No access</span>}
+                        {!u["Page Access"] && <span className="text-[10px] text-slate-300">No access</span>}
                       </div>
                     </TableCell>
                     <TableCell className="text-right py-3.5 pr-6">
@@ -420,7 +478,7 @@ export function UserManagement() {
             <Button
               className="rounded-lg text-xs h-9 flex-1 bg-rose-600 hover:bg-rose-700 text-white"
               disabled={deleteMutation.isPending}
-              onClick={() => deleteConfirm !== null && deleteMutation.mutate(deleteConfirm.id!)}
+              onClick={() => deleteConfirm !== null && deleteConfirm.id !== undefined && deleteMutation.mutate(deleteConfirm.id)}
             >
               {deleteMutation.isPending ? (
                 <>
@@ -445,12 +503,12 @@ export function UserManagement() {
 interface UserFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user: LoginUser | null;
+  user: UserItem | null;
   onSuccess: (msg: string) => void;
 }
 
 function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogProps) {
-  const [formData, setFormData] = useState<Partial<LoginUser>>({});
+  const [formData, setFormData] = useState<Partial<UserItem>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -462,7 +520,7 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
     if (open) {
       if (user) {
         setFormData(user);
-        setSelectedPages(((user as any)["Page Access"] || "").split(",").map((s: string) => s.trim()).filter(Boolean));
+        setSelectedPages((user["Page Access"] || "").split(",").map((s: string) => s.trim()).filter(Boolean));
       } else {
         setFormData({ Role: "User" });
         setSelectedPages([]);
@@ -474,16 +532,16 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
   }, [open, user]);
 
   const createMutation = useMutation({
-    mutationFn: async (data: Partial<LoginUser>) => {
+    mutationFn: async (data: Partial<UserItem>) => {
       const res = await fetch(`${API_URL}/users/manage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({
-          username: (data as any).Username,
-          password: (data as any).Password,
-          role: (data as any).Role || 'User',
-          firm_name: (data as any)["Firm Name"] || '',
-          page_access: (data as any).Page || '',
+          username: data.Username,
+          password: data.Password,
+          role: data.Role || 'User',
+          firm_name: data["Firm Name"] || '',
+          page_access: data.Page || '',
         }),
       });
       const json = await res.json();
@@ -500,16 +558,16 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: Partial<LoginUser>) => {
+    mutationFn: async (data: Partial<UserItem>) => {
       const res = await fetch(`${API_URL}/users/manage/${user!.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({
-          username: (data as any).Username,
-          ...(((data as any).Password) && { password: (data as any).Password }),
-          role: (data as any).Role || 'User',
-          firm_name: (data as any)["Firm Name"] || '',
-          page_access: (data as any).Page || '',
+          username: data.Username,
+          ...(data.Password && { password: data.Password }),
+          role: data.Role || 'User',
+          firm_name: data["Firm Name"] || '',
+          page_access: data.Page || '',
         }),
       });
       const json = await res.json();
@@ -528,8 +586,11 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!formData.Username?.trim()) newErrors.username = "Username is required";
-    if (!formData.Password?.trim()) newErrors.password = "Password is required";
-    else if (formData.Password.length < 4) newErrors.password = "Password must be at least 4 characters";
+    if (!user && !formData.Password?.trim()) {
+      newErrors.password = "Password is required";
+    } else if (formData.Password && formData.Password.length < 4) {
+      newErrors.password = "Password must be at least 4 characters";
+    }
     if (!formData.Role) newErrors.role = "Role is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -553,13 +614,26 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
     }
   };
 
+  const [expandedSystems, setExpandedSystems] = useState<Record<string, boolean>>({});
+
+  const toggleSystemExpand = (sysKey: string) => {
+    setExpandedSystems((prev) => ({ ...prev, [sysKey]: !prev[sysKey] }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
-    const submitData: Partial<LoginUser> = {
+    let pagePayload = selectedPages.join(",");
+    if (formData.Role === "Admin" || formData.Role === "Viewer") {
+      const { generatedPageFirms } = buildAllSystemPermissions(formData.Role === "Viewer");
+      pagePayload = JSON.stringify(generatedPageFirms);
+    }
+
+    const submitData: Partial<UserItem> = {
       ...formData,
-      Page: selectedPages.join(","),
+      Page: pagePayload,
+      "Firm Name": (formData.Role === "Admin" || formData.Role === "Viewer") ? "all" : (formData["Firm Name"] || ""),
     };
 
     if (user) {
@@ -605,7 +679,7 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
                   touched.username && errors.username && "border-rose-300 focus:ring-rose-500"
                 )}
                 value={formData.Username || ""}
-                onChange={(e) => setFormData({ ...formData, Username: e.target.value })}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, Username: e.target.value })}
                 onBlur={() => handleBlur("username")}
                 placeholder="Enter username"
               />
@@ -627,7 +701,7 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
                     touched.password && errors.password && "border-rose-300 focus:ring-rose-500"
                   )}
                   value={formData.Password || ""}
-                  onChange={(e) => setFormData({ ...formData, Password: e.target.value })}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, Password: e.target.value })}
                   onBlur={() => handleBlur("password")}
                   placeholder={user ? "Leave blank to keep current" : "Enter password"}
                 />
@@ -654,7 +728,7 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
               </Label>
               <Select
                 value={formData.Role || "User"}
-                onValueChange={(v) => {
+                onValueChange={(v: string) => {
                   setFormData({ ...formData, Role: String(v) });
                   setErrors((prev) => ({ ...prev, role: "" }));
                 }}
@@ -679,30 +753,32 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
             </div>
 
             {/* Firm Name */}
-            <div className="space-y-1.5">
-              <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Firm Name
-              </Label>
-              <Select
-                value={formData["Firm Name"] || "none"}
-                onValueChange={(v) => {
-                  const firm = String(v);
-                  setFormData({ ...formData, "Firm Name": firm === "none" ? "" : firm });
-                }}
-              >
-                <SelectTrigger className="h-10 bg-white border-slate-200 rounded-lg text-sm">
-                  <SelectValue placeholder="Select firm (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {FIRM_OPTIONS.map((f) => (
-                    <SelectItem key={f} value={f}>
-                      {f}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {formData.Role !== "Admin" && formData.Role !== "Viewer" && (
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Firm Name
+                </Label>
+                <Select
+                  value={formData["Firm Name"] || "none"}
+                  onValueChange={(v: string) => {
+                    const firm = String(v);
+                    setFormData({ ...formData, "Firm Name": firm === "none" ? "" : firm });
+                  }}
+                >
+                  <SelectTrigger className="h-10 bg-white border-slate-200 rounded-lg text-sm">
+                    <SelectValue placeholder="Select firm (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {FIRM_OPTIONS.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Page Access */}
             <div className="space-y-2">
@@ -710,52 +786,109 @@ function UserFormDialog({ open, onOpenChange, user, onSuccess }: UserFormDialogP
                 <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Page Access
                 </Label>
-                <button
-                  type="button"
-                  onClick={selectAllPages}
-                  className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-wider"
-                >
-                  {selectedPages.length === ALL_PAGES.length ? "Deselect All" : "Select All"}
-                </button>
+                {formData.Role !== "Admin" && formData.Role !== "Viewer" && (
+                  <button
+                    type="button"
+                    onClick={selectAllPages}
+                    className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-wider"
+                  >
+                    {selectedPages.length === ALL_PAGES.length ? "Deselect All" : "Select All"}
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                {ALL_PAGES.map((page) => {
-                  const isSelected = selectedPages.includes(page.key);
-                  return (
-                    <button
-                      key={page.key}
-                      type="button"
-                      onClick={() => togglePage(page.key)}
-                      className={cn(
-                        "flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all",
-                        isSelected
-                          ? "bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
-                          : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
-                      )}
-                    >
-                      <div
+
+              {formData.Role === "Admin" || formData.Role === "Viewer" ? (
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2">
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700">
+                    <span className="font-semibold">
+                      {formData.Role === "Viewer"
+                        ? "Viewer Mode: Read-only access across all 11 systems and 9 firms"
+                        : "Admin Mode: Full access across all 11 systems and 9 firms"}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">All 9 Firms Included</span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {Object.entries(SYSTEM_REGISTRY).map(([sysKey, sysConfig]) => {
+                      const isExpanded = !!expandedSystems[sysKey];
+                      const visiblePages = getVisiblePages(sysKey);
+
+                      return (
+                        <div key={sysKey} className="border border-slate-200 rounded-lg bg-white overflow-hidden shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => toggleSystemExpand(sysKey)}
+                            className="w-full flex items-center justify-between p-2.5 hover:bg-slate-50 transition-colors text-left"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-800">{sysConfig.label}</span>
+                              <span className="text-[10px] text-slate-400">({visiblePages.length} pages)</span>
+                            </div>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {formData.Role === "Viewer" ? "View Granted" : "Full Access"}
+                            </span>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="px-3 pb-3 pt-1 border-t border-slate-100 bg-slate-50/60">
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {visiblePages.map((page) => (
+                                  <div
+                                    key={page.key}
+                                    className="flex items-center gap-1.5 p-1 rounded bg-white border border-slate-100 text-[11px] text-slate-600"
+                                  >
+                                    <span className="text-emerald-500 font-bold">✓</span>
+                                    <span className="truncate">{page.label || page.key}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {ALL_PAGES.map((page) => {
+                    const isSelected = selectedPages.includes(page.key);
+                    return (
+                      <button
+                        key={page.key}
+                        type="button"
+                        onClick={() => togglePage(page.key)}
                         className={cn(
-                          "w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all",
-                          isSelected ? "bg-blue-600 border-blue-600" : "border-slate-300"
+                          "flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all",
+                          isSelected
+                            ? "bg-blue-50 border-blue-200 text-blue-700 shadow-sm"
+                            : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
                         )}
                       >
-                        {isSelected && (
-                          <svg
-                            className="w-2.5 h-2.5 text-white"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className="truncate">{page.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                        <div
+                          className={cn(
+                            "w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all",
+                            isSelected ? "bg-blue-600 border-blue-600" : "border-slate-300"
+                          )}
+                        >
+                          {isSelected && (
+                            <svg
+                              className="w-2.5 h-2.5 text-white"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              strokeWidth={3}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        <span className="truncate">{page.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

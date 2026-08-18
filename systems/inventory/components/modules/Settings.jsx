@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryApi } from '../../lib/api';
 import { Shield, Check, Save } from 'lucide-react';
+import {
+  SYSTEM_REGISTRY,
+  ALL_FIRMS,
+  getVisiblePages,
+  buildAllSystemPermissions,
+} from '@/systems/core/config/systemRegistry';
 
 export default function Settings() {
   const [users, setUsers] = useState([]);
@@ -9,24 +15,7 @@ export default function Settings() {
   const [userAccess, setUserAccess] = useState([]);
   const [saving, setSaving] = useState(false);
 
-  const inventoryPages = [
-    { key: 'Inventory_Dashboard', label: 'Inventory Overview Dashboard' },
-    { key: 'Inventory_RawMaterial_Purab', label: 'Purab Raw Material' },
-    { key: 'Inventory_RawMaterial_Pmmpl', label: 'PMMPL Raw Material' },
-    { key: 'Inventory_RawMaterial_Rkl', label: 'RKL Raw Material' },
-    { key: 'Inventory_FinishGood_Purab', label: 'Purab Finished Goods' },
-    { key: 'Inventory_FinishGood_Pmmpl', label: 'PMMPL Finished Goods' },
-    { key: 'Inventory_FinishGood_Rkl', label: 'RKL Finished Goods' },
-    { key: 'Inventory_TradingMaterial', label: 'Trading Material' },
-    { key: 'Inventory_StockAdjustment_Purab', label: 'Stock Adjustment (Purab)' },
-    { key: 'Inventory_StockAdjustment_Pmmpl', label: 'Stock Adjustment (PMMPL)' },
-    { key: 'Inventory_StockAdjustment_Rkl', label: 'Stock Adjustment (RKL)' },
-    { key: 'Inventory_StockAdjustmentTab_Adjustments', label: 'Stock Adjustment - Adjustments Log Tab' },
-    { key: 'Inventory_StockAdjustmentTab_OpStock', label: 'Stock Adjustment - Op Stock Setup Tab' },
-    { key: 'Inventory_StockAdjustmentTab_Products', label: 'Stock Adjustment - Product Directory Tab' },
-    { key: 'Inventory_History', label: 'Daily History Snapshots' },
-    { key: 'Inventory_Settings', label: 'Settings & Page Access' },
-  ];
+  const inventoryPages = getVisiblePages("inventory");
 
   useEffect(() => {
     fetchSettings();

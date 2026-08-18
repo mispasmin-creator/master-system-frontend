@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { servicesApi } from '../../lib/api';
+import { ChevronDown, ChevronRight, Check } from 'lucide-react';
+import {
+  SYSTEM_REGISTRY,
+  ALL_FIRMS,
+  getVisiblePages,
+  buildAllSystemPermissions,
+} from '@/systems/core/config/systemRegistry';
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -10,6 +17,13 @@ export default function Users() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [expandedSystems, setExpandedSystems] = useState({});
+
+  const toggleSystemExpand = (sysKey) => {
+    setExpandedSystems((prev) => ({ ...prev, [sysKey]: !prev[sysKey] }));
+  };
+
+  const availablePages = getVisiblePages("services");
 
   const [form, setForm] = useState({
     username: '',
@@ -17,19 +31,8 @@ export default function Users() {
     name: '',
     role: 'user',
     firms: 'PMMPL',
-    selectedPages: ['Services_Dashboard', 'Services_Offers', 'Services_Services', 'Services_Bills', 'Services_Tally', 'Services_Utility', 'Services_Reports']
+    selectedPages: availablePages.map((p) => p.key)
   });
-
-  const availablePages = [
-    { key: 'Services_Dashboard', label: 'Dashboard' },
-    { key: 'Services_Offers', label: 'Offers' },
-    { key: 'Services_Services', label: 'Services' },
-    { key: 'Services_Bills', label: 'Bills' },
-    { key: 'Services_Tally', label: 'Tally Entry' },
-    { key: 'Services_Utility', label: 'Utility Payments' },
-    { key: 'Services_Reports', label: 'Reports' },
-    { key: 'Services_Users', label: 'User Management' }
-  ];
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -96,13 +99,19 @@ export default function Users() {
     }
     setSaving(true);
     try {
+      let pagesValue = form.selectedPages.join(', ');
+      if (form.role === 'admin' || form.role === 'viewer') {
+        const { generatedPageFirms } = buildAllSystemPermissions(form.role === 'viewer');
+        pagesValue = JSON.stringify(generatedPageFirms);
+      }
+
       const payload = {
         username: form.username,
         password: form.password,
         name: form.name,
         role: form.role,
-        firms: form.firms,
-        pages: form.selectedPages.join(', ')
+        firms: (form.role === 'admin' || form.role === 'viewer') ? 'all' : form.firms,
+        pages: pagesValue,
       };
 
       let res;
@@ -285,36 +294,93 @@ export default function Users() {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Firm Scope</label>
-                <input
-                  type="text"
-                  placeholder="PMMPL, PMM Logisol..."
-                  value={form.firms}
-                  onChange={(e) => setForm({ ...form, firms: e.target.value })}
-                  className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                />
-              </div>
+              {form.role !== 'admin' && form.role !== 'viewer' && (
+                <div>
+                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Firm Scope</label>
+                  <input
+                    type="text"
+                    placeholder="PMMPL, PMM Logisol..."
+                    value={form.firms}
+                    onChange={(e) => setForm({ ...form, firms: e.target.value })}
+                    className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
+                  />
+                </div>
+              )}
 
               {/* Page Access Permissions */}
               <div>
                 <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-2">Services Page Permissions</label>
-                <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
-                  {availablePages.map((p) => {
-                    const isChecked = form.selectedPages.includes(p.key);
-                    return (
-                      <label key={p.key} className="flex items-center gap-2 cursor-pointer text-zinc-700 dark:text-zinc-300">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handlePageToggle(p.key)}
-                          className="rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <span>{p.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
+                {form.role === 'admin' || form.role === 'viewer' ? (
+                  <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 bg-zinc-50 dark:bg-zinc-800/40 space-y-2">
+                    <div className="flex items-center justify-between px-2 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs text-zinc-700 dark:text-zinc-300">
+                      <span className="font-semibold">
+                        {form.role === 'viewer'
+                          ? 'Viewer Mode: Read-only access across all 11 systems and 9 firms'
+                          : 'Admin Mode: Full access across all 11 systems and 9 firms'}
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500">All 9 Firms Included</span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                      {Object.entries(SYSTEM_REGISTRY).map(([sysKey, sysConfig]) => {
+                        const isExpanded = !!expandedSystems[sysKey];
+                        const visiblePages = getVisiblePages(sysKey);
+
+                        return (
+                          <div key={sysKey} className="border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => toggleSystemExpand(sysKey)}
+                              className="w-full flex items-center justify-between p-2 hover:bg-zinc-50 dark:hover:bg-zinc-700/50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />}
+                                <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">{sysConfig.label}</span>
+                                <span className="text-[10px] text-zinc-400">({visiblePages.length} pages)</span>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {form.role === 'viewer' ? 'View Granted' : 'Full Access'}
+                              </span>
+                            </button>
+
+                            {isExpanded && (
+                              <div className="px-2.5 pb-2.5 pt-1 border-t border-zinc-100 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/50">
+                                <div className="grid grid-cols-2 gap-1">
+                                  {visiblePages.map((page) => (
+                                    <div
+                                      key={page.key}
+                                      className="flex items-center gap-1.5 p-1 rounded bg-white dark:bg-zinc-800 border border-zinc-100 dark:border-zinc-700 text-[11px] text-zinc-600 dark:text-zinc-400"
+                                    >
+                                      <Check className="h-3 w-3 text-emerald-500 shrink-0" />
+                                      <span className="truncate">{page.label || page.key}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 p-3 rounded-2xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
+                    {availablePages.map((p) => {
+                      const isChecked = form.selectedPages.includes(p.key);
+                      return (
+                        <label key={p.key} className="flex items-center gap-2 cursor-pointer text-zinc-700 dark:text-zinc-300">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handlePageToggle(p.key)}
+                            className="rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span>{p.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-3">
