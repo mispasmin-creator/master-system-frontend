@@ -198,13 +198,22 @@ export default function JobCardsPage() {
       })
 
       // Process pending orders from Costing Response
-      // Only include orders routed for Job Card (standard approval / passed sample test), skip Final Approved orders
+      // Include all orders routed for Job Card (Final Approved, Management Approved, or Job Card Pending)
       const filteredRows = (allCostingData || []).filter((row: any) => {
         const status = String(row.status || row.Status || row["Status"] || "").trim().toLowerCase()
-        const isApproved = status === "management approved" || status === "job card pending"
-        const isFinalApproved = status === "final approved" || status.includes("final")
+        const hasApprovedReview = Array.isArray(row.managementReview) &&
+          row.managementReview.some((r: any) => {
+            const revStatus = String(r.status || "").trim().toLowerCase();
+            return revStatus.includes("approved") || revStatus === "ok";
+          });
+        const isApproved =
+          status === "management approved" ||
+          status === "job card pending" ||
+          status === "final approved" ||
+          status === "approved" ||
+          hasApprovedReview;
         const emptyActual3 = !row["Actual 3"] && !row.actual3
-        return isApproved && !isFinalApproved && emptyActual3
+        return isApproved && emptyActual3
       })
 
       const findProductionRow = (deliveryOrderNo: string, partyName: string, productName: string) => {

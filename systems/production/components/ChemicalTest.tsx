@@ -406,7 +406,7 @@ export default function ChemicalTestPage() {
 
       if (!isNonTested) {
         payload.testedBy = formData.testedBy
-        payload.dateOfTest = format(new Date(), "yyyy-MM-dd")
+        payload.dateOfTest = new Date().toISOString()
         payload.aluminaPercent = formData.aluminaPercentage ? Number(formData.aluminaPercentage) : null
         payload.ironPercent = formData.ironPercentage ? Number(formData.ironPercentage) : null
         payload.silicaPercent = formData.silicaPercentage ? Number(formData.silicaPercentage) : null

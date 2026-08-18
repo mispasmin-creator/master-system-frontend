@@ -432,18 +432,14 @@ export default function LabTesting1Page() {
             dateOfTest: lab1Check.dateOfTest ? format(new Date(lab1Check.dateOfTest), "dd/MM/yy") : "",
             testedBy: String(lab1Check.testedBy || ""),
             wcPercentage: lab1Check.wcPercent != null ? String(lab1Check.wcPercent) : "",
-            // Initial/Final Setting Time, What To Be Mixed, Flow of Material, Sieve
-            // Analysis and free-text remarks have no matching columns on
-            // ProductionQcCheckpoint - they're folded into `status` when saved (see
-            // handleSaveLabTest) but there's no structured column to read them back from.
-            initialSettingTime: "",
-            finalSettingTime: "",
-            whatToBeMixed: "",
-            flowOfMaterial: "",
-            sieveAnalysisTest: "",
+            initialSettingTime: String(lab1Check.initialSettingTime || ""),
+            finalSettingTime: String(lab1Check.finalSettingTime || ""),
+            whatToBeMixed: String(lab1Check.whatToBeMixed || ""),
+            flowOfMaterial: String(lab1Check.flowOfMaterial || ""),
+            sieveAnalysisTest: String(lab1Check.sieveAnalysis || ""),
             test1CompletedAt: lab1Check.createdAt || "",
             timestamp: lab1Check.createdAt ? format(new Date(lab1Check.createdAt), "dd/MM/yyyy HH:mm:ss") : "",
-            labTest1Remarks: "",
+            labTest1Remarks: String(lab1Check.remarks || ""),
           } as HistoryItem)
         }
       })
@@ -538,10 +534,16 @@ export default function LabTesting1Page() {
         jobCardId: selectedProduction.jobCardId,
         stage: LAB1_STAGE,
         status: statusNote,
+        remarks: formData.labTest1Remarks?.trim() || null,
+        initialSettingTime: formData.initialSettingTime?.trim() || null,
+        finalSettingTime: formData.finalSettingTime?.trim() || null,
+        whatToBeMixed: formData.whatToBeMixed?.trim() || null,
+        flowOfMaterial: formData.flowOfMaterial?.trim() || null,
+        sieveAnalysis: formData.sieveAnalysis?.trim() || null,
       }
 
       if (!isSkipped) {
-        payload.dateOfTest = format(formData.dateOfTest, "yyyy-MM-dd")
+        payload.dateOfTest = formData.dateOfTest ? new Date(formData.dateOfTest).toISOString() : new Date().toISOString()
         payload.testedBy = String(formData.testedBy)
         payload.wcPercent = formData.wcPercentage ? Number(formData.wcPercentage) : null
       }

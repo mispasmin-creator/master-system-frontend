@@ -187,66 +187,6 @@ export default function CompositionQCPage() {
         })
       }
 
-      // Process direct "Final Approved" costings (bypasses Sample Test, Job Cards, and Actual Production)
-      const handledOrderIds = new Set(result.map((r) => r.productionId).filter(Boolean));
-
-      for (const costRow of (costData || []) as any[]) {
-        const status = String(costRow.status || costRow.Status || "").trim().toLowerCase();
-        const isFinalApproved = status === "final approved" || status === "direct to composition qc";
-        const hasFinalReview = Array.isArray(costRow.managementReview) &&
-          costRow.managementReview.some((r: any) => String(r.status || "").trim().toLowerCase() === "final approved");
-
-        if (isFinalApproved || hasFinalReview) {
-          const order = costRow.orderId ? orderById.get(costRow.orderId) : (costRow.order || null);
-          if (!order) continue;
-          if (handledOrderIds.has(order.id)) continue;
-          handledOrderIds.add(order.id);
-
-          const jobCardNo = costRow.compositionNo ? `DIRECT (${costRow.compositionNo})` : "DIRECT (Final Approved)";
-          const doNo = String(order.deliveryOrderNo || "").trim();
-          const productName = String(order.productName || "").trim();
-          const firmName = String(order.firmName || "");
-          const fgQty = Number(order.orderQuantity || 0);
-          const productRate = Number(costRow.sellingPrice || order.productRate || 0);
-          const sellingPriceTotal = productRate * fgQty;
-          const manufacturingCostTotal = Number(costRow.manufacturingCost || 0) * fgQty;
-
-          const expTotal = Number(costRow.variableCost || 0);
-          const actTotal = Number(costRow.variableCost || 0);
-          const matDiffPct = 0;
-          const costDiffPct = 0;
-          const expectedProfit = sellingPriceTotal > 0 ? sellingPriceTotal - (expTotal + manufacturingCostTotal) : null;
-          const actualProfit = expectedProfit;
-          const profitVariance = 0;
-          const profitLoss = actualProfit;
-
-          result.push({
-            productionId: order.id || "",
-            jobCardNo,
-            doNo,
-            partyName: String(order.partyName || ""),
-            productName,
-            fgQty,
-            productRate,
-            sellingPriceTotal,
-            manufacturingCostTotal,
-            expectedCostTotal: expTotal,
-            actualCostTotal: actTotal,
-            matDiffPct,
-            costDiffPct,
-            expectedProfit,
-            actualProfit,
-            profitVariance,
-            profitLoss,
-            materials: [],
-            firmName,
-            productionDate: costRow.updatedAt
-              ? format(new Date(costRow.updatedAt), "dd/MM/yyyy")
-              : (costRow.createdAt ? format(new Date(costRow.createdAt), "dd/MM/yyyy") : ""),
-          });
-        }
-      }
-
       const userFirms = user?.firm ? user.firm.split(',').map((f: string) => f.trim()).filter(Boolean) : []
       const isAdmin = user?.role?.toLowerCase() === "admin"
       const filtered = result.filter((r) => {

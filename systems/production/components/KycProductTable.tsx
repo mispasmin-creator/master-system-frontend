@@ -90,13 +90,15 @@ export default function KycProductTable() {
     setLoading(true);
     try {
       const [
-        { data: rawData },
-        { data: semiActualData },
-        { data: crushingActualData },
-        { data: sjcData },
-        { data: sfProdData },
-        { data: inventoryHistoryData }
+        kycRes,
+        rawDataRes,
+        semiActualRes,
+        crushingActualRes,
+        sjcRes,
+        sfProdRes,
+        invHistRes,
       ] = await Promise.all([
+        productionApi.get('kyc').catch(() => ({ data: [] })),
         Promise.resolve(productionApi.get('LIFT-ACCOUNTS')).catch(() => ({ data: [], error: null })),
         productionApi.get('semi_actual').catch(() => ({ data: [] })),
         productionApi.get('crushing_actual').catch(() => ({ data: [] })),
@@ -106,6 +108,14 @@ export default function KycProductTable() {
           productionApi.get('inventory_master_history')
         ).catch(() => ({ data: [], error: null }))
       ]);
+
+      const kycData = Array.isArray(kycRes) ? kycRes : (kycRes?.data || []);
+      const rawData = Array.isArray(rawDataRes) ? rawDataRes : (rawDataRes?.data || []);
+      const semiActualData = Array.isArray(semiActualRes) ? semiActualRes : (semiActualRes?.data || []);
+      const crushingActualData = Array.isArray(crushingActualRes) ? crushingActualRes : (crushingActualRes?.data || []);
+      const sjcData = Array.isArray(sjcRes) ? sjcRes : (sjcRes?.data || []);
+      const sfProdData = Array.isArray(sfProdRes) ? sfProdRes : (sfProdRes?.data || []);
+      const inventoryHistoryData = Array.isArray(invHistRes) ? invHistRes : (invHistRes?.data || []);
 
       const sfFirmMap = new Map<string, string>();
       (sfProdData || []).forEach((row: any) => {
@@ -236,6 +246,37 @@ export default function KycProductTable() {
         timestamp?: string;
         isCustom?: boolean;
       }>();
+
+      // 1. Populate recordMap from KYC master table
+      (kycData || []).forEach((k: any) => {
+        const productName = String(k.productName || k["Product name"] || "").trim();
+        if (!productName) return;
+        const firmName = String(k.firmName || "All").trim();
+        const key = `${normFirm(firmName)}___${normProd(productName)}`;
+
+        const alumina = k.alumina !== null && k.alumina !== undefined && !isNaN(Number(k.alumina)) ? Number(k.alumina) : null;
+        const iron = k.iron !== null && k.iron !== undefined && !isNaN(Number(k.iron)) ? Number(k.iron) : null;
+        const price = k.price !== null && k.price !== undefined && !isNaN(Number(k.price)) ? Number(k.price) : null;
+        const bd = k.bd !== null && k.bd !== undefined && !isNaN(Number(k.bd)) ? Number(k.bd) : null;
+        const ap = k.ap !== null && k.ap !== undefined && !isNaN(Number(k.ap)) ? Number(k.ap) : null;
+
+        const pCost = procCostMap.get(normProd(productName)) || null;
+        const pSource = procCostSourceMap.get(normProd(productName));
+
+        recordMap.set(key, {
+          firmName,
+          productName,
+          alumina,
+          iron,
+          price,
+          baseRate: price,
+          transportRate: 0,
+          procCost: pCost,
+          procCostSource: pSource,
+          bd,
+          ap,
+        });
+      });
 
       // Sort rawData by Actual Receipt Date / Bill Date / Timestamp descending (matching Purchase FMS UI)
       const getReceiptTime = (row: any) => {
@@ -648,13 +689,21 @@ export default function KycProductTable() {
   }, []);
 
   // Filter Dropdown Options
-  const firmOptions = Array.from(new Set(data.map((d) => d.firmName))).filter(Boolean);
+  const firmOptions = Array.from(new Set(["Pmmpl", "Purab", "Rkl", ...data.map((d) => d.firmName)])).filter(Boolean);
   const productOptions = Array.from(new Set(data.map((d) => d.productName))).filter(Boolean);
 
   // Filtered Records (Firm + Product + Search string)
   const filteredData = data.filter((item) => {
-    const matchFirm = selectedFirm === "ALL" || item.firmName.toLowerCase() === selectedFirm.toLowerCase();
-    const matchProduct = selectedProduct === "ALL" || item.productName.toLowerCase() === selectedProduct.toLowerCase();
+    const itemFirm = (item.firmName || "All").toLowerCase();
+    const selFirm = selectedFirm.toLowerCase();
+    const matchFirm =
+      selectedFirm === "ALL" ||
+      itemFirm === selFirm ||
+      itemFirm === "all";
+
+    const matchProduct =
+      selectedProduct === "ALL" ||
+      item.productName.toLowerCase() === selectedProduct.toLowerCase();
     
     const qRaw = searchQuery.toLowerCase().trim();
     if (!qRaw) return matchFirm && matchProduct;
@@ -687,7 +736,7 @@ export default function KycProductTable() {
         <div>
           <div className="flex items-center gap-3">
             <CardTitle className="text-xl font-bold text-slate-800">
-              Latest Product Quality Data (LIFT-ACCOUNTS)
+              Latest Product Quality Data (KYC)
             </CardTitle>
             <Badge
               variant="outline"
@@ -835,7 +884,7 @@ export default function KycProductTable() {
               ) : filteredData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="h-48 text-center text-gray-500 font-medium text-xs">
-                    No matching quality records found in LIFT-ACCOUNTS.
+                    No matching quality records found in KYC.
                   </TableCell>
                 </TableRow>
               ) : (

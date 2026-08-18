@@ -523,11 +523,31 @@ export function FullKittingHistory({
     let successCount = 0;
     const batchId = `BATCH-${Date.now()}`;
     try {
+      let entries: any[] = [];
+      try {
+        const entryRes = await freightPaymentApi.get("entry");
+        entries = entryRes.data || [];
+      } catch (err) {
+        console.warn("Could not fetch entries list before processing group", err);
+      }
+
       for (const row of group.children) {
         const uniqueId = getRowUniqueId(row);
         if (!selectedModalItems.has(uniqueId)) continue;
         setProcessingId(uniqueId);
-        await freightPaymentApi.post("kitting", toSystemPayment(row, batchId));
+
+        let match = entries.find(
+          (e: any) =>
+            (e.unique_number || `KIT-${e.id}`) === uniqueId ||
+            (e.lift_id && e.lift_id === row.liftId)
+        );
+
+        if (match?.id) {
+          await freightPaymentApi.patch("kitting", match.id, "complete", { remark: row.fullkittingRemarks });
+        } else {
+          await freightPaymentApi.post("kitting", toSystemPayment(row, batchId));
+        }
+
         setProcessedIds((prev) => {
           const next = new Set(prev);
           next.add(uniqueId);
@@ -845,8 +865,6 @@ export function FullKittingHistory({
     setProcessMessage(null);
 
     try {
-      // Use the entry's unique number as the lookup key; the backend
-      // patches the kitting stage record keyed on the FreightPaymentEntry id.
       const entryRes = await freightPaymentApi.get("entry");
       const entries: any[] = entryRes.data || [];
       const match = entries.find(
@@ -854,8 +872,11 @@ export function FullKittingHistory({
           (e.unique_number || `KIT-${e.id}`) === uniqueId ||
           e.lift_id === row.liftId
       );
-      if (!match) throw new Error(`Entry not found for ${row.liftId}`);
-      await freightPaymentApi.patch("kitting", match.id, "complete", { remark: row.fullkittingRemarks });
+      if (match?.id) {
+        await freightPaymentApi.patch("kitting", match.id, "complete", { remark: row.fullkittingRemarks });
+      } else {
+        await freightPaymentApi.post("kitting", toSystemPayment(row));
+      }
       setProcessedIds((prev) => new Set(prev).add(uniqueId));
       setProcessMessage(`Processed ${row.liftId} successfully`);
       queryClient.invalidateQueries({ queryKey: ["freight-entries"] });
@@ -879,9 +900,7 @@ export function FullKittingHistory({
       const entryRes = await freightPaymentApi.get("entry");
       entries = entryRes.data || [];
     } catch {
-      setProcessMessage("Failed to load entries from backend");
-      setIsBatchProcessing(false);
-      return;
+      // Continue to post
     }
 
     let successCount = 0;
@@ -894,8 +913,11 @@ export function FullKittingHistory({
             (e.unique_number || `KIT-${e.id}`) === uniqueId ||
             e.lift_id === row.liftId
         );
-        if (!match) continue;
-        await freightPaymentApi.patch("kitting", match.id, "complete", { remark: row.fullkittingRemarks });
+        if (match?.id) {
+          await freightPaymentApi.patch("kitting", match.id, "complete", { remark: row.fullkittingRemarks });
+        } else {
+          await freightPaymentApi.post("kitting", toSystemPayment(row));
+        }
         setProcessedIds((prev) => new Set(prev).add(uniqueId));
         successCount += 1;
       }

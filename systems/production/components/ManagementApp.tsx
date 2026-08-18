@@ -440,7 +440,7 @@ export default function ManagementApp() {
         title: decision === "Approved" ? `✅ ${status}` : "🔴 Management Rejected",
         description:
           decision === "Approved"
-            ? (approvalType === "OK" ? "Entry finalized and routed directly to Composition QC." : "Entry moved to Sample Test.")
+            ? (approvalType === "OK" ? "Entry finalized and moved to Job Cards." : "Entry moved to Sample Test.")
             : "Entry marked as rejected and sent to history.",
       });
 
@@ -950,7 +950,7 @@ export default function ManagementApp() {
                   >
                     <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-amber-100 flex-1">
                       <RadioGroupItem value="OK" id="ok" />
-                      <Label htmlFor="ok" className="font-semibold cursor-pointer flex-1 py-1 text-sm text-emerald-800">✅ Final Approve (Direct to Composition QC)</Label>
+                      <Label htmlFor="ok" className="font-semibold cursor-pointer flex-1 py-1 text-sm text-emerald-800">✅ Final Approve (Move to Job Cards)</Label>
                     </div>
                     <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-amber-100 flex-1">
                       <RadioGroupItem value="Make a sample Test" id="sample" />

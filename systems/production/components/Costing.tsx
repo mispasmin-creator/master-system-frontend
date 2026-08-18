@@ -466,55 +466,71 @@ export default function CostingPage() {
     setVisibleHistoryColumns(initializeVisibility(HISTORY_COLUMNS_META))
   }, [])
 
-  const processCompleteDetails = (row: any): CompleteProductionDetails => {
-    const rawMaterials = []
-    for (let i = 1; i <= 20; i++) {
-      const rawMaterialName = row[`Raw Material Name ${i}`]
-      const rawMaterialQty = row[`Quantity Of Raw Material ${i}`]
+  const [liveRatesMapState, setLiveRatesMapState] = useState<Map<string, number>>(new Map())
 
-      if (rawMaterialName && String(rawMaterialName).trim() !== "") {
-        rawMaterials.push({
-          name: String(rawMaterialName || ""),
-          quantity: rawMaterialQty || 0
-        })
+  const processCompleteDetails = (row: any): CompleteProductionDetails => {
+    const jc = row.jobCard || {}
+    const order = jc.order || {}
+
+    const rawMaterials: RawMaterial[] = []
+    if (Array.isArray(row.materials) && row.materials.length > 0) {
+      row.materials.forEach((m: any) => {
+        if (m.materialName && String(m.materialName).trim() !== "") {
+          rawMaterials.push({
+            name: String(m.materialName).trim(),
+            quantity: m.quantity ?? 0,
+          })
+        }
+      })
+    } else {
+      for (let i = 1; i <= 20; i++) {
+        const rawMaterialName = row[`Raw Material Name ${i}`]
+        const rawMaterialQty = row[`Quantity Of Raw Material ${i}`]
+
+        if (rawMaterialName && String(rawMaterialName).trim() !== "") {
+          rawMaterials.push({
+            name: String(rawMaterialName || "").trim(),
+            quantity: rawMaterialQty || 0,
+          })
+        }
       }
     }
 
     return {
       // Basic Info
-      timestamp: formatDateTimeValue(row["Timestamp"]),
-      jobCardNo: String(row["Job Card No."] || ""),
-      firmName: String(row["FIRM Name"] || ""),
-      dateOfProduction: formatDateValue(row["Date Of Production"]),
-      nameOfSupervisor: String(row["Name Of Supervisor"] || ""),
-      productName: String(row["Product Name"] || ""),
-      quantityOfFG: Number(row["Quantity Of FG"] || 0),
-      serialNumber: String(row["Serial Number"] || ""),
+      timestamp: formatDateTimeValue(row.createdAt || row["Timestamp"]),
+      jobCardNo: String(jc.jobCardNo || row["Job Card No."] || row["JC-Job Card Number"] || ""),
+      firmName: String(order.firmName || row["FIRM Name"] || row["Firm Name"] || ""),
+      dateOfProduction: formatDateValue(row.dateOfProduction || row["Date Of Production"] || jc.dateOfProduction),
+      nameOfSupervisor: String(row.supervisorName || row["Name Of Supervisor"] || jc.supervisorName || ""),
+      productName: String(order.productName || row["Product Name"] || ""),
+      quantityOfFG: Number(row.quantityFg ?? row["Quantity Of FG"] ?? jc.quantity ?? 0),
+      serialNumber: String(row.serialNumber || row["Serial Number"] || ""),
 
       // Raw Materials
       rawMaterials,
 
       // Additional Fields
-      machineRunningHour: String(row["Machine Running hour"] || ""),
-      remarks1: String(row["Remarks1"] || ""),
-      ppBagUsed: String(row["PP BAG USED"] || ""),
-      ppBagToBeUsed: String(row["PP BAG TO BE USED"] || ""),
-      partyName: String(row["Party Name"] || ""),
-      ppBagSmall: String(row["PP Bag (Small)"] || ""),
-      costingAmount: Number(row["Costing Amount"] || 0),
-      colorCondition: String(row["Color Condition"] || ""),
-      orderNo: String(row["Order No."] || ""),
+      machineRunningHour: String(row.machineHours ?? row["Machine Running hour"] ?? ""),
+      remarks1: String(row.remarks1 || row["Remarks1"] || ""),
+      ppBagUsed: String(row.ppBagUsed ?? row["PP BAG USED"] ?? ""),
+      ppBagToBeUsed: String(row.ppBagToBeUsed ?? row["PP BAG TO BE USED"] ?? ""),
+      partyName: String(order.partyName || row["Party Name"] || ""),
+      ppBagSmall: String(row.ppBagSmall ?? row["PP Bag (Small)"] ?? ""),
+      costingAmount: Number(row.costingAmount ?? row["Costing Amount"] ?? 0),
+      colorCondition: String(row.colorCondition || row["Color Condition"] || ""),
+      orderNo: String(order.deliveryOrderNo || row["Order No."] || row["Delivery Order No."] || ""),
       planned1: formatDateValue(row["Planned1"]),
       actual1: formatDateTimeValue(row["Actual1"]),
-      status: String(row["Status"] || ""),
+      status: String(row.status || row["Status"] || ""),
       actualQty1: String(row["Qty"] || ""),
       planned2: formatDateValue(row["Planned2"]),
       actual2: formatDateTimeValue(row["Actual2"]),
       timeDelay2: String(row["Time Delay2"] || ""),
-      remarks: String(row["Remarks"] || ""),
-      planned3: formatDateValue(row["Planned3"]),
+      remarks: String(row.remarks || row["Remarks"] || ""),
+      planned3: formatDateValue(row.dateOfProduction || row.createdAt || row["Planned8"] || row["Planned3"]),
       actual3: formatDateTimeValue(row["Actual3"]),
-      costingAmount2: String(row["Costing Amount"] || ""),
+      costingAmount2: String(row.costingAmount ?? row["Costing Amount"] ?? ""),
       planned4: formatDateValue(row["Planned4"]),
       actual4: formatDateTimeValue(row["Actual4"]),
       remarks1_2: String(row["Remarks2"] || ""),
@@ -594,41 +610,48 @@ export default function CostingPage() {
           }
         })
 
+      setLiveRatesMapState(rawMaterialRatesMap)
+
       // The same job card number is reused across several DOs, so a lookup on
       // the number alone resolves to whichever row happened to be last and
       // pulls in another order's party/firm. Key on DO + product as well.
       const normalizeKey = (value: any) => String(value ?? "").trim().toLowerCase()
       const jobCardsByNo = new Map<string, any>()
         ; (jobCardsRows || []).forEach((jc: any) => {
-          const jcNo = String(jc["JC-Job Card Number"] || "").trim()
+          const jcNo = String(jc.jobCardNo || jc["JC-Job Card Number"] || "").trim()
           if (!jcNo) return
-          const doNo = normalizeKey(jc["Delivery Order No."])
-          const product = normalizeKey(jc["Product Name"])
+          const doNo = normalizeKey(jc.order?.deliveryOrderNo || jc["Delivery Order No."])
+          const product = normalizeKey(jc.order?.productName || jc["Product Name"])
           jobCardsByNo.set(`${jcNo}::${doNo}::${product}`, jc)
           jobCardsByNo.set(`${jcNo}::${doNo}`, jc)
           jobCardsByNo.set(jcNo, jc)
         })
 
       const buildItem = (row: any) => {
-        const jobCardNo = String(row["Job Card No."] || "").trim()
-        const rowDoNo = normalizeKey(row["Order No."])
-        const rowProduct = normalizeKey(row["Product Name"])
+        const jc = row.jobCard || {}
+        const order = jc.order || {}
+        const jobCardNo = String(jc.jobCardNo || row["Job Card No."] || row["JC-Job Card Number"] || "").trim()
+        const rowDoNo = normalizeKey(order.deliveryOrderNo || row["Order No."] || row["Delivery Order No."])
+        const rowProduct = normalizeKey(order.productName || row["Product Name"])
         // Most specific match first; falls back to the plain number so job
         // cards that appear only once behave exactly as before.
         const jobCard =
           jobCardsByNo.get(`${jobCardNo}::${rowDoNo}::${rowProduct}`) ||
           jobCardsByNo.get(`${jobCardNo}::${rowDoNo}`) ||
-          jobCardsByNo.get(jobCardNo)
+          jobCardsByNo.get(jobCardNo) ||
+          jc
+
+        const resolvedOrder = jobCard?.order || order || {}
 
         return {
           id: row.id,
           jobCardNo,
-          deliveryOrderNo: String(row["Order No."] || jobCard?.["Delivery Order No."] || ""),
-          productName: String(row["Product Name"] || jobCard?.["Product Name"] || ""),
-          firmName: String(row["FIRM Name"] || jobCard?.["Firm Name"] || ""),
-          partyName: String(row["Party Name"] || jobCard?.["Party Name"] || ""),
-          quantityOfFG: Number(row["Quantity Of FG"] || jobCard?.["Quantity"] || 0),
-          planned3: formatDateValue(row["Planned8"]),
+          deliveryOrderNo: String(resolvedOrder.deliveryOrderNo || row["Order No."] || jobCard?.["Delivery Order No."] || ""),
+          productName: String(resolvedOrder.productName || row["Product Name"] || jobCard?.["Product Name"] || ""),
+          firmName: String(resolvedOrder.firmName || row["FIRM Name"] || row["Firm Name"] || jobCard?.["Firm Name"] || ""),
+          partyName: String(resolvedOrder.partyName || row["Party Name"] || jobCard?.["Party Name"] || ""),
+          quantityOfFG: Number(row.quantityFg ?? row["Quantity Of FG"] ?? jobCard?.quantity ?? jobCard?.["Quantity"] ?? 0),
+          planned3: formatDateValue(row.dateOfProduction || row.createdAt || row["Planned8"]),
           completeDetails: processCompleteDetails(row),
         }
       }
@@ -636,9 +659,10 @@ export default function CostingPage() {
       // Build map of submitted costing_response records by DO + Product + Party
       const costingResponseMap = new Map<string, any>()
         ; (costingResponseRows || []).forEach((cRow: any) => {
-          const doNo = String(cRow["Order No."] || "").trim().toLowerCase()
-          const prod = String(cRow["product name"] || "").trim().toLowerCase()
-          const party = String(cRow["Party Name"] || "").trim().toLowerCase()
+          const order = cRow.order || {}
+          const doNo = String(order.deliveryOrderNo || cRow["Order No."] || "").trim().toLowerCase()
+          const prod = String(order.productName || cRow["product name"] || "").trim().toLowerCase()
+          const party = String(order.partyName || cRow["Party Name"] || "").trim().toLowerCase()
           if (doNo) {
             costingResponseMap.set(`${doNo}::${prod}::${party}`, cRow)
             costingResponseMap.set(`${doNo}::${prod}`, cRow)
@@ -648,12 +672,25 @@ export default function CostingPage() {
           }
         })
 
+      const isRowCosted = (row: any) => {
+        if (row.costingAmount !== null && row.costingAmount !== undefined && String(row.costingAmount).trim() !== "" && Number(row.costingAmount) > 0) {
+          return true
+        }
+        if (String(row.status || "").toLowerCase() === "costed") return true
+        if (hasValue(row["Actual8"])) return true
+        return false
+      }
+
+      const hasJobCard = (row: any) => {
+        return Boolean(row.jobCardId || row.jobCard?.jobCardNo || row["Job Card No."] || row["JC-Job Card Number"])
+      }
+
       const pendingData: PendingCostingItem[] = (actualProductionRows || [])
-        .filter((row: any) => hasValue(row["Job Card No."]) && hasValue(row["Planned8"]) && !hasValue(row["Actual8"]))
+        .filter((row: any) => hasJobCard(row) && !isRowCosted(row))
         .map(buildItem)
 
       const historyData: HistoryCostingItem[] = (actualProductionRows || [])
-        .filter((row: any) => hasValue(row["Job Card No."]) && hasValue(row["Planned8"]) && hasValue(row["Actual8"]))
+        .filter((row: any) => hasJobCard(row) && isRowCosted(row))
         .map((row: any) => {
           const item = buildItem(row)
           const firm = item.firmName || ""
@@ -668,17 +705,22 @@ export default function CostingPage() {
 
           const rmFields: Record<string, any> = {}
           const rms = item.completeDetails?.rawMaterials || []
+          const costingMaterials = Array.isArray(matchedCosting?.materials) ? matchedCosting.materials : []
 
           for (let i = 1; i <= 20; i++) {
             const rmFromProd = rms[i - 1]
-            const rmNameFromCosting = matchedCosting ? matchedCosting[`RM${i}`] : null
+            const rmNameFromCosting = costingMaterials[i - 1]?.materialName || (matchedCosting ? matchedCosting[`RM${i}`] : null)
             const name = rmFromProd?.name?.trim() || (rmNameFromCosting ? String(rmNameFromCosting).trim() : "")
 
             if (name) {
-              const qty = rmFromProd?.quantity != null ? String(rmFromProd.quantity) : (matchedCosting?.[`QTY${i}`] != null ? String(matchedCosting[`QTY${i}`]) : "-")
+              const qty = rmFromProd?.quantity != null
+                ? String(rmFromProd.quantity)
+                : (costingMaterials[i - 1]?.quantity != null
+                    ? String(costingMaterials[i - 1].quantity)
+                    : (matchedCosting?.[`QTY${i}`] != null ? String(matchedCosting[`QTY${i}`]) : "-"))
 
               // Priority 1: Use submitted COSTi from costing_response table
-              let submittedCost = matchedCosting ? matchedCosting[`COST${i}`] : null
+              let submittedCost = matchedCosting ? (costingMaterials[i - 1]?.cost ?? matchedCosting[`COST${i}`]) : null
               let rateStr = "-"
 
               if (submittedCost !== null && submittedCost !== undefined && !isNaN(Number(submittedCost)) && Number(submittedCost) > 0) {
@@ -709,46 +751,46 @@ export default function CostingPage() {
           return {
             ...item,
             ...rmFields,
-            costingAmount: Number(row["Costing Amount"] || 0),
-            costingDate: formatDateTimeValue(row["Actual8"]),
+            costingAmount: Number(row.costingAmount ?? row["Costing Amount"] ?? 0),
+            costingDate: formatDateTimeValue(row.updatedAt || row.createdAt || row["Actual8"]),
           }
         })
         .sort((a: any, b: any) => new Date(b.costingDate).getTime() - new Date(a.costingDate).getTime())
 
       const responses: CostingResponseRecord[] = (costingResponseRows || [])
-        .map((row: any) => ({
-          orderNo: String(row["Order No."] || ""),
-          variableCost: String(row["VARIABLE COST"] || ""),
-          manufacturingCost: String(row["Manufacturing Cost"] || ""),
-          interestDays: String(row["Interest (days)"] || ""),
-          interestCost: String(row["Interest Cost"] || ""),
-          transporting: String(row["Transporting (FOR)"] || ""),
-          sellingPrice: String(row["SELLING PRICE"] || ""),
-        }))
+        .map((row: any) => {
+          const order = row.order || {}
+          return {
+            orderNo: String(order.deliveryOrderNo || row["Order No."] || ""),
+            variableCost: String(row.variableCost ?? row["VARIABLE COST"] ?? ""),
+            manufacturingCost: String(row.manufacturingCost ?? row["Manufacturing Cost"] ?? ""),
+            interestDays: String(row.interestCost ?? row["Interest (days)"] ?? ""),
+            interestCost: String(row.interestCost ?? row["Interest Cost"] ?? ""),
+            transporting: String(row.transportingFor ?? row["Transporting (FOR)"] ?? ""),
+            sellingPrice: String(row.sellingPrice ?? row["SELLING PRICE"] ?? ""),
+          }
+        })
         .filter((r: any) => r.orderNo)
 
       const rates: Record<string, number> = {}
-      if (orderReceiptRes && orderReceiptRes.data) {
-        orderReceiptRes.data.forEach((row: any) => {
-          const doNo = String(row["DO-Delivery Order No."] || "").trim()
-          const rate = Number(row["Rate Of Material"] || 0)
-          const firmName = String(row["Firm Name"] || "").trim()
-          const productName = String(row["Product Name"] || "").trim()
+      if (costingResponseRows) {
+        (costingResponseRows || []).forEach((cRow: any) => {
+          const order = cRow.order || {}
+          const doNo = String(order.deliveryOrderNo || cRow["Order No."] || "").trim()
+          const rate = Number(order.productRate ?? cRow.sellingPrice ?? cRow["SELLING PRICE"] ?? 0)
+          const firmName = String(order.firmName || cRow["Firm Name"] || "").trim()
+          const productName = String(order.productName || cRow["product name"] || "").trim()
 
-          if (doNo) {
-            // 1. Map by DO + Product + Firm
+          if (doNo && rate > 0) {
             if (productName && firmName) {
               rates[`${doNo}_${productName}_${firmName}`.toLowerCase()] = rate
             }
-            // 2. Map by DO + Product
             if (productName) {
               rates[`${doNo}_${productName}`.toLowerCase()] = rate
             }
-            // 3. Map by DO + Firm
             if (firmName) {
               rates[`${doNo}_${firmName}`.toLowerCase()] = rate
             }
-            // 4. Legacy/fallback map by DO only
             rates[doNo] = rate
             rates[doNo.toLowerCase()] = rate
           }
@@ -805,61 +847,86 @@ export default function CostingPage() {
           const rmName = rm.name ? rm.name.trim() : ""
           if (!rmName) return
 
-          const { data, error } = await productionApi.get('LIFT-ACCOUNTS')
+          let foundRate = 0
+          let calculatedTransportRate = 0
+          let rateType = ""
+          let totalBagsQty = 0
+          let liftQty = 0
 
-          if (!error && data && data.length > 0) {
-            const row = data[0]
-            const rawRate = Number(row["Transporter Rate"] || 0)
-            const liftQty = Number(row["Lifting Qty"] || 0)
-            const rateType = String(row["Type Of Transporting Rate"] || "").trim().toLowerCase()
+          try {
+            const { data, error } = await productionApi.get('LIFT-ACCOUNTS')
 
-            // Calculate Per MT Transportation Rate dynamically
-            let calculatedTransportRate = 0
-            if ((rateType === "per mt" || rateType === "fixed") && liftQty > 0) {
-              calculatedTransportRate = rawRate / liftQty
-            }
+            if (!error && data && data.length > 0) {
+              const row = data[0]
+              const rawRate = Number(row["Transporter Rate"] || 0)
+              liftQty = Number(row["Lifting Qty"] || 0)
+              rateType = String(row["Type Of Transporting Rate"] || "").trim().toLowerCase()
 
-            let totalBagsQty = row["Total Bags Qty"] !== null && row["Total Bags Qty"] !== undefined ? Number(row["Total Bags Qty"]) : 0
+              // Calculate Per MT Transportation Rate dynamically
+              if ((rateType === "per mt" || rateType === "fixed") && liftQty > 0) {
+                calculatedTransportRate = rawRate / liftQty
+              }
 
-            // If the latest row doesn't have Total Bags Qty, fetch the latest one that does
-            if (totalBagsQty === 0) {
-              const { data: bagsData, error: bagsErr } = await productionApi.get('LIFT-ACCOUNTS')
+              totalBagsQty = row["Total Bags Qty"] !== null && row["Total Bags Qty"] !== undefined ? Number(row["Total Bags Qty"]) : 0
 
-              if (!bagsErr && bagsData && bagsData.length > 0) {
-                totalBagsQty = Number(bagsData[0]["Total Bags Qty"] || 0)
+              // If the latest row doesn't have Total Bags Qty, fetch the latest one that does
+              if (totalBagsQty === 0) {
+                const { data: bagsData, error: bagsErr } = await productionApi.get('LIFT-ACCOUNTS')
+
+                if (!bagsErr && bagsData && bagsData.length > 0) {
+                  totalBagsQty = Number(bagsData[0]["Total Bags Qty"] || 0)
+                }
+              }
+
+              foundRate = Number(row["Rate"] || 0)
+              const isSpecialPPBag = (name: string) => {
+                const n = name.trim().replace(/\s+/g, ' ').toLowerCase();
+                return (
+                  n === "pp bag (25 kgs)" ||
+                  n === "pp bag (50 kgs)" ||
+                  n === "pp bags 25 kg" ||
+                  n === "pp bag r - 25" ||
+                  n === "pp bag b - 25"
+                );
+              }
+
+              if (isSpecialPPBag(rmName) && totalBagsQty > 0) {
+                const oldRate = foundRate
+                foundRate = (liftQty * oldRate) / totalBagsQty
               }
             }
+          } catch (e) {
+            // LIFT-ACCOUNTS lookup error handled via fallback
+          }
 
-            let finalRate = Number(row["Rate"] || 0)
-            const isSpecialPPBag = (name: string) => {
-              const n = name.trim().replace(/\s+/g, ' ').toLowerCase();
-              return (
-                n === "pp bag (25 kgs)" ||
-                n === "pp bag (50 kgs)" ||
-                n === "pp bags 25 kg" ||
-                n === "pp bag r - 25" ||
-                n === "pp bag b - 25"
-              );
+          // Fallback to liveRatesMapState if LIFT-ACCOUNTS didn't provide a rate
+          if (!foundRate) {
+            const normF = (name: any) => {
+              const str = String(name || "").toLowerCase().trim()
+              if (str.includes("purab")) return "purab"
+              if (str.includes("pmmpl")) return "pmmpl"
+              if (str.includes("rkl")) return "rkl"
+              return str
             }
+            const normP = (name: any) => String(name || "").toLowerCase().trim()
+            const key = `${normF(firmName)}___${normP(rmName)}`
+            const fallbackRate = liveRatesMapState.get(key) ??
+              liveRatesMapState.get(`purab___${normP(rmName)}`) ??
+              liveRatesMapState.get(`pmmpl___${normP(rmName)}`) ??
+              liveRatesMapState.get(`rkl___${normP(rmName)}`) ??
+              0
 
-            if (isSpecialPPBag(rmName) && totalBagsQty > 0) {
-              const oldRate = finalRate
-              finalRate = (liftQty * finalRate) / totalBagsQty
-              console.log(`[PP BAG CALC MATCH] ${rmName}: (${liftQty} * ${oldRate}) / ${totalBagsQty} = ${finalRate}`)
-            } else {
-              console.log(`[PP BAG CALC SKIP] ${rmName}: isSpecial=${isSpecialPPBag(rmName)}, totalBagsQty=${totalBagsQty}, rate=${finalRate}`)
+            if (fallbackRate > 0) {
+              foundRate = fallbackRate
             }
+          }
 
-            ratesMap[rmName] = {
-              rate: finalRate,
-              type: String(row["Type Of Transporting Rate"] || "").trim(),
-              transportRate: calculatedTransportRate,
-              totalBagsQty,
-              billingQty: liftQty,
-            }
-          } else {
-            console.log(`[PP BAG CALC NO ROW] ${rmName} in LIFT-ACCOUNTS`)
-            ratesMap[rmName] = { rate: 0, type: "", transportRate: 0, totalBagsQty: 0, billingQty: 0 }
+          ratesMap[rmName] = {
+            rate: foundRate,
+            type: rateType,
+            transportRate: calculatedTransportRate,
+            totalBagsQty,
+            billingQty: liftQty,
           }
         })
       )

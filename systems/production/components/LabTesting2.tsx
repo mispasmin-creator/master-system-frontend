@@ -523,7 +523,7 @@ export default function LabTesting2Page() {
 
       if (!isNonTested) {
         payload.testedBy = formData.testedBy
-        payload.dateOfTest = format(formData.dateOfTest, "yyyy-MM-dd")
+        payload.dateOfTest = formData.dateOfTest ? new Date(formData.dateOfTest).toISOString() : new Date().toISOString()
         payload.bdAt110c = formData.bdAt110 ? Number(formData.bdAt110) : null
         payload.ccsAt100c = formData.ccsAt100 ? Number(formData.ccsAt100) : null
       }
