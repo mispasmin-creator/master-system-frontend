@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { CheckCircle2, Search, History, ArrowLeft, Sparkles, FileText, Calendar, Filter, ChevronRight, AlertCircle } from "lucide-react"
-import { API_URL, getToken } from "@/lib/auth"
+import { API_URL, getToken, getStoredUser } from "@/lib/auth"
 
 const CONFIG = {
   SHEET_NAME: "DELEGATION",
@@ -41,52 +41,15 @@ function ReverificationPage() {
   const [filterGivenBy, setFilterGivenBy] = useState("")
   const [filterName, setFilterName] = useState("")
 
-  const formatDateToDDMMYYYY = (date) => {
-    const day = date.getDate().toString().padStart(2, "0")
-    const month = (date.getMonth() + 1).toString().padStart(2, "0")
-    const year = date.getFullYear()
-    return `${day}/${month}/${year}`
-  }
-
   const isEmpty = (value) => {
     return value === null || value === undefined || (typeof value === "string" && value.trim() === "")
   }
 
   useEffect(() => {
-    const role = sessionStorage.getItem("role")
-    const user = sessionStorage.getItem("username")
-    setUserRole(role || "")
-    setUsername(user || "")
+    const stored = getStoredUser()
+    setUserRole((stored?.role || sessionStorage.getItem("role") || "admin").toLowerCase())
+    setUsername(stored?.username || sessionStorage.getItem("username") || "")
   }, [])
-
-  const parseGoogleSheetsDate = (dateStr) => {
-    if (!dateStr) return ""
-
-    if (typeof dateStr === "string" && dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-      return dateStr
-    }
-
-    if (typeof dateStr === "string" && dateStr.startsWith("Date(")) {
-      const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateStr)
-      if (match) {
-        const year = Number.parseInt(match[1], 10)
-        const month = Number.parseInt(match[2], 10)
-        const day = Number.parseInt(match[3], 10)
-        return `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`
-      }
-    }
-
-    try {
-      const date = new Date(dateStr)
-      if (!isNaN(date.getTime())) {
-        return formatDateToDDMMYYYY(date)
-      }
-    } catch (error) {
-      console.error("Error parsing date:", error)
-    }
-
-    return dateStr
-  }
 
   const parseDateFromDDMMYYYY = (dateStr) => {
     if (!dateStr || typeof dateStr !== "string") return null
@@ -184,15 +147,16 @@ function ReverificationPage() {
         const rowData = {
           _id: task.id,
           _rowIndex: index,
-          colA: task.createdAt ? formatDateToDDMMYYYY(new Date(task.createdAt)) : '',
+          colA: task.createdAt ? formatDateToDDMMYYYY(task.createdAt) : '',
           colB: task.taskSeq || task.id,
           colC: task.department ? task.department.name : "DELEGATION",
           colD: task.givenBy || '',
           colE: task.assignedTo || '',
           colF: task.description || '',
-          colK: task.dueDate ? formatDateToDDMMYYYY(new Date(task.dueDate)) : '',
-          colL: task.completedAt ? formatDateToDDMMYYYY(new Date(task.completedAt)) : '',
-          colS: task.verifiedAt ? formatDateToDDMMYYYY(new Date(task.verifiedAt)) : '',
+          colG: task.createdAt ? formatDateToDDMMYYYY(task.createdAt) : '',
+          colK: task.dueDate ? formatDateToDDMMYYYY(task.dueDate) : '',
+          colL: task.completedAt ? formatDateToDDMMYYYY(task.completedAt) : '',
+          colS: task.verifiedAt ? formatDateToDDMMYYYY(task.verifiedAt) : '',
           colT: task.verificationRemarks || ''
         };
 
@@ -220,8 +184,6 @@ function ReverificationPage() {
 
   // Checkbox handlers
   const handleSelectItem = useCallback((id, isChecked) => {
-    console.log(`Checkbox action: ${id} -> ${isChecked}`)
-
     setSelectedItems((prev) => {
       const newSelected = new Set(prev)
 
@@ -229,15 +191,12 @@ function ReverificationPage() {
         newSelected.add(id)
       } else {
         newSelected.delete(id)
-        // Clean up related data when unchecking
         setRemarksData((prevRemarks) => {
           const newRemarksData = { ...prevRemarks }
           delete newRemarksData[id]
           return newRemarksData
         })
       }
-
-      console.log(`Updated selection: ${Array.from(newSelected)}`)
       return newSelected
     })
   }, [])
@@ -246,7 +205,6 @@ function ReverificationPage() {
     (e, id) => {
       e.stopPropagation()
       const isChecked = e.target.checked
-      console.log(`Checkbox clicked: ${id}, checked: ${isChecked}`)
       handleSelectItem(id, isChecked)
     },
     [handleSelectItem],
@@ -256,16 +214,13 @@ function ReverificationPage() {
     (e) => {
       e.stopPropagation()
       const checked = e.target.checked
-      console.log(`Select all clicked: ${checked}`)
 
       if (checked) {
         const allIds = filteredTaskData.map((item) => item._id)
         setSelectedItems(new Set(allIds))
-        console.log(`Selected all items: ${allIds}`)
       } else {
         setSelectedItems(new Set())
         setRemarksData({})
-        console.log("Cleared all selections")
       }
     },
     [filteredTaskData],
@@ -294,14 +249,13 @@ function ReverificationPage() {
     let successCount = 0;
     
     try {
-      const curUser = sessionStorage.getItem("username") || "Unknown";
+      const stored = getStoredUser();
+      const curUser = stored?.username || sessionStorage.getItem("username") || "Unknown";
       const selectedItemsArray = Array.from(selectedItems);
       
       for (const id of selectedItemsArray) {
         const item = taskData.find((a) => a._id === id);
         if (!item) continue;
-        
-        const action = selectedActions[id] === "Verified" ? "verify" : "reopen";
         
         const res = await fetch(`${API_URL}/checklist/verification/${item.colB}/verify`, {
           method: "PATCH",
@@ -310,7 +264,7 @@ function ReverificationPage() {
             Authorization: `Bearer ${getToken()}`
           },
           body: JSON.stringify({
-            action,
+            action: "verify",
             remarks: remarksData[id] || "",
             verifiedBy: curUser
           })
@@ -324,7 +278,6 @@ function ReverificationPage() {
         setTimeout(() => setSuccessMessage(""), 5000);
         setSelectedItems(new Set());
         setRemarksData({});
-        setSelectedActions({});
         fetchSheetData();
       }
     } catch (error) {
@@ -335,7 +288,6 @@ function ReverificationPage() {
     }
   }
 
-  // Convert Set to Array for display
   const selectedItemsCount = selectedItems.size
 
   return (

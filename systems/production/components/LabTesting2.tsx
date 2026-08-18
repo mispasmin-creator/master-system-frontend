@@ -29,6 +29,7 @@ interface RawMaterial {
 
 interface ProductionItem {
   id: string
+  actualRunId?: string
   jobCardId: string
   productionId?: number | string
   jobCardNo: string
@@ -50,6 +51,7 @@ interface ProductionItem {
 
 interface HistoryItem {
   id: string
+  actualRunId?: string
   jobCardId: string
   productionId?: number | string
   jobCardNo: string
@@ -63,8 +65,6 @@ interface HistoryItem {
   test2Status: string
   bdAt110?: string
   ccsAt100?: string
-  // BD/CCS/PLC at 1100°C have no matching columns on ProductionQcCheckpoint (only
-  // bdAt110c/ccsAt100c exist) - kept in the UI/interface but always blank.
   ccsAt1100: string
   plcAt1100: string
   bdAt1100: string
@@ -377,57 +377,71 @@ export default function LabTesting2Page() {
       ;(jobCardsData || []).forEach((jc: any) => {
         if (isCancelledStatus(jc.status)) return
         const order = jc.order || {}
-        const actualRun = (jc.actualRuns && jc.actualRuns[0]) || null
-        if (!actualRun) return
+        const actualRuns = (jc.actualRuns || []).slice().sort((a: any, b: any) => 
+          new Date(a.createdAt || a.dateOfProduction || 0).getTime() - new Date(b.createdAt || b.dateOfProduction || 0).getTime()
+        )
+        if (actualRuns.length === 0) return
 
-        const lab1Check = (jc.qcChecks || []).find((c: any) => c.stage === "lab1")
-        // Lab 2 only becomes relevant once Lab 1 has a recorded decision (tested, non
-        // tested, or auto-skipped from Lab 1 - see LabTesting1's save handler).
-        if (!lab1Check) return
-        const lab2Check = (jc.qcChecks || []).find((c: any) => c.stage === LAB2_STAGE)
+        const lab1Checks = (jc.qcChecks || [])
+          .filter((c: any) => c.stage === "lab1")
+          .sort((a: any, b: any) => new Date(a.createdAt || a.dateOfTest || 0).getTime() - new Date(b.createdAt || b.dateOfTest || 0).getTime())
 
-        const base = {
-          id: jc.id,
-          jobCardId: jc.id,
-          productionId: order.id ?? "",
-          jobCardNo: String(jc.jobCardNo || "").trim(),
-          deliveryOrderNo: String(order.deliveryOrderNo || ""),
-          partyName: String(order.partyName || ""),
-          productName: String(order.productName || ""),
-          quantity: Number(actualRun.quantityFg || jc.quantity || 0),
-          expectedDeliveryDate: order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy") : "",
-          priority: String(order.priority || ""),
-          dateOfProduction: actualRun.dateOfProduction
-            ? format(new Date(actualRun.dateOfProduction), "dd/MM/yyyy")
-            : (jc.dateOfProduction ? format(new Date(jc.dateOfProduction), "dd/MM/yyyy") : ""),
-          // No "Planned Date" concept remains for this stage in the new schema.
-          plannedDate: "",
-          supervisorName: String(actualRun.supervisorName || jc.supervisorName || ""),
-          shift: String(jc.shift || ""),
-          rawMaterials: buildRawMaterials(actualRun.materials),
-          machineHours: actualRun.machineHours != null ? String(actualRun.machineHours) : "-",
-          labTest1Status: String(lab1Check.status || "N/A"),
-          firmName: String(order.firmName || ""),
-        }
+        const lab2Checks = (jc.qcChecks || [])
+          .filter((c: any) => c.stage === LAB2_STAGE)
+          .sort((a: any, b: any) => new Date(a.createdAt || a.dateOfTest || 0).getTime() - new Date(b.createdAt || b.dateOfTest || 0).getTime())
 
-        if (!lab2Check) {
-          pendingData.push(base as ProductionItem)
-        } else {
-          historyData.push({
-            ...base,
-            test1Status: base.labTest1Status,
-            dateOfTest2: lab2Check.dateOfTest ? format(new Date(lab2Check.dateOfTest), "dd/MM/yyyy") : "",
-            testedBy: String(lab2Check.testedBy || ""),
-            test2Status: String(lab2Check.status || "N/A"),
-            bdAt110: lab2Check.bdAt110c != null ? String(lab2Check.bdAt110c) : "",
-            ccsAt100: lab2Check.ccsAt100c != null ? String(lab2Check.ccsAt100c) : "",
-            // BD/CCS/PLC at 1100°C have no matching columns on ProductionQcCheckpoint.
-            ccsAt1100: "",
-            plcAt1100: "",
-            bdAt1100: "",
-            test2CompletedAt: lab2Check.createdAt ? format(new Date(lab2Check.createdAt), "dd/MM/yy HH:mm") : "",
-          } as HistoryItem)
-        }
+        actualRuns.forEach((actualRun: any, idx: number) => {
+          const lab1Check = lab1Checks.find((c: any) => c.actualRunId === actualRun.id) || 
+            (idx < lab1Checks.length && !lab1Checks[idx].actualRunId ? lab1Checks[idx] : null)
+          // Lab 2 only becomes relevant once Lab 1 has a recorded decision
+          if (!lab1Check) return
+
+          const lab2Check = lab2Checks.find((c: any) => c.actualRunId === actualRun.id) || 
+            (idx < lab2Checks.length && !lab2Checks[idx].actualRunId ? lab2Checks[idx] : null)
+
+          const base = {
+            id: actualRun.id,
+            actualRunId: actualRun.id,
+            jobCardId: jc.id,
+            productionId: order.id ?? "",
+            jobCardNo: String(jc.jobCardNo || "").trim(),
+            deliveryOrderNo: String(order.deliveryOrderNo || ""),
+            partyName: String(order.partyName || ""),
+            productName: String(order.productName || ""),
+            quantity: Number(actualRun.quantityFg || 0),
+            expectedDeliveryDate: order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy") : "",
+            priority: String(order.priority || ""),
+            dateOfProduction: actualRun.dateOfProduction
+              ? format(new Date(actualRun.dateOfProduction), "dd/MM/yyyy")
+              : (jc.dateOfProduction ? format(new Date(jc.dateOfProduction), "dd/MM/yyyy") : ""),
+            // No "Planned Date" concept remains for this stage in the new schema.
+            plannedDate: "",
+            supervisorName: String(actualRun.supervisorName || jc.supervisorName || ""),
+            shift: String(jc.shift || ""),
+            rawMaterials: buildRawMaterials(actualRun.materials),
+            machineHours: actualRun.machineHours != null ? String(actualRun.machineHours) : "-",
+            labTest1Status: String(lab1Check.status || "N/A"),
+            firmName: String(order.firmName || ""),
+          }
+
+          if (!lab2Check) {
+            pendingData.push(base as ProductionItem)
+          } else {
+            historyData.push({
+              ...base,
+              test1Status: base.labTest1Status,
+              dateOfTest2: lab2Check.dateOfTest ? format(new Date(lab2Check.dateOfTest), "dd/MM/yyyy") : "",
+              testedBy: String(lab2Check.testedBy || ""),
+              test2Status: String(lab2Check.status || "N/A"),
+              bdAt110: lab2Check.bdAt110c != null ? String(lab2Check.bdAt110c) : "",
+              ccsAt100: lab2Check.ccsAt100c != null ? String(lab2Check.ccsAt100c) : "",
+              ccsAt1100: lab2Check.ccsAt1100c != null ? String(lab2Check.ccsAt1100c) : "",
+              plcAt1100: lab2Check.plcAt1100c != null ? String(lab2Check.plcAt1100c) : "",
+              bdAt1100: lab2Check.bdAt1100c != null ? String(lab2Check.bdAt1100c) : "",
+              test2CompletedAt: lab2Check.createdAt ? format(new Date(lab2Check.createdAt), "dd/MM/yy HH:mm") : "",
+            } as HistoryItem)
+          }
+        })
       })
 
       const userFirms = user?.firm ? user.firm.split(',').map((f: string) => f.trim()).filter(Boolean) : []
@@ -506,10 +520,6 @@ export default function LabTesting2Page() {
     try {
       const isNonTested = formData.testStatus === "Non Tested"
 
-      // Only jobCardId/stage/dateOfTest/testedBy/bdAt110c/ccsAt100c/status map to real
-      // columns on ProductionQcCheckpoint. BD/CCS/PLC at 1100°C and free-text remarks
-      // have no matching column, so remarks are folded into `status` (Non Tested case)
-      // and the 1100°C readings are simply not sent.
       let statusNote = String(formData.testStatus)
       if (isNonTested && formData.remarks?.trim()) {
         statusNote = `${statusNote}: ${formData.remarks.trim()}`
@@ -517,8 +527,10 @@ export default function LabTesting2Page() {
 
       const payload: any = {
         jobCardId: selectedTest.jobCardId,
+        actualRunId: selectedTest.actualRunId || selectedTest.id,
         stage: LAB2_STAGE,
         status: statusNote,
+        remarks: formData.remarks?.trim() || null,
       }
 
       if (!isNonTested) {
@@ -526,6 +538,9 @@ export default function LabTesting2Page() {
         payload.dateOfTest = formData.dateOfTest ? new Date(formData.dateOfTest).toISOString() : new Date().toISOString()
         payload.bdAt110c = formData.bdAt110 ? Number(formData.bdAt110) : null
         payload.ccsAt100c = formData.ccsAt100 ? Number(formData.ccsAt100) : null
+        payload.bdAt1100c = formData.bdAt1100 ? Number(formData.bdAt1100) : null
+        payload.ccsAt1100c = formData.ccsAt1100 ? Number(formData.ccsAt1100) : null
+        payload.plcAt1100c = formData.plcAt1100 ? Number(formData.plcAt1100) : null
       }
 
       const { error: createErr } = await productionApi.post(QC_CHECKPOINTS_TABLE, payload)

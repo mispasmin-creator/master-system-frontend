@@ -157,9 +157,9 @@ const checklistTabs = [
   { id: 'delegation', label: 'Delegation', stepName: 'Delegation', path: '/delegation' },
   { id: 'verification', label: 'Verification', stepName: 'Verification', path: '/verification' },
   { id: 'companies', label: 'Companies', stepName: 'Companies', path: '/companies' },
-  { id: 'license', label: 'License', stepName: 'License', path: '/license' },
-  { id: 'training-video', label: 'Training Video', stepName: 'Training Video', path: '/training-video' },
-  { id: 'checklist-master', label: 'Checklist Master', stepName: 'Checklist Master', path: '/checklist-master' }
+  // { id: 'license', label: 'License', stepName: 'License', path: '/license' },
+  // { id: 'training-video', label: 'Training Video', stepName: 'Training Video', path: '/training-video' },
+  // { id: 'checklist-master', label: 'Checklist Master', stepName: 'Checklist Master', path: '/checklist-master' }
 ];
 
 const freightPaymentTabs = [

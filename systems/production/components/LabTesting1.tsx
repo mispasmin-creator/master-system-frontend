@@ -30,6 +30,7 @@ interface RawMaterial {
 
 interface ProductionItem {
   _rowIndex: string
+  actualRunId?: string
   jobCardId: string
   productionId?: number | string
   jobCardNo: string
@@ -50,6 +51,7 @@ interface ProductionItem {
 
 interface HistoryItem {
   _rowIndex: string
+  actualRunId?: string
   jobCardId: string
   productionId?: number | string
   jobCardNo: string
@@ -394,54 +396,64 @@ export default function LabTesting1Page() {
       ;(jobCardsData || []).forEach((jc: any) => {
         if (isCancelledStatus(jc.status)) return
         const order = jc.order || {}
-        const actualRun = (jc.actualRuns && jc.actualRuns[0]) || null
+        const actualRuns = (jc.actualRuns || []).slice().sort((a: any, b: any) => 
+          new Date(a.createdAt || a.dateOfProduction || 0).getTime() - new Date(b.createdAt || b.dateOfProduction || 0).getTime()
+        )
         // A job only reaches Lab Test 1 once actual production has been logged.
-        if (!actualRun) return
+        if (actualRuns.length === 0) return
 
-        const lab1Check = (jc.qcChecks || []).find((c: any) => c.stage === LAB1_STAGE)
+        const lab1Checks = (jc.qcChecks || [])
+          .filter((c: any) => c.stage === LAB1_STAGE)
+          .sort((a: any, b: any) => new Date(a.createdAt || a.dateOfTest || 0).getTime() - new Date(b.createdAt || b.dateOfTest || 0).getTime())
 
-        const base = {
-          _rowIndex: jc.id,
-          jobCardId: jc.id,
-          productionId: order.id ?? "",
-          jobCardNo: String(jc.jobCardNo || "").trim(),
-          firmName: String(order.firmName || ""),
-          deliveryOrderNo: String(order.deliveryOrderNo || ""),
-          partyName: String(order.partyName || ""),
-          productName: String(order.productName || ""),
-          quantity: Number(actualRun.quantityFg || jc.quantity || 0),
-          expectedDeliveryDate: order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy") : "",
-          priority: String(order.priority || ""),
-          dateOfProduction: actualRun.dateOfProduction
-            ? format(new Date(actualRun.dateOfProduction), "dd/MM/yyyy")
-            : (jc.dateOfProduction ? format(new Date(jc.dateOfProduction), "dd/MM/yyyy") : ""),
-          supervisorName: String(actualRun.supervisorName || jc.supervisorName || ""),
-          shift: String(jc.shift || ""),
-          rawMaterials: buildRawMaterials(actualRun.materials),
-          machineHours: actualRun.machineHours != null ? String(actualRun.machineHours) : "-",
-          // No "Planned Date" concept remains for this stage in the new schema.
-          plannedDate: "",
-        }
+        actualRuns.forEach((actualRun: any, idx: number) => {
+          const lab1Check = lab1Checks.find((c: any) => c.actualRunId === actualRun.id) || 
+            (idx < lab1Checks.length && !lab1Checks[idx].actualRunId ? lab1Checks[idx] : null)
 
-        if (!lab1Check) {
-          pendingData.push(base as ProductionItem)
-        } else {
-          historyData.push({
-            ...base,
-            testStatus: String(lab1Check.status || ""),
-            dateOfTest: lab1Check.dateOfTest ? format(new Date(lab1Check.dateOfTest), "dd/MM/yy") : "",
-            testedBy: String(lab1Check.testedBy || ""),
-            wcPercentage: lab1Check.wcPercent != null ? String(lab1Check.wcPercent) : "",
-            initialSettingTime: String(lab1Check.initialSettingTime || ""),
-            finalSettingTime: String(lab1Check.finalSettingTime || ""),
-            whatToBeMixed: String(lab1Check.whatToBeMixed || ""),
-            flowOfMaterial: String(lab1Check.flowOfMaterial || ""),
-            sieveAnalysisTest: String(lab1Check.sieveAnalysis || ""),
-            test1CompletedAt: lab1Check.createdAt || "",
-            timestamp: lab1Check.createdAt ? format(new Date(lab1Check.createdAt), "dd/MM/yyyy HH:mm:ss") : "",
-            labTest1Remarks: String(lab1Check.remarks || ""),
-          } as HistoryItem)
-        }
+          const base = {
+            _rowIndex: actualRun.id,
+            actualRunId: actualRun.id,
+            jobCardId: jc.id,
+            productionId: order.id ?? "",
+            jobCardNo: String(jc.jobCardNo || "").trim(),
+            firmName: String(order.firmName || ""),
+            deliveryOrderNo: String(order.deliveryOrderNo || ""),
+            partyName: String(order.partyName || ""),
+            productName: String(order.productName || ""),
+            quantity: Number(actualRun.quantityFg || 0),
+            expectedDeliveryDate: order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy") : "",
+            priority: String(order.priority || ""),
+            dateOfProduction: actualRun.dateOfProduction
+              ? format(new Date(actualRun.dateOfProduction), "dd/MM/yyyy")
+              : (jc.dateOfProduction ? format(new Date(jc.dateOfProduction), "dd/MM/yyyy") : ""),
+            supervisorName: String(actualRun.supervisorName || jc.supervisorName || ""),
+            shift: String(jc.shift || ""),
+            rawMaterials: buildRawMaterials(actualRun.materials),
+            machineHours: actualRun.machineHours != null ? String(actualRun.machineHours) : "-",
+            // No "Planned Date" concept remains for this stage in the new schema.
+            plannedDate: "",
+          }
+
+          if (!lab1Check) {
+            pendingData.push(base as ProductionItem)
+          } else {
+            historyData.push({
+              ...base,
+              testStatus: String(lab1Check.status || ""),
+              dateOfTest: lab1Check.dateOfTest ? format(new Date(lab1Check.dateOfTest), "dd/MM/yy") : "",
+              testedBy: String(lab1Check.testedBy || ""),
+              wcPercentage: lab1Check.wcPercent != null ? String(lab1Check.wcPercent) : "",
+              initialSettingTime: String(lab1Check.initialSettingTime || ""),
+              finalSettingTime: String(lab1Check.finalSettingTime || ""),
+              whatToBeMixed: String(lab1Check.whatToBeMixed || ""),
+              flowOfMaterial: String(lab1Check.flowOfMaterial || ""),
+              sieveAnalysisTest: String(lab1Check.sieveAnalysis || ""),
+              test1CompletedAt: lab1Check.createdAt || "",
+              timestamp: lab1Check.createdAt ? format(new Date(lab1Check.createdAt), "dd/MM/yyyy HH:mm:ss") : "",
+              labTest1Remarks: String(lab1Check.remarks || ""),
+            } as HistoryItem)
+          }
+        })
       })
 
       const firmSearchValues = getFirmMatchValues(user?.firm)
@@ -521,10 +533,6 @@ export default function LabTesting1Page() {
       const isDirectSupply = formData.testStatus === "Direct supply"
       const isSkipped = isNonTested || isDirectSupply
 
-      // Only jobCardId/stage/dateOfTest/testedBy/wcPercent/status map to real columns on
-      // ProductionQcCheckpoint. InitialSettingTime, FinalSettingTime, WhatToBeMixed,
-      // FlowOfMaterial and SieveAnalysis have no backend column, so they're folded into
-      // the `status` note (for the skip case) instead of being silently dropped.
       let statusNote = String(formData.testStatus)
       if (isSkipped && formData.labTest1Remarks?.trim()) {
         statusNote = `${statusNote}: ${formData.labTest1Remarks.trim()}`
@@ -532,6 +540,7 @@ export default function LabTesting1Page() {
 
       const payload: any = {
         jobCardId: selectedProduction.jobCardId,
+        actualRunId: selectedProduction.actualRunId || selectedProduction._rowIndex,
         stage: LAB1_STAGE,
         status: statusNote,
         remarks: formData.labTest1Remarks?.trim() || null,
@@ -551,19 +560,18 @@ export default function LabTesting1Page() {
       const { error: createErr } = await productionApi.post(QC_CHECKPOINTS_TABLE, payload)
       if (createErr) throw createErr
 
-      // Mirrors the old sheet's "skip forward" behaviour: if Lab Test 1 was skipped
-      // (Non Tested / Direct supply), Lab Test 2 and Chemical Test are auto-marked as
-      // skipped too so this job card doesn't sit pending in those stages.
       if (isSkipped) {
         const skipStatus = `Skipped (Lab 1: ${formData.testStatus})`
         const { error: lab2Err } = await productionApi.post(QC_CHECKPOINTS_TABLE, {
           jobCardId: selectedProduction.jobCardId,
+          actualRunId: selectedProduction.actualRunId || selectedProduction._rowIndex,
           stage: LAB2_STAGE,
           status: skipStatus,
         })
         if (lab2Err) throw lab2Err
         const { error: chemErr } = await productionApi.post(QC_CHECKPOINTS_TABLE, {
           jobCardId: selectedProduction.jobCardId,
+          actualRunId: selectedProduction.actualRunId || selectedProduction._rowIndex,
           stage: CHEMICAL_STAGE,
           status: skipStatus,
         })

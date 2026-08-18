@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { CheckCircle2, Upload, X, Search, History, ArrowLeft, Filter, Sparkles, FileText, AlertCircle, User, Calendar, ChevronRight } from "lucide-react"
-import { API_URL, getToken } from "@/lib/auth"
+import { API_URL, getToken, getStoredUser } from "@/lib/auth"
 
 const CONFIG = {
   SOURCE_SHEET_NAME: "DELEGATION",
@@ -52,70 +52,66 @@ function DelegationDataPage() {
   const [filterGivenBy, setFilterGivenBy] = useState("")
   const [filterName, setFilterName] = useState("")
 
+  useEffect(() => {
+    const stored = getStoredUser()
+    const role = stored?.role || sessionStorage.getItem("role") || "admin"
+    const user = stored?.username || sessionStorage.getItem("username") || ""
+    setUserRole(role)
+    setUsername(user)
+  }, [])
+
   // Debounced search term for better performance
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   const formatDateToDDMMYYYY = useCallback((date) => {
-    const day = date.getDate().toString().padStart(2, "0")
-    const month = (date.getMonth() + 1).toString().padStart(2, "0")
-    const year = date.getFullYear()
+    if (!date) return ""
+    const d = new Date(date)
+    if (isNaN(d.getTime())) return ""
+    const day = d.getDate().toString().padStart(2, "0")
+    const month = (d.getMonth() + 1).toString().padStart(2, "0")
+    const year = d.getFullYear()
     return `${day}/${month}/${year}`
   }, [])
 
-  const isEmpty = useCallback((value) => {
-    return value === null || value === undefined || (typeof value === "string" && value.trim() === "")
-  }, [])
+  const parseGoogleSheetsDate = useCallback((dateStr) => {
+    if (!dateStr) return ""
 
-  useEffect(() => {
-    const role = sessionStorage.getItem("role")
-    const user = sessionStorage.getItem("username")
-    setUserRole(role || "")
-    setUsername(user || "")
-  }, [])
-
-  const parseGoogleSheetsDate = useCallback(
-    (dateStr) => {
-      if (!dateStr) return ""
-
-      // If it's already in DD/MM/YYYY format, return as is
-      if (typeof dateStr === "string" && dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
-        // Ensure proper padding for DD/MM/YYYY format
-        const parts = dateStr.split("/")
-        if (parts.length === 3) {
-          const day = parts[0].padStart(2, "0")
-          const month = parts[1].padStart(2, "0")
-          const year = parts[2]
-          return `${day}/${month}/${year}`
-        }
-        return dateStr
+    // If it's already in DD/MM/YYYY format, return as is
+    if (typeof dateStr === "string" && dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+      const parts = dateStr.split("/")
+      if (parts.length === 3) {
+        const day = parts[0].padStart(2, "0")
+        const month = parts[1].padStart(2, "0")
+        const year = parts[2]
+        return `${day}/${month}/${year}`
       }
-
-      // Handle Google Sheets Date() format
-      if (typeof dateStr === "string" && dateStr.startsWith("Date(")) {
-        const match = /Date$$(\d+),(\d+),(\d+)$$/.exec(dateStr)
-        if (match) {
-          const year = Number.parseInt(match[1], 10)
-          const month = Number.parseInt(match[2], 10)
-          const day = Number.parseInt(match[3], 10)
-          return `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`
-        }
-      }
-
-      // Handle other date formats
-      try {
-        const date = new Date(dateStr)
-        if (!isNaN(date.getTime())) {
-          return formatDateToDDMMYYYY(date)
-        }
-      } catch (error) {
-        console.error("Error parsing date:", error)
-      }
-
-      // If all else fails, return the original string
       return dateStr
-    },
-    [formatDateToDDMMYYYY],
-  )
+    }
+
+    // Handle Google Sheets Date() format
+    if (typeof dateStr === "string" && dateStr.startsWith("Date(")) {
+      const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateStr)
+      if (match) {
+        const year = Number.parseInt(match[1], 10)
+        const month = Number.parseInt(match[2], 10)
+        const day = Number.parseInt(match[3], 10)
+        return `${day.toString().padStart(2, "0")}/${(month + 1).toString().padStart(2, "0")}/${year}`
+      }
+    }
+
+    // Handle other date formats
+    try {
+      const date = new Date(dateStr)
+      if (!isNaN(date.getTime())) {
+        return formatDateToDDMMYYYY(date)
+      }
+    } catch (error) {
+      console.error("Error parsing date:", error)
+    }
+
+    // If all else fails, return the original string
+    return dateStr
+  }, [formatDateToDDMMYYYY])
 
   const formatDateForDisplay = useCallback(
     (dateStr) => {
@@ -264,8 +260,9 @@ function DelegationDataPage() {
       const delegationTasks = tasks.filter(t => t.taskType === 'delegation' && t.status !== 'Completed' && t.status !== 'Verified');
       const historyTasks = tasks.filter(t => t.taskType === 'delegation' && (t.status === 'Completed' || t.status === 'Verified'));
       
-      const currentUsername = sessionStorage.getItem("username") || "";
-      const currentUserRole = sessionStorage.getItem("role") || "";
+      const stored = getStoredUser();
+      const currentUsername = stored?.username || sessionStorage.getItem("username") || "";
+      const currentUserRole = (stored?.role || sessionStorage.getItem("role") || "admin").toLowerCase();
       
       const mapTask = (t) => {
         return {
@@ -273,7 +270,7 @@ function DelegationDataPage() {
           _taskId: t.id,
           col0: t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-GB') : "",
           col1: t.id,
-          col2: t.firmName || "N/A",
+          col2: t.department ? t.department.name : (t.firmName || "DELEGATION"),
           col3: t.givenBy || "",
           col4: t.assignedTo || "Unassigned",
           col5: t.description || "",
@@ -288,7 +285,7 @@ function DelegationDataPage() {
       };
       
       const mappedTasks = delegationTasks.map(mapTask).filter(t => 
-        currentUserRole === 'admin' || t.col4.toLowerCase() === currentUsername.toLowerCase()
+        currentUserRole === 'admin' || !currentUsername || (t.col4 && t.col4.toLowerCase() === currentUsername.toLowerCase())
       );
       
       setAccountData(mappedTasks);
@@ -436,7 +433,8 @@ function DelegationDataPage() {
     let successCount = 0;
     
     try {
-      const curUser = sessionStorage.getItem("username") || "Unknown";
+      const stored = getStoredUser();
+      const curUser = stored?.username || sessionStorage.getItem("username") || "Unknown";
       
       for (const id of selectedItemsArray) {
         const item = accountData.find(a => a._id === id);

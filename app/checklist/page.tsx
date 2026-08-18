@@ -1,4 +1,5 @@
 'use client';
+// Force Next.js refresh
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';

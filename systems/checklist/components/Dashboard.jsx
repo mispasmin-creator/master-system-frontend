@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { API_URL, getToken } from "@/lib/auth"
+import { API_URL, getToken, getStoredUser } from "@/lib/auth"
 import { BarChart3, CheckCircle2, Clock, ListTodo, Users, AlertTriangle, Filter, TrendingUp, Calendar, Target } from 'lucide-react'
 import {
   BarChart,
@@ -272,8 +272,9 @@ export default function AdminDashboard() {
       const taskJson = await taskRes.json();
       const allTasksRaw = (taskJson.data && Array.isArray(taskJson.data)) ? taskJson.data : [];
 
-      const username = sessionStorage.getItem('username') || '';
-      const userRole = sessionStorage.getItem('role') || '';
+      const stored = getStoredUser();
+      const username = stored?.username || sessionStorage.getItem('username') || '';
+      const userRole = (stored?.role || sessionStorage.getItem('role') || 'admin').toLowerCase();
 
       const monthlyData = {
         Jan: { completed: 0, pending: 0 }, Feb: { completed: 0, pending: 0 }, Mar: { completed: 0, pending: 0 },
@@ -287,7 +288,7 @@ export default function AdminDashboard() {
 
       // Fix 2: Delegation detection uses taskType or departmentId check
       const filteredRawTasks = allTasksRaw.filter(task => {
-        const isUserMatch = userRole === 'admin' || (task.assignedTo || '').toLowerCase() === username.toLowerCase();
+        const isUserMatch = userRole === 'admin' || !username || (task.assignedTo || '').toLowerCase() === username.toLowerCase();
         if (!isUserMatch) return false;
         
         if (dashboardType === 'delegation') {

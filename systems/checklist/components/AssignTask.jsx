@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { BellRing, FileCheck, Calendar, Clock, Users, FileText, Sparkles, CheckCircle2, AlertCircle } from "lucide-react"
 import { API_URL, getToken } from "@/lib/auth";
 
@@ -158,9 +158,37 @@ export default function AssignTask() {
   const [showCalendar, setShowCalendar] = useState(false);
   const [accordionOpen, setAccordionOpen] = useState(false);
 
+  const [checklistMasterList, setChecklistMasterList] = useState([]);
   const [departmentOptions, setDepartmentOptions] = useState([]);
   const [givenByOptions, setGivenByOptions] = useState([]);
-  const [doerOptions, setDoerOptions] = useState([]);
+
+  const [formData, setFormData] = useState({
+    taskType: "checklist",
+    department: "",
+    givenBy: "",
+    doer: "",
+    description: "",
+    frequency: "daily",
+    enableReminders: true,
+    requireAttachment: false,
+  });
+
+  // Cascading Doer options filtered by selected Firm
+  const doerOptions = useMemo(() => {
+    let list = checklistMasterList;
+    if (formData.department && formData.department.trim() !== "") {
+      const selectedFirm = formData.department.trim().toLowerCase();
+      const filtered = list.filter(
+        (r) => (r.firm || "").trim().toLowerCase() === selectedFirm
+      );
+      if (filtered.length > 0) {
+        list = filtered;
+      }
+    }
+    return Array.from(
+      new Set(list.map((r) => r.doerName && String(r.doerName).trim()).filter(Boolean))
+    ).sort();
+  }, [checklistMasterList, formData.department]);
 
   const frequencies = [
     // { value: "one-time", label: "One Time (No Recurrence)" },
@@ -177,17 +205,6 @@ export default function AssignTask() {
     { value: "end-of-last-week", label: "End of Last Week" },
   ];
 
-  const [formData, setFormData] = useState({
-    taskType: "checklist",
-    department: "",
-    givenBy: "",
-    doer: "",
-    description: "",
-    frequency: "daily",
-    enableReminders: true,
-    requireAttachment: false,
-  });
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -199,21 +216,31 @@ export default function AssignTask() {
 
   const fetchMasterSheetOptions = async () => {
     try {
-      const response = await fetch(`${API_URL}/checklist/department`, {
+      let response = await fetch(`${API_URL}/checklist/master`, {
         headers: { Authorization: `Bearer ${getToken()}` }
       });
+      if (!response.ok) {
+        response = await fetch(`${API_URL}/checklist-master`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
+      }
       const result = await response.json();
-      const depts = (result.data || []).map(d => d.name);
-      if (!depts.includes("REFRATECH")) depts.push("REFRATECH");
-      
-      setDepartmentOptions(depts);
-      setGivenByOptions(["Admin", "Manager"]); // Mock fallback since we don't have a users endpoint
-      setDoerOptions(["Staff", "Employee"]); // Mock fallback
+      const list = result.data || [];
+      setChecklistMasterList(list);
+
+      // Distinct Firm Names
+      const firms = Array.from(
+        new Set(list.map((r) => r.firm && String(r.firm).trim()).filter(Boolean))
+      ).sort();
+      setDepartmentOptions(firms);
+
+      // Distinct Given By
+      const givenBys = Array.from(
+        new Set(list.map((r) => r.givenBy && String(r.givenBy).trim()).filter(Boolean))
+      ).sort();
+      setGivenByOptions(givenBys);
     } catch (error) {
-      console.error("Error fetching master sheet options:", error);
-      setDepartmentOptions(["Department 1", "Department 2"]);
-      setGivenByOptions(["User 1", "User 2"]);
-      setDoerOptions(["Doer 1", "Doer 2"]);
+      console.error("Error fetching master options from checklist_master:", error);
     }
   };
 
@@ -226,11 +253,6 @@ export default function AssignTask() {
     fetchMasterSheetOptions();
   }, []);
 
-  const getLastTaskId = async (sheetName) => {
-    // The backend now handles taskSeq automatically during task batch creation.
-    return 0;
-  };
-
   const formatDateToDDMMYYYY = (date) => {
     const d = new Date(date);
     const day = d.getDate().toString().padStart(2, "0");
@@ -239,9 +261,21 @@ export default function AssignTask() {
     return `${day}/${month}/${year}`;
   };
 
-  const fetchWorkingDays = async () => {
-    // Return empty array to use default working days logic
-    return [];
+  const fetchWorkingDays = async (refDate) => {
+    const days = [];
+    const start = refDate ? new Date(refDate) : new Date();
+    start.setDate(start.getDate() - 7);
+    start.setHours(0, 0, 0, 0);
+
+    const current = new Date(start);
+    for (let i = 0; i < 400; i++) {
+      // Include working days Monday - Saturday (skip Sunday = 0)
+      if (current.getDay() !== 0) {
+        days.push(formatDateToDDMMYYYY(current));
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    return days;
   };
 
   const findClosestWorkingDayIndex = (workingDays, targetDateStr) => {
@@ -272,11 +306,7 @@ export default function AssignTask() {
       return;
     }
 
-    const workingDays = await fetchWorkingDays();
-    if (workingDays.length === 0) {
-      alert("Could not retrieve working days. Please make sure the Working Day Calendar sheet is properly set up.");
-      return;
-    }
+    const workingDays = await fetchWorkingDays(date);
 
     const sortedWorkingDays = [...workingDays].sort((a, b) => {
       const [dayA, monthA, yearA] = a.split('/').map(Number);
@@ -293,7 +323,7 @@ export default function AssignTask() {
     });
 
     if (futureDates.length === 0) {
-      alert("No working days found on or after your selected date. Please choose a different start date or update the Working Day Calendar.");
+      alert("No working days found on or after your selected date. Please choose a different start date.");
       return;
     }
 
@@ -302,7 +332,6 @@ export default function AssignTask() {
 
     if (startIndex === -1) {
       startIndex = 0;
-      alert(`The selected date (${startDateStr}) is not in the Working Day Calendar. The next available working day will be used instead: ${futureDates[0]}`);
     }
 
     const tasks = [];
@@ -508,54 +537,49 @@ export default function AssignTask() {
         return;
       }
 
-      const submitSheetName = formData.taskType === "delegation" ? "DELEGATION" : formData.department;
-
-      const lastTaskId = await getLastTaskId(submitSheetName);
-      let nextTaskId = lastTaskId + 1;
-
-      const tasksData = generatedTasks.map((task, index) => ({
-        timestamp: formatDateToDDMMYYYY(new Date()),
-        taskId: (nextTaskId + index).toString(),
-        firm: task.department,
-        givenBy: task.givenBy,
-        name: task.doer,
-        description: task.description,
-        startDate: task.dueDate,
-        freq: task.frequency,
-        enableReminders: task.enableReminders ? "Yes" : "No",
-        requireAttachment: task.requireAttachment ? "Yes" : "No"
-      }));
-
-      console.log(`Submitting ${tasksData.length} tasks in batch to ${submitSheetName} sheet:`, tasksData);
-
-      const formPayload = new FormData();
-      formPayload.append("sheetName", submitSheetName);
-      formPayload.append("action", "insert");
-      formPayload.append("batchInsert", "true");
-      formPayload.append("rowData", JSON.stringify(tasksData));
-
-      await fetch(
-        "http://localhost:3000/api/mock",
-        {
-          method: "POST",
-          body: formPayload,
-          mode: "no-cors",
+      const occurrences = generatedTasks.map((task) => {
+        let isoDueDate = new Date().toISOString();
+        if (task.dueDate) {
+          const parts = task.dueDate.split('/');
+          if (parts.length === 3) {
+            const d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10), 12, 0, 0);
+            if (!isNaN(d.getTime())) isoDueDate = d.toISOString();
+          }
         }
-      );
-
-      alert(`Successfully submitted ${generatedTasks.length} tasks to ${submitSheetName} sheet in one batch!`);
-
-      console.log("sendTaskAssignedNotification", {
-        doer: formData.doer,
-        description: formData.description,
-        department: formData.taskType === "delegation" ? "DELEGATION" : formData.department,
-        givenBy: formData.givenBy,
-        frequency: formData.frequency,
-        startDate: generatedTasks[0]?.dueDate || formatDateToDDMMYYYY(selectedDate),
-        totalTasks: generatedTasks.length,
-        requireAttachment: formData.requireAttachment,
-        enableReminders: formData.enableReminders,
+        return {
+          dueDate: isoDueDate
+        };
       });
+
+      const payload = {
+        taskType: formData.taskType,
+        departmentName: formData.taskType === "delegation" ? null : formData.department,
+        firm: formData.taskType === "delegation" ? null : formData.department,
+        givenBy: formData.givenBy,
+        assignedTo: formData.doer,
+        description: formData.description,
+        frequency: formData.frequency,
+        startDate: date ? date.toISOString() : new Date().toISOString(),
+        enableReminders: formData.enableReminders,
+        requireAttachment: formData.requireAttachment,
+        occurrences
+      };
+
+      const response = await fetch(`${API_URL}/checklist/task/batch`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || `Failed to assign tasks (Status ${response.status})`);
+      }
+
+      alert(`Successfully assigned ${generatedTasks.length} task(s)!`);
 
       setFormData({
         taskType: "checklist",
@@ -572,7 +596,7 @@ export default function AssignTask() {
       setAccordionOpen(false);
     } catch (error) {
       console.error("Submission error:", error);
-      alert("Failed to assign tasks. Please try again.");
+      alert(`Error: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -666,7 +690,7 @@ export default function AssignTask() {
                     required
                     className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                   >
-                    <option value="">Select Department</option>
+                    <option value="">Select Firm Name</option>
                     {departmentOptions.map((dept, index) => (
                       <option key={index} value={dept}>
                         {dept}
@@ -712,7 +736,7 @@ export default function AssignTask() {
                     required
                     className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                   >
-                    <option value="">Select Doer</option>
+                    <option value="">Select Doer's Name</option>
                     {doerOptions.map((doer, index) => (
                       <option key={index} value={doer}>
                         {doer}

@@ -32,6 +32,7 @@ interface RawMaterial {
 
 interface PendingChemicalTestItem {
   id: string
+  actualRunId?: string
   jobCardId: string
   productionId?: number | string
   jobCardNo: string
@@ -53,6 +54,7 @@ interface PendingChemicalTestItem {
 
 interface HistoryChemicalTestItem {
   id: string
+  actualRunId?: string
   jobCardId: string
   productionId?: number | string
   jobCardNo: string
@@ -262,60 +264,81 @@ export default function ChemicalTestPage() {
       ;(jobCardsData || []).forEach((jc: any) => {
         if (isCancelledStatus(jc.status)) return
         const order = jc.order || {}
-        const actualRun = (jc.actualRuns && jc.actualRuns[0]) || null
-        if (!actualRun) return
+        const actualRuns = (jc.actualRuns || []).slice().sort((a: any, b: any) => 
+          new Date(a.createdAt || a.dateOfProduction || 0).getTime() - new Date(b.createdAt || b.dateOfProduction || 0).getTime()
+        )
+        if (actualRuns.length === 0) return
 
-        const lab1Check = (jc.qcChecks || []).find((c: any) => c.stage === "lab1")
-        const lab2Check = (jc.qcChecks || []).find((c: any) => c.stage === LAB2_STAGE)
-        // Chemical testing only becomes relevant once Lab 2 has a recorded decision.
-        if (!lab2Check) return
-        const chemicalCheck = (jc.qcChecks || []).find((c: any) => c.stage === CHEMICAL_STAGE)
+        const lab1Checks = (jc.qcChecks || [])
+          .filter((c: any) => c.stage === "lab1")
+          .sort((a: any, b: any) => new Date(a.createdAt || a.dateOfTest || 0).getTime() - new Date(b.createdAt || b.dateOfTest || 0).getTime())
 
-        const base = {
-          id: jc.id,
-          jobCardId: jc.id,
-          productionId: order.id ?? "",
-          jobCardNo: String(jc.jobCardNo || "").trim(),
-          firmName: String(order.firmName || ""),
-          deliveryOrderNo: String(order.deliveryOrderNo || ""),
-          partyName: String(order.partyName || ""),
-          productName: String(order.productName || ""),
-          quantity: Number(actualRun.quantityFg || jc.quantity || 0),
-          expectedDeliveryDate: order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy") : "",
-          priority: String(order.priority || ""),
-          dateOfProduction: actualRun.dateOfProduction ? format(new Date(actualRun.dateOfProduction), "dd/MM/yyyy") : "",
-          // No "Planned Date" concept remains for this stage in the new schema.
-          plannedDate: "",
-          shift: String(jc.shift || ""),
-          rawMaterials: buildRawMaterials(actualRun.materials),
-          machineHours: actualRun.machineHours != null ? String(actualRun.machineHours) : "-",
-          labTest1Status: String(lab1Check?.status || "N/A"),
-          labTest2Status: String(lab2Check.status || "N/A"),
-        }
+        const lab2Checks = (jc.qcChecks || [])
+          .filter((c: any) => c.stage === LAB2_STAGE)
+          .sort((a: any, b: any) => new Date(a.createdAt || a.dateOfTest || 0).getTime() - new Date(b.createdAt || b.dateOfTest || 0).getTime())
 
-        if (!chemicalCheck) {
-          pendingData.push(base as PendingChemicalTestItem)
-        } else {
-          historyData.push({
-            id: base.id,
-            jobCardId: base.jobCardId,
-            productionId: base.productionId,
-            jobCardNo: base.jobCardNo,
-            firmName: base.firmName,
-            deliveryOrderNo: base.deliveryOrderNo,
-            partyName: base.partyName,
-            productName: base.productName,
-            quantity: base.quantity,
-            labTest2Status: base.labTest2Status,
-            dateOfChemicalTest: chemicalCheck.dateOfTest ? format(new Date(chemicalCheck.dateOfTest), "dd/MM/yyyy") : "",
-            testedBy: String(chemicalCheck.testedBy || ""),
-            aluminaPercentage: chemicalCheck.aluminaPercent != null ? String(chemicalCheck.aluminaPercent) : "",
-            ironPercentage: chemicalCheck.ironPercent != null ? String(chemicalCheck.ironPercent) : "",
-            silicaPercentage: chemicalCheck.silicaPercent != null ? String(chemicalCheck.silicaPercent) : "",
-            calciumPercentage: chemicalCheck.calciumPercent != null ? String(chemicalCheck.calciumPercent) : "",
-            chemicalTestCompletedAt: chemicalCheck.createdAt ? format(new Date(chemicalCheck.createdAt), "dd/MM/yy HH:mm") : "",
-          } as HistoryChemicalTestItem)
-        }
+        const chemicalChecks = (jc.qcChecks || [])
+          .filter((c: any) => c.stage === CHEMICAL_STAGE)
+          .sort((a: any, b: any) => new Date(a.createdAt || a.dateOfTest || 0).getTime() - new Date(b.createdAt || b.dateOfTest || 0).getTime())
+
+        actualRuns.forEach((actualRun: any, idx: number) => {
+          const lab1Check = lab1Checks.find((c: any) => c.actualRunId === actualRun.id) || 
+            (idx < lab1Checks.length && !lab1Checks[idx].actualRunId ? lab1Checks[idx] : null)
+
+          const lab2Check = lab2Checks.find((c: any) => c.actualRunId === actualRun.id) || 
+            (idx < lab2Checks.length && !lab2Checks[idx].actualRunId ? lab2Checks[idx] : null)
+          if (!lab2Check) return
+
+          const chemicalCheck = chemicalChecks.find((c: any) => c.actualRunId === actualRun.id) || 
+            (idx < chemicalChecks.length && !chemicalChecks[idx].actualRunId ? chemicalChecks[idx] : null)
+
+          const base = {
+            id: actualRun.id,
+            actualRunId: actualRun.id,
+            jobCardId: jc.id,
+            productionId: order.id ?? "",
+            jobCardNo: String(jc.jobCardNo || "").trim(),
+            firmName: String(order.firmName || ""),
+            deliveryOrderNo: String(order.deliveryOrderNo || ""),
+            partyName: String(order.partyName || ""),
+            productName: String(order.productName || ""),
+            quantity: Number(actualRun.quantityFg || 0),
+            expectedDeliveryDate: order.expectedDeliveryDate ? format(new Date(order.expectedDeliveryDate), "dd/MM/yyyy") : "",
+            priority: String(order.priority || ""),
+            dateOfProduction: actualRun.dateOfProduction ? format(new Date(actualRun.dateOfProduction), "dd/MM/yyyy") : "",
+            plannedDate: "",
+            shift: String(jc.shift || ""),
+            rawMaterials: buildRawMaterials(actualRun.materials),
+            machineHours: actualRun.machineHours != null ? String(actualRun.machineHours) : "-",
+            labTest1Status: String(lab1Check?.status || "N/A"),
+            labTest2Status: String(lab2Check.status || "N/A"),
+          }
+
+          if (!chemicalCheck) {
+            pendingData.push(base as PendingChemicalTestItem)
+          } else {
+            historyData.push({
+              id: base.id,
+              actualRunId: base.actualRunId,
+              jobCardId: base.jobCardId,
+              productionId: base.productionId,
+              jobCardNo: base.jobCardNo,
+              firmName: base.firmName,
+              deliveryOrderNo: base.deliveryOrderNo,
+              partyName: base.partyName,
+              productName: base.productName,
+              quantity: base.quantity,
+              labTest2Status: base.labTest2Status,
+              dateOfChemicalTest: chemicalCheck.dateOfTest ? format(new Date(chemicalCheck.dateOfTest), "dd/MM/yyyy") : "",
+              testedBy: String(chemicalCheck.testedBy || ""),
+              aluminaPercentage: chemicalCheck.aluminaPercent != null ? String(chemicalCheck.aluminaPercent) : "",
+              ironPercentage: chemicalCheck.ironPercent != null ? String(chemicalCheck.ironPercent) : "",
+              silicaPercentage: chemicalCheck.silicaPercent != null ? String(chemicalCheck.silicaPercent) : "",
+              calciumPercentage: chemicalCheck.calciumPercent != null ? String(chemicalCheck.calciumPercent) : "",
+              chemicalTestCompletedAt: chemicalCheck.createdAt ? format(new Date(chemicalCheck.createdAt), "dd/MM/yy HH:mm") : "",
+            } as HistoryChemicalTestItem)
+          }
+        })
       })
 
       const firmSearchValues = getFirmMatchValues(user?.firm)
@@ -335,7 +358,6 @@ export default function ChemicalTestPage() {
         )
       )
 
-      // Set options from master data
       const statuses = [...new Set((masterData || []).map((row: any) => String(row.testStatus || "")).filter(Boolean))] as string[]
       if (!statuses.includes("Tested")) statuses.push("Tested")
       if (!statuses.includes("Non Tested")) statuses.push("Non Tested")
@@ -364,7 +386,10 @@ export default function ChemicalTestPage() {
     if (!formData.status) errors.status = "Status is required."
     
     if (formData.status !== "Non Tested") {
+      if (!formData.dateOfChemicalTest) errors.dateOfChemicalTest = "Date of Test is required."
       if (!formData.testedBy) errors.testedBy = "Tested By is required."
+      if (!formData.aluminaPercentage) errors.aluminaPercentage = "Alumina % is required."
+      if (!formData.ironPercentage) errors.ironPercentage = "Iron % is required."
     } else {
       if (!formData.remarks || !formData.remarks.trim()) {
         errors.remarks = "Remark is required for Non Tested."
@@ -389,10 +414,6 @@ export default function ChemicalTestPage() {
     try {
       const isNonTested = formData.status === "Non Tested"
 
-      // Only jobCardId/stage/dateOfTest/testedBy/aluminaPercent/ironPercent/
-      // silicaPercent/calciumPercent/status map to real columns on
-      // ProductionQcCheckpoint. Free-text remarks have no matching column, so they're
-      // folded into `status` for the Non Tested case instead of being dropped.
       let statusNote = String(formData.status)
       if (isNonTested && formData.remarks?.trim()) {
         statusNote = `${statusNote}: ${formData.remarks.trim()}`
@@ -400,13 +421,15 @@ export default function ChemicalTestPage() {
 
       const payload: any = {
         jobCardId: selectedTest.jobCardId,
+        actualRunId: selectedTest.actualRunId || selectedTest.id,
         stage: CHEMICAL_STAGE,
         status: statusNote,
+        remarks: formData.remarks?.trim() || null,
       }
 
       if (!isNonTested) {
         payload.testedBy = formData.testedBy
-        payload.dateOfTest = new Date().toISOString()
+        payload.dateOfTest = formData.dateOfChemicalTest ? new Date(formData.dateOfChemicalTest).toISOString() : new Date().toISOString()
         payload.aluminaPercent = formData.aluminaPercentage ? Number(formData.aluminaPercentage) : null
         payload.ironPercent = formData.ironPercentage ? Number(formData.ironPercentage) : null
         payload.silicaPercent = formData.silicaPercentage ? Number(formData.silicaPercentage) : null

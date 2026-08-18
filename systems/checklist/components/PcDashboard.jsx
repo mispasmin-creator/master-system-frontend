@@ -6,9 +6,7 @@ import {
   Calendar, RefreshCw, Search, ListTodo, Activity,
   ChevronUp, ChevronDown, Filter
 } from "lucide-react"
-
-const SHEET_ID = "1sn8_JWWODv3JM097Q1oIpVt0EhxRxEBi4sy7onV95tc"
-
+import { API_URL, getToken, getStoredUser } from "@/lib/auth"
 
 const DEPARTMENTS = [
   { name: "PMMPL",     sheet: "PMMPL" },
@@ -21,32 +19,13 @@ const DEPARTMENTS = [
 // ─── Pure helpers ────────────────────────────────────────────────────────────
 
 function formatDateToDDMMYYYY(date) {
-  const day   = date.getDate().toString().padStart(2, "0")
-  const month = (date.getMonth() + 1).toString().padStart(2, "0")
-  const year  = date.getFullYear()
+  if (!date) return ""
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ""
+  const day   = d.getDate().toString().padStart(2, "0")
+  const month = (d.getMonth() + 1).toString().padStart(2, "0")
+  const year  = d.getFullYear()
   return `${day}/${month}/${year}`
-}
-
-function parseGoogleSheetsDate(raw) {
-  if (!raw) return ""
-  const s = String(raw)
-  if (s.match(/^\d{2}\/\d{2}\/\d{4}$/)) return s
-  if (s.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
-    const [d, m, y] = s.split("/")
-    return `${d.padStart(2,"0")}/${m.padStart(2,"0")}/${y}`
-  }
-  if (s.startsWith("Date(")) {
-    const m = /Date\((\d+),(\d+),(\d+)\)/.exec(s)
-    if (m) {
-      const yr = parseInt(m[1], 10), mo = parseInt(m[2], 10), dy = parseInt(m[3], 10)
-      return `${dy.toString().padStart(2,"0")}/${(mo+1).toString().padStart(2,"0")}/${yr}`
-    }
-  }
-  try {
-    const d = new Date(raw)
-    if (!isNaN(d.getTime())) return formatDateToDDMMYYYY(d)
-  } catch (_) {}
-  return ""
 }
 
 function parseDDMMYYYY(str) {
@@ -82,7 +61,7 @@ export default function PCDashboard() {
   const [tasks,         setTasks]         = useState([])
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
-  const [activeFilter,  setActiveFilter]  = useState("overdue")
+  const [activeFilter,  setActiveFilter]  = useState("all")
   const [searchQuery,   setSearchQuery]   = useState("")
   const [selectedDept,  setSelectedDept]  = useState("All")
   const [sortField,     setSortField]     = useState("dueDate")
@@ -108,24 +87,23 @@ export default function PCDashboard() {
       const { data } = await response.json()
 
       const collected = []
-      data.forEach((task, idx) => {
+      const taskList = Array.isArray(data) ? data : []
+      taskList.forEach((task) => {
         if (task.status === 'Completed' || task.status === 'Verified') return
 
-        const dueDateObj = new Date(task.dueDate)
-        const dueDate = formatDateToDDMMYYYY(dueDateObj)
-
-        const status = classifyStatus(dueDate, task.completionDate, todayMs)
+        const dueDate = formatDateToDDMMYYYY(task.dueDate)
+        const status = classifyStatus(dueDate, task.completedAt, todayMs)
         const delayDays = status === "overdue" ? calcDelayDays(dueDate, todayMs) : 0
 
         collected.push({
           id: String(task.id),
           taskId: String(task.taskSeq || task.id),
-          department: task.department ? task.department.name : "Unassigned",
+          department: task.department ? task.department.name : (task.taskType === 'delegation' ? 'DELEGATION' : 'Unassigned'),
           assignedTo: task.assignedTo || "Unassigned",
           givenBy: task.givenBy || "—",
           description: task.description || "—",
           dueDate,
-          completionDate: task.completedAt ? formatDateToDDMMYYYY(new Date(task.completedAt)) : "",
+          completionDate: task.completedAt ? formatDateToDDMMYYYY(task.completedAt) : "",
           frequency: task.frequency || "—",
           status,
           delayDays,
@@ -136,7 +114,7 @@ export default function PCDashboard() {
       setLastRefreshed(new Date())
     } catch (err) {
       setError("Failed to load data. Please refresh.")
-      console.error(err);
+      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -152,13 +130,12 @@ export default function PCDashboard() {
     const todayCount = pendingTasks.filter(t => t.status === "today").length
     const thisWeek   = pendingTasks.filter(t => t.status === "today" || t.status === "this-week").length
     const pending    = pendingTasks.filter(t => t.status === "overdue" || t.status === "today" || t.status === "this-week").length
-    const upcoming   = pendingTasks.filter(t => t.status === "this-week" || t.status === "upcoming").length
+    const upcoming   = pendingTasks.filter(t => t.status === "upcoming").length
     return { total, pending, overdue, todayCount, thisWeek, upcoming }
   }, [tasks])
 
   // ── Filtered & sorted task list (completed never shown) ────────────────────
   const filteredTasks = useMemo(() => {
-    // Base: always exclude completed tasks
     let result = tasks.filter(t => t.status !== "completed")
 
     // Apply active filter on top
@@ -168,21 +145,21 @@ export default function PCDashboard() {
         case "today":     return t.status === "today"
         case "pending":   return t.status === "overdue" || t.status === "today" || t.status === "this-week"
         case "this-week": return t.status === "today" || t.status === "this-week"
-        case "upcoming":  return t.status === "this-week" || t.status === "upcoming"
-        default:          return true  // show all non-completed
+        case "upcoming":  return t.status === "upcoming"
+        default:          return true // show all non-completed
       }
     })
 
     if (selectedDept !== "All") {
-      result = result.filter(t => t.department === selectedDept)
+      result = result.filter(t => (t.department || "").toLowerCase() === selectedDept.toLowerCase())
     }
 
     const q = searchQuery.trim().toLowerCase()
     if (q) {
       result = result.filter(t =>
-        t.assignedTo.toLowerCase().includes(q)  ||
-        t.description.toLowerCase().includes(q) ||
-        t.department.toLowerCase().includes(q)
+        (t.assignedTo || "").toLowerCase().includes(q)  ||
+        (t.description || "").toLowerCase().includes(q) ||
+        (t.department || "").toLowerCase().includes(q)
       )
     }
 
@@ -197,7 +174,7 @@ export default function PCDashboard() {
       } else if (sortField === "delayDays") {
         cmp = a.delayDays - b.delayDays
       } else if (sortField === "assignedTo") {
-        cmp = a.assignedTo.localeCompare(b.assignedTo)
+        cmp = (a.assignedTo || "").localeCompare(b.assignedTo || "")
       }
       return sortDir === "asc" ? cmp : -cmp
     })
@@ -285,7 +262,7 @@ export default function PCDashboard() {
               border: "border-slate-200",
               textCls: "text-slate-800",
               subCls: "text-slate-500",
-              filter: null,
+              filter: "all",
             },
             {
               label: "Overdue",
@@ -376,11 +353,11 @@ export default function PCDashboard() {
             {/* Quick filter chips — actionable filters only, no completed */}
             <div className="flex flex-wrap gap-2">
               {[
-                { key: "overdue",   label: "🔴 Overdue",   count: stats.overdue,    color: "red",    desc: "Past due, not done" },
-                { key: "today",     label: "📅 Today",      count: stats.todayCount, color: "blue",   desc: "Due today" },
-                { key: "pending",   label: "⏳ Pending",    count: stats.pending,    color: "amber",  desc: "Overdue + today + this week" },
-                { key: "this-week", label: "📆 This Week",  count: stats.thisWeek,   color: "purple", desc: "Due within 7 days" },
-                { key: "upcoming",  label: "🗓 Upcoming",   count: stats.upcoming,   color: "indigo", desc: "Future tasks" },
+                { key: "all",       label: "📋 All Pending", count: stats.total,      color: "blue",   desc: "All pending tasks" },
+                { key: "overdue",   label: "🔴 Overdue",     count: stats.overdue,    color: "red",    desc: "Past due, not done" },
+                { key: "today",     label: "📅 Today",        count: stats.todayCount, color: "blue",   desc: "Due today" },
+                { key: "this-week", label: "📆 This Week",    count: stats.thisWeek,   color: "purple", desc: "Due within 7 days" },
+                { key: "upcoming",  label: "🗓 Upcoming",     count: stats.upcoming,   color: "indigo", desc: "Future tasks" },
               ].map(f => {
                 const active = activeFilter === f.key
                 const colorMap = {
@@ -431,6 +408,7 @@ export default function PCDashboard() {
                   {DEPARTMENTS.map(d => (
                     <option key={d.name} value={d.name}>{d.name}</option>
                   ))}
+                  <option value="DELEGATION">DELEGATION</option>
                 </select>
               </div>
             </div>
@@ -440,7 +418,7 @@ export default function PCDashboard() {
           {loading ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3 text-slate-400">
               <RefreshCw className="h-7 w-7 animate-spin" />
-              <p className="text-sm">Fetching tasks from all {DEPARTMENTS.length} departments…</p>
+              <p className="text-sm">Fetching tasks…</p>
             </div>
           ) : filteredTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3">

@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { CheckCircle2, Upload, X, Search, History, ArrowLeft, Filter, Sparkles, FileText, ChevronRight, User, Calendar } from "lucide-react"
-import { API_URL, getToken } from "@/lib/auth"
-
-
+import { API_URL, getToken, getStoredUser } from "@/lib/auth"
 
 const COMPANIES = [
   { id: "pmmpl",     name: "PMMPL",     SHEET_NAME: "PMMPL",     DRIVE_FOLDER_ID: "1wY0PCy9GfMHzh046D3Rj_O1JrujpiD_f" },
@@ -14,7 +12,23 @@ const COMPANIES = [
   { id: "purab",     name: "PURAB",     SHEET_NAME: "PURAB",     DRIVE_FOLDER_ID: "1IENpXhLEgB7lI8VAMc0qPIqtQgBcPDcM" },
 ]
 
-// ─── inner content (no AdminLayout) ───────────────────────────────────────────
+function formatDateToDDMMYYYY(date) {
+  if (!date) return ""
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ""
+  const day = d.getDate().toString().padStart(2, "0")
+  const month = (d.getMonth() + 1).toString().padStart(2, "0")
+  return `${day}/${month}/${d.getFullYear()}`
+}
+
+function parseDateFromDDMMYYYY(dateStr) {
+  if (!dateStr || typeof dateStr !== "string") return null
+  const p = dateStr.split("/")
+  if (p.length !== 3) return null
+  return new Date(p[2], p[1] - 1, p[0])
+}
+
+// ─── inner content (Single Company) ───────────────────────────────────────────
 function CompanyTaskContent({ config }) {
   const [accountData, setAccountData]     = useState([])
   const [selectedItems, setSelectedItems] = useState(new Set())
@@ -37,8 +51,9 @@ function CompanyTaskContent({ config }) {
   const [filterName, setFilterName]       = useState("")
 
   useEffect(() => {
-    setUserRole(sessionStorage.getItem("role") || "")
-    setUsername(sessionStorage.getItem("username") || "")
+    const stored = getStoredUser()
+    setUserRole((stored?.role || sessionStorage.getItem("role") || "admin").toLowerCase())
+    setUsername(stored?.username || sessionStorage.getItem("username") || "")
   }, [])
 
   // reset all state when company tab switches
@@ -59,38 +74,6 @@ function CompanyTaskContent({ config }) {
     setFilterGivenBy("")
     setFilterName("")
   }, [config.id])
-
-  const formatDateToDDMMYYYY = (date) => {
-    const d = date.getDate().toString().padStart(2, "0")
-    const m = (date.getMonth() + 1).toString().padStart(2, "0")
-    return `${d}/${m}/${date.getFullYear()}`
-  }
-
-  const isEmpty = (v) => v === null || v === undefined || (typeof v === "string" && v.trim() === "")
-
-  const parseGoogleSheetsDate = useCallback((dateStr) => {
-    if (!dateStr) return ""
-    if (typeof dateStr === "string" && dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) return dateStr
-    if (typeof dateStr === "string" && dateStr.startsWith("Date(")) {
-      const match = /Date\((\d+),(\d+),(\d+)\)/.exec(dateStr)
-      if (match) {
-        const y = parseInt(match[1]), mo = parseInt(match[2]), d = parseInt(match[3])
-        return `${String(d).padStart(2,"0")}/${String(mo+1).padStart(2,"0")}/${y}`
-      }
-    }
-    try {
-      const d = new Date(dateStr)
-      if (!isNaN(d.getTime())) return formatDateToDDMMYYYY(d)
-    } catch {}
-    return dateStr
-  }, [])
-
-  const parseDateFromDDMMYYYY = (dateStr) => {
-    if (!dateStr || typeof dateStr !== "string") return null
-    const p = dateStr.split("/")
-    if (p.length !== 3) return null
-    return new Date(p[2], p[1] - 1, p[0])
-  }
 
   const sortDateWise = (a, b) => {
     const da = parseDateFromDDMMYYYY(a["col6"] || "")
@@ -160,8 +143,9 @@ function CompanyTaskContent({ config }) {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       const resData = await resp.json()
 
-      const curUser = sessionStorage.getItem("username")
-      const curRole = sessionStorage.getItem("role")
+      const stored = getStoredUser()
+      const curUser = stored?.username || sessionStorage.getItem("username") || ""
+      const curRole = (stored?.role || sessionStorage.getItem("role") || "admin").toLowerCase()
       const today = new Date()
       const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1)
       const todayStr = formatDateToDDMMYYYY(today)
@@ -172,13 +156,13 @@ function CompanyTaskContent({ config }) {
 
       // Filter tasks by the active company/department tab
       const deptTasks = (resData.data || []).filter(
-        t => t.department && t.department.name === config.SHEET_NAME
+        t => t.department && t.department.name.toLowerCase() === config.SHEET_NAME.toLowerCase()
       );
 
       deptTasks.forEach((task, ri) => {
         const assignedTo = task.assignedTo || "Unassigned"
         membersSet.add(assignedTo)
-        const isMatch = curRole === "admin" || assignedTo.toLowerCase() === curUser?.toLowerCase()
+        const isMatch = curRole === "admin" || !curUser || assignedTo.toLowerCase() === curUser.toLowerCase()
         if (!isMatch) return
 
         if (task.status === "DONE" || task.status === "Completed" || task.status === "Verified") {
@@ -187,15 +171,15 @@ function CompanyTaskContent({ config }) {
               _id: task.id,
               _rowIndex: ri + 1,
               _taskId: task.taskSeq || task.id,
-              col0: task.createdAt ? formatDateToDDMMYYYY(new Date(task.createdAt)) : "",
+              col0: task.createdAt ? formatDateToDDMMYYYY(task.createdAt) : "",
               col1: task.taskSeq || task.id,
               col2: task.department.name,
               col3: task.givenBy || "",
               col4: task.assignedTo || "",
               col5: task.description || "",
-              col6: task.dueDate ? formatDateToDDMMYYYY(new Date(task.dueDate)) : "",
+              col6: task.dueDate ? formatDateToDDMMYYYY(task.dueDate) : "",
               col7: task.frequency || "",
-              col10: task.completedAt ? formatDateToDDMMYYYY(new Date(task.completedAt)) : "",
+              col10: task.completedAt ? formatDateToDDMMYYYY(task.completedAt) : "",
               col12: task.status === "Completed" || task.status === "Verified" ? "DONE" : task.status,
               col13: task.remarks || "",
               col14: task.attachmentUrl || ""
@@ -203,7 +187,7 @@ function CompanyTaskContent({ config }) {
            history.push(rowData);
         } else {
            // Pending task logic
-           const fmtDate = task.dueDate ? formatDateToDDMMYYYY(new Date(task.dueDate)) : ""
+           const fmtDate = task.dueDate ? formatDateToDDMMYYYY(task.dueDate) : ""
            const d = task.dueDate ? new Date(task.dueDate) : null
            
            if (fmtDate === todayStr || fmtDate === tomorrowStr || (d && d <= today)) {
@@ -211,7 +195,7 @@ function CompanyTaskContent({ config }) {
                 _id: task.id,
                 _rowIndex: ri + 1,
                 _taskId: task.taskSeq || task.id,
-                col0: task.createdAt ? formatDateToDDMMYYYY(new Date(task.createdAt)) : "",
+                col0: task.createdAt ? formatDateToDDMMYYYY(task.createdAt) : "",
                 col1: task.taskSeq || task.id,
                 col2: task.department.name,
                 col3: task.givenBy || "",
@@ -260,11 +244,6 @@ function CompanyTaskContent({ config }) {
     else { setSelectedItems(new Set()); setAdditionalData({}); setRemarksData({}) }
   }, [filteredAccountData])
 
-  const fileToBase64 = (file) => new Promise((res, rej) => {
-    const r = new FileReader(); r.readAsDataURL(file)
-    r.onload = () => res(r.result); r.onerror = rej
-  })
-
   const handleImageUpload = (id, e) => {
     const file = e.target.files[0]; if (!file) return
     setAccountData(prev => prev.map(item => item._id === id ? {...item, image: file} : item))
@@ -279,7 +258,8 @@ function CompanyTaskContent({ config }) {
     let successCount = 0;
     
     try {
-      const curUser = sessionStorage.getItem("username") || "Unknown";
+      const stored = getStoredUser();
+      const curUser = stored?.username || sessionStorage.getItem("username") || "Unknown";
       const selectedItemsArray = Array.from(selectedItems);
       
       for (const id of selectedItemsArray) {
@@ -321,8 +301,7 @@ function CompanyTaskContent({ config }) {
         setSuccessMessage(`Successfully completed ${successCount} tasks.`);
         setTimeout(() => setSuccessMessage(""), 5000);
         setSelectedItems(new Set());
-        // Simple reload for now
-        window.location.reload();
+        fetchSheetData();
       }
     } catch (error) {
       console.error(error);
@@ -591,7 +570,7 @@ function CompanyTaskContent({ config }) {
   )
 }
 
-// ─── ALL companies read-only view ─────────────────────────────────────────────
+// ─── ALL companies view ───────────────────────────────────────────────────────
 function AllCompaniesContent() {
   const [allData, setAllData]         = useState([])
   const [loading, setLoading]         = useState(true)
@@ -601,67 +580,63 @@ function AllCompaniesContent() {
   const [filterName, setFilterName]   = useState("")
   const [filterCompany, setFilterCompany] = useState("")
 
-  const parseGoogleSheetsDate = (dateStr) => {
-    if (!dateStr) return ""
-    if (typeof dateStr === "string" && dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) return dateStr
-    if (typeof dateStr === "string" && dateStr.startsWith("Date(")) {
-      const m = /Date\((\d+),(\d+),(\d+)\)/.exec(dateStr)
-      if (m) return `${String(parseInt(m[3])).padStart(2,"0")}/${String(parseInt(m[2])+1).padStart(2,"0")}/${m[1]}`
-    }
-    try { const d = new Date(dateStr); if (!isNaN(d)) { const dd=String(d.getDate()).padStart(2,"0"),mm=String(d.getMonth()+1).padStart(2,"0"); return `${dd}/${mm}/${d.getFullYear()}` } } catch {}
-    return dateStr
-  }
+  const fetchAllCompanies = useCallback(async () => {
+    try {
+      setLoading(true)
+      const resp = await fetch(`${API_URL}/checklist/task`, {
+        headers: { Authorization: `Bearer ${getToken()}` }
+      })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const resData = await resp.json()
 
-  const parseDateFromDDMMYYYY = (s) => {
-    if (!s) return null; const p = s.split("/"); if (p.length!==3) return null
-    return new Date(p[2], p[1]-1, p[0])
-  }
+      const stored = getStoredUser()
+      const curUser = stored?.username || sessionStorage.getItem("username") || ""
+      const curRole = (stored?.role || sessionStorage.getItem("role") || "admin").toLowerCase()
+      const today = new Date()
+      const tomorrow = new Date(today); tomorrow.setDate(today.getDate()+1)
+      const todayStr = formatDateToDDMMYYYY(today)
+      const tomorrowStr = formatDateToDDMMYYYY(tomorrow)
+
+      const result = []
+      const taskList = Array.isArray(resData.data) ? resData.data : []
+
+      taskList.forEach((task, ri) => {
+        if (task.status === "DONE" || task.status === "Completed" || task.status === "Verified") return
+        const assignedTo = task.assignedTo || "Unassigned"
+        if (curRole !== "admin" && curUser && assignedTo.toLowerCase() !== curUser.toLowerCase()) return
+
+        const fmtDate = task.dueDate ? formatDateToDDMMYYYY(task.dueDate) : ""
+        const d = task.dueDate ? new Date(task.dueDate) : null
+        if (fmtDate !== todayStr && fmtDate !== tomorrowStr && !(d && d <= today)) return
+
+        const companyName = task.department ? task.department.name : (task.taskType === 'delegation' ? 'DELEGATION' : 'Unassigned')
+
+        result.push({
+          _id: task.id,
+          _company: companyName,
+          col1: task.taskSeq || task.id,
+          col2: companyName,
+          col3: task.givenBy || "",
+          col4: task.assignedTo || "",
+          col5: task.description || "",
+          col6: fmtDate,
+          col7: task.frequency || "",
+          col8: task.enableReminders ? "Yes" : "No",
+          col9: task.requireAttachment ? "Yes" : "No",
+        })
+      })
+
+      setAllData(result)
+      setLoading(false)
+    } catch (e) {
+      setError(e.message)
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    const curUser = sessionStorage.getItem("username")
-    const curRole = sessionStorage.getItem("role")
-    const today = new Date()
-    const fmt = (d) => { const dd=String(d.getDate()).padStart(2,"0"),mm=String(d.getMonth()+1).padStart(2,"0"); return `${dd}/${mm}/${d.getFullYear()}` }
-    const todayStr = fmt(today)
-    const tom = new Date(today); tom.setDate(today.getDate()+1); const tomStr = fmt(tom)
-
-    Promise.all(COMPANIES.map(async (co) => {
-      try {
-        const resp = await fetch(`${APPS_SCRIPT_URL}?sheet=${co.SHEET_NAME}&action=fetch`)
-        if (!resp.ok) return []
-        const text = await resp.text()
-        let data; try { data = JSON.parse(text) } catch { const s=text.indexOf("{"),e=text.lastIndexOf("}"); if(s!==-1&&e!==-1) data=JSON.parse(text.substring(s,e+1)); else return [] }
-        const rows = data.table?.rows || (Array.isArray(data)?data:[])
-        const result = []
-        rows.forEach((row,ri)=>{
-          if(ri===0) return
-          const rv = row.c ? row.c.map(c=>c?.v??"") : (Array.isArray(row)?row:[])
-          const assignedTo = rv[4]||"Unassigned"
-          if(curRole!=="admin" && assignedTo.toLowerCase()!==curUser?.toLowerCase()) return
-          const colG=rv[6], colK=rv[10], colM=rv[12]
-          if(colM?.toString().trim()==="DONE") return
-          const hasG = colG!==null && colG!==undefined && String(colG).trim()!==""
-          const emptyK = colK===null || colK===undefined || String(colK).trim()===""
-          if(!hasG||!emptyK) return
-          const fmtDate = parseGoogleSheetsDate(String(colG))
-          const d = parseDateFromDDMMYYYY(fmtDate)
-          if(fmtDate!==todayStr && fmtDate!==tomStr && !(d&&d<=today)) return
-          const taskId=rv[1]||""; const gsRow=ri+1
-          const rowData = {
-            _id:`${co.id}_task_${taskId}_${gsRow}`, _company: co.name,
-            col1:rv[1]||"", col2:rv[2]||"", col3:rv[3]||"", col4:rv[4]||"",
-            col5:rv[5]||"", col6:parseGoogleSheetsDate(String(rv[6]||"")),
-            col7:rv[7]||"", col8:rv[8]||"", col9:rv[9]||"",
-          }
-          result.push(rowData)
-        })
-        return result
-      } catch { return [] }
-    })).then(results => {
-      setAllData(results.flat())
-      setLoading(false)
-    }).catch(e => { setError(e.message); setLoading(false) })
-  }, [])
+    fetchAllCompanies()
+  }, [fetchAllCompanies])
 
   const givenByOptions = useMemo(()=>[...new Set(allData.map(t=>t.col3).filter(Boolean))].sort(),[allData])
   const nameOptions    = useMemo(()=>[...new Set(allData.map(t=>t.col4).filter(Boolean))].sort(),[allData])
@@ -677,7 +652,7 @@ function AllCompaniesContent() {
     if(!da)return 1; if(!db)return -1; return da-db
   }),[allData,searchTerm,filterGivenBy,filterName,filterCompany])
 
-  const companyOptions = COMPANIES.map(c=>c.name)
+  const companyOptions = Array.from(new Set(allData.map(c=>c._company))).sort()
 
   return (
     <div className="space-y-4">
