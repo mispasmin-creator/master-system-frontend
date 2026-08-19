@@ -1,7 +1,7 @@
 import { CheckCircle } from 'lucide-react';
 import Heading from '../element/Heading';
 import { useEffect, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef } from '@tanstack/react-table/legacy';
 import { formatDate, formatDateTime } from '@/lib/utils';
 import DataTable from '../element/DataTable';
 import { useAuth } from '@/context/AuthContext';
@@ -66,29 +66,29 @@ export default function ApprovedPOs() {
 
             const poMasterInternalCodes = new Set(
                 (poMasterData || [])
-                    .filter((r) => r.internal_code)
-                    .map((r) => r.internal_code?.toString().trim())
+                    .filter((r: any) => r.internal_code)
+                    .map((r: any) => r.internal_code?.toString().trim())
                     .filter(Boolean)
             );
 
             const { data: allIndents } = await storeApi.get('indent');
-            let indentData = (allIndents || []).filter((r: any) => (r.po_required === 'Yes' || r.po_requred === 'Yes' || r.poRequired === 'Yes'));
+            let indentData = (allIndents || []).filter((r: any) => r.vendor_quotation?.po_required === 'Yes');
             if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
                 const targetFirm = user.firmNameMatch.trim().toLowerCase();
                 indentData = indentData.filter((r: any) => (r.firm_name_match || r.firm_name || '').trim().toLowerCase() === targetFirm);
             }
 
-            const filteredData = (indentData || []).filter((sheet) => {
+            const filteredData = (indentData || []).filter((sheet: any) => {
                 const indentNumber = sheet.indent_number?.toString().trim();
                 return !(indentNumber && poMasterInternalCodes.has(indentNumber));
             });
 
             const mappedData = filteredData
-                .map((sheet) => {
+                .map((sheet: any) => {
                     let formattedDate = '';
                     let formattedPlannedDate = '';
                     try { if (sheet.timestamp) formattedDate = formatDateTime(sheet.timestamp); } catch {}
-                    try { if (sheet.planned5) formattedPlannedDate = formatDate(sheet.planned5); } catch {}
+                    try { if (sheet.management_approval?.created_at) formattedPlannedDate = formatDate(sheet.management_approval.created_at); } catch {}
 
                     let rawExpected = sheet.expected_req_date || sheet.delivery_date || null;
                     let formattedExpectedDate = '';
@@ -103,19 +103,19 @@ export default function ApprovedPOs() {
                         firmNameMatch: sheet.firm_name_match || '',
                         product: sheet.product_name || '',
                         quantity: Number(sheet.pending_po_qty) || Number(sheet.quantity) || 0,
-                        rate: Number(sheet.approved_rate) || Number(sheet.rate1) || 0,
+                        rate: Number(sheet.management_approval?.approved_rate) || Number(sheet.vendor_quotation?.rate1) || 0,
                         uom: sheet.uom || '',
-                        vendorName: sheet.approved_vendor_name || sheet.vendor_name1 || '',
-                        paymentTerm: sheet.approved_payment_term || sheet.payment_term1 || '',
+                        vendorName: sheet.management_approval?.approved_vendor_name || sheet.vendor_quotation?.vendor_name1 || '',
+                        paymentTerm: sheet.management_approval?.approved_payment_term || sheet.vendor_quotation?.payment_term1 || '',
                         specifications: sheet.specifications || '',
-                        poRequired: (sheet.po_required || sheet.po_requred)?.toString() || 'Yes',
+                        poRequired: sheet.vendor_quotation?.po_required?.toString() || 'Yes',
                         poRequiredStatus: 'Yes' as const,
                         expectedReqDateRaw: rawExpected,
                         expectedReqDate: formattedExpectedDate,
                         rawTimestamp: sheet.timestamp ? new Date(sheet.timestamp).getTime() : 0,
                     };
                 })
-                .sort((a, b) => b.rawTimestamp - a.rawTimestamp);
+                .sort((a: any, b: any) => b.rawTimestamp - a.rawTimestamp);
 
             setApprovedTableData(mappedData);
         } catch (err) {
@@ -140,7 +140,7 @@ export default function ApprovedPOs() {
             poData.sort((a: any, b: any) => String(b.timestamp).localeCompare(String(a.timestamp)));
 
             const internalCodes = (poData || [])
-                .map((r) => r.internal_code?.toString().trim())
+                .map((r: any) => r.internal_code?.toString().trim())
                 .filter(Boolean) as string[];
 
             // Fetch indent records for cancel_qty, lifting_status, received_quantity base
@@ -156,11 +156,11 @@ export default function ApprovedPOs() {
                 });
             }
 
-            // Fetch store_in records and aggregate qty per indent_no
-            // liftedQty = indent.received_quantity + SUM(store_in.qty) for that indent
+            // Fetch lift records and aggregate qty per indent_no
+            // liftedQty = indent.received_quantity + SUM(lift.qty) for that indent
             let storeInSumMap: Record<string, number> = {};
             if (internalCodes.length > 0) {
-                const { data: allStoreIn } = await storeApi.get('store_in');
+                const { data: allStoreIn } = await storeApi.get('lift');
                 const storeInData = (allStoreIn || []).filter((r: any) => {
                     const indentNo = r.indent_no?.toString().trim();
                     return indentNo && internalCodes.includes(indentNo);

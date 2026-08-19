@@ -9,38 +9,107 @@ export async function fetchIndents() {
         const response = await storeApi.get('indent');
         const data = response.data;
 
+        // Fetch po_master to know which indents already have POs generated
+        let existingPoCodes = new Set<string>();
+        try {
+            const poRes = await storeApi.get('po_master');
+            const poData = poRes.data || [];
+            existingPoCodes = new Set(
+                poData
+                    .map((p: any) => String(p.internal_code || '').trim())
+                    .filter(Boolean)
+            );
+        } catch (poErr) {
+            console.warn('⚠️ Could not fetch po_master for indent PO status check:', poErr);
+        }
+
         return (data || []).map((r: any) => {
             // Priority: pending_po_qty > approved_quantity > quantity
             const rawPending = Number(r.pending_po_qty) || 0;
-            const rawApproved = Number(r.approved_quantity) || 0;
+            const rawApproved = Number(r.indent_approval?.approved_quantity) || 0;
             const rawQuantity = Number(r.quantity) || 0;
             const finalApprovedQty = rawPending > 0 ? rawPending : (rawApproved > 0 ? rawApproved : rawQuantity);
 
+            const approvedVendor = r.management_approval?.approved_vendor_name || r.vendor_quotation?.vendor_name1 || '';
+            const approvedRate = Number(r.management_approval?.approved_rate ?? r.vendor_quotation?.rate1 ?? 0);
+            const approvedPaymentTerm = r.management_approval?.approved_payment_term || r.vendor_quotation?.payment_term1 || '';
+
+            const indentNo = String(r.indent_number || '').trim();
+            const hasPo = Boolean(
+                (r.po_lines && r.po_lines.length > 0) ||
+                (indentNo && existingPoCodes.has(indentNo)) ||
+                r.po_number
+            );
+            const isApproved = Boolean(
+                r.management_approval?.approved_vendor_name ||
+                r.vendor_quotation?.po_required === 'Yes'
+            );
+
+            let quotationNumber = r.management_approval?.approved_quotation_no ||
+                r.management_approval?.approvedQuotationNo || '';
+            let quotationDate = r.management_approval?.approved_quotation_date ||
+                r.management_approval?.approvedQuotationDate || '';
+
+            if (!quotationNumber && r.vendor_quotation) {
+                const vq = r.vendor_quotation;
+                if (approvedVendor && vq.vendor_name2 && vq.vendor_name2.trim() === approvedVendor.trim()) {
+                    quotationNumber = vq.quotation_no2 || vq.quotationNo2 || '';
+                    quotationDate = vq.quotation_date2 || vq.quotationDate2 || '';
+                } else if (approvedVendor && vq.vendor_name3 && vq.vendor_name3.trim() === approvedVendor.trim()) {
+                    quotationNumber = vq.quotation_no3 || vq.quotationNo3 || '';
+                    quotationDate = vq.quotation_date3 || vq.quotationDate3 || '';
+                } else {
+                    quotationNumber = vq.quotation_no1 || vq.quotationNo1 || '';
+                    quotationDate = vq.quotation_date1 || vq.quotationDate1 || '';
+                }
+            }
+
             return {
                 id: r.id,
-                planned4: r.planned4 || '',
-                actual4: r.actual4 || '',
-                approvedVendorName: r.approved_vendor_name || '',
+                planned4: isApproved ? (r.management_approval?.created_at || r.management_approval?.approved_date || r.timestamp || 'planned') : '',
+                actual4: hasPo ? (r.po_lines?.[0]?.timestamp || 'actual') : '',
+                approvedVendorName: approvedVendor,
                 firmName: r.firm_name || '',
                 firmNameMatch: r.firm_name_match || '',
                 indentNumber: r.indent_number || '',
                 productName: r.product_name || '',
                 specifications: r.specifications || '',
-                taxValue1: r.tax_value1 || 0,
-                taxValue4: r.tax_value4 || 0,
+                taxValue1: 0,
+                taxValue4: 0,
                 approvedQuantity: finalApprovedQty,
                 pendingPoQty: rawPending,
                 uom: r.uom || '',
-                approvedRate: r.approved_rate || 0,
-                quotationNumber: r.approved_quotation_no || '',
-                quotationDate: r.approved_quotation_date || '',
-                approvedPaymentTerm: r.approved_payment_term || '',
-                approvedAdvancePercent: r.approved_advance_percent || '',
+                approvedRate: approvedRate,
+                quotationNumber: quotationNumber || '',
+                quotationDate: quotationDate || '',
+                approvedPaymentTerm: approvedPaymentTerm,
+                approvedAdvancePercent: '',
             };
         });
     } catch (error) {
         console.error('Error fetching indents:', error);
         throw error;
+    }
+}
+
+/**
+ * Update indent records after PO creation
+ */
+export async function updateIndentsAfterPoCreation(ids: number[], deliveryDate?: string, poNumber?: string, poCopy?: string) {
+    try {
+        await Promise.all(ids.map(async (id) => {
+            const updates: Record<string, any> = {};
+            if (poNumber) updates.po_number = poNumber;
+            if (deliveryDate) updates.delivery_date = deliveryDate;
+            if (poCopy) updates.attachment = poCopy;
+            try {
+                await storeApi.patch('indent', id, updates);
+            } catch (err) {
+                console.warn(`Could not update indent ${id} after PO creation:`, err);
+            }
+        }));
+    } catch (error) {
+        console.error('Error updating indents after PO creation:', error);
     }
 }
 
@@ -104,11 +173,39 @@ export async function fetchPoMaster() {
     }
 }
 
+export interface MasterDetails {
+    destinationAddress?: string;
+    defaultTerms?: string[];
+    vendors?: Array<{
+        vendorName?: string;
+        address?: string;
+        gstin?: string;
+        vendorEmail?: string;
+        email?: string;
+    }>;
+    firmCompanyMap?: Record<string, {
+        companyName?: string;
+        companyAddress?: string;
+        destinationAddress?: string;
+        companyEmail?: string;
+        companyPhone?: string;
+        companyGstin?: string;
+        companyPan?: string;
+    }>;
+    companyName?: string;
+    paymentTerms?: string[];
+    companyPhone?: string;
+    companyGstin?: string;
+    companyPan?: string;
+    companyAddress?: string;
+    billingAddress?: string;
+}
+
 /**
  * Fetch master data (vendors, company info, terms, etc.)
  * Used for populating vendor details and default terms
  */
-export async function fetchMasterData() {
+export async function fetchMasterData(): Promise<MasterDetails> {
     try {
         const response = await storeApi.get('master');
         const records = response.data;
@@ -140,14 +237,20 @@ export async function fetchMasterData() {
             }));
 
         // Deduplicate vendors by name
-        const uniqueVendors = Array.from(new Map(vendors.map((v: any) => [v.vendorName, v])).values());
+        const uniqueVendors = Array.from(new Map<string, any>(vendors.map((v: any) => [v.vendorName, v])).values());
 
         // Extract payment terms
-        const paymentTerms = Array.from(new Set(records.map((r: any) => r.payment_term).filter(Boolean)));
+        const paymentTerms: string[] = Array.from(
+            new Set<string>(
+                records
+                    .map((r: any) => (typeof r.payment_term === 'string' ? r.payment_term.trim() : ''))
+                    .filter(Boolean)
+            )
+        );
 
         // Extract default terms
-        const defaultTerms = Array.from(
-            new Set(
+        const defaultTerms: string[] = Array.from(
+            new Set<string>(
                 records
                     .map((r: any) => (typeof r.default_terms === 'string' ? r.default_terms.trim() : ''))
                     .filter(Boolean)
@@ -243,6 +346,7 @@ function toSafeIsoString(val: any): string | null {
 export async function insertPoRecords(poRecords: any[]) {
     try {
         const mappedRecords = poRecords.map((record) => ({
+            indent_id: record.indentId || undefined,
             party_name: record.partyName || '',
             po_number: record.poNumber || '',
             internal_code: record.internalCode || '',
@@ -290,25 +394,3 @@ export async function insertPoRecords(poRecords: any[]) {
     }
 }
 
-/**
- * Update indent records to mark them as having PO created.
- * Sets actual4 timestamp and delivery_date for indents included in the PO.
- */
-export async function updateIndentsAfterPoCreation(ids: number[], deliveryDate?: string, poNumber?: string, poCopy?: string) {
-    try {
-        const now = new Date().toISOString();
-        const updateData: any = {
-            actual4: now,
-            planned5: now,
-        };
-        if (poNumber) updateData.po_number = poNumber;
-        if (poCopy) updateData.po_copy = poCopy;
-
-        for (const id of ids) {
-            await storeApi.patch('indent', id, updateData);
-        }
-    } catch (error) {
-        console.error('Error updating indents after PO creation:', error);
-        throw error;
-    }
-}

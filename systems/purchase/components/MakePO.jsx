@@ -1184,8 +1184,9 @@ export default function CreatePO() {
                         <td className="px-4 py-3">
                           <Input
                             type="number"
+                            placeholder="0"
                             className="w-20 text-center h-9 no-spinner"
-                            value={item.quantity || 0}
+                            value={item.quantity === 0 || item.quantity === "0" ? "" : (item.quantity ?? "")}
                             onChange={(e) =>
                               updateIndent(index, "quantity", e.target.value)
                             }
@@ -1201,8 +1202,9 @@ export default function CreatePO() {
                         <td className="px-4 py-3">
                           <Input
                             type="number"
+                            placeholder="0"
                             className="w-24 text-center h-9 no-spinner"
-                            value={item.rate ?? 0}
+                            value={item.rate === 0 || item.rate === "0" ? "" : (item.rate ?? "")}
                             onChange={(e) =>
                               updateIndent(index, "rate", e.target.value)
                             }
@@ -1211,8 +1213,9 @@ export default function CreatePO() {
                         <td className="px-4 py-3">
                           <Input
                             type="number"
+                            placeholder="0"
                             className="w-16 text-center h-9 no-spinner"
-                            value={item.gstPercent ?? 0}
+                            value={item.gstPercent === 0 || item.gstPercent === "0" ? "" : (item.gstPercent ?? "")}
                             onChange={(e) =>
                               updateIndent(index, "gstPercent", e.target.value)
                             }
@@ -1221,8 +1224,9 @@ export default function CreatePO() {
                         <td className="px-4 py-3">
                           <Input
                             type="number"
+                            placeholder="0"
                             className="w-16 text-center h-9 no-spinner"
-                            value={item.discountPercent ?? 0}
+                            value={item.discountPercent === 0 || item.discountPercent === "0" ? "" : (item.discountPercent ?? "")}
                             onChange={(e) =>
                               updateIndent(index, "discountPercent", e.target.value)
                             }

@@ -114,8 +114,6 @@ const storeTabs = [
   { id: "issue-data", label: "Issue Data", path: "/Issue-data" },
   { id: "inventory", label: "Inventory", path: "/inventory" },
   { id: "master", label: "Master", path: "/master" },
-  { id: "received", label: "Received", path: "/received" },
-  { id: "stock", label: "Stock", path: "/stock" },
   { id: "create-indent", label: "Create Indent", path: "/create-indent" },
   { id: "approve-indent", label: "Group Indent Approval", path: "/approve-indent" },
   { id: "vendor-rate-update", label: "Vendor Rate Update", path: "/vendor-rate-update" },
@@ -127,14 +125,11 @@ const storeTabs = [
   { id: "get-lift", label: "Material Receipt / Store In", path: "/get-lift" },
   { id: "store-in", label: "HOD Check", path: "/store-in" },
   { id: "hod-store-check", label: "Transporting Update", path: "/hod-store-check" },
-  { id: "full-kitting", label: "Freight Payment", path: "/Full-Kiting" },
-  { id: "payment-status", label: "Process for Payment / Debit Note", path: "/Payment-Status" },
   { id: "make-payment", label: "Make Payment", path: "/Make-Payment" },
   { id: "quality-check", label: "Reject For GRN", path: "/Quality-Check-In-Received-Item" },
   { id: "send-debit-note", label: "Send Debit Note", path: "/Send-Debit-Note" },
   { id: "audit-data", label: "Audit Data", path: "/audit-data" },
-  { id: "bill-not-received", label: "Bill Not Received", path: "/Bill-Not-Received" },
-  { id: "administration", label: "Adminstration", path: "/administration" }
+  { id: "bill-not-received", label: "Bill Not Received", path: "/Bill-Not-Received" }
 ];
 
 const rmSalesTabs = [

@@ -28,8 +28,8 @@ export type Sheet =
   | 'Payment History'
   |'Payments' ;// ✅ ADD THIS
 
-// Your existing PoMasterSheet interface
 export interface PoMasterSheet {
+    indentId?: number;
     timestamp: string;
     partyName: string;
     poNumber: string;
@@ -46,25 +46,38 @@ export interface PoMasterSheet {
     packaging?: number;
     forwarding?: number;
     packagingAndForwarding?: number;
-    pdf: string;
-    preparedBy: string;
-    approvedBy: string;
-    quotationNumber: string;
-    quotationDate: string;
-    enquiryNumber: string;
-    enquiryDate: string;
-    term1: string;
-    term2: string;
-    term3: string;
-    term4: string;
-    term5: string;
-    term6: string;
-    term7: string;
-    term8: string;
-    term9: string;
-    term10: string;
+    pdf?: string;
+    preparedBy?: string;
+    approvedBy?: string;
+    quotationNumber?: string;
+    quotationDate?: string | null;
+    enquiryNumber?: string;
+    enquiryDate?: string | null;
+    term1?: string;
+    term2?: string;
+    term3?: string;
+    term4?: string;
+    term5?: string;
+    term6?: string;
+    term7?: string;
+    term8?: string;
+    term9?: string;
+    term10?: string;
     discountPercent?: number;
     gstPercent?: number;
+    deliveryDays?: number;
+    deliveryType?: string;
+    firmNameMatch?: string;
+    totalPaidAmount?: number;
+    outstandingAmount?: number;
+    status?: string;
+    deliveryDate?: string | Date | null;
+    paymentTerms?: string;
+    rowIndex?: number;
+    companyEmail?: string;
+    numberOfDays?: number;
+    advancePercent?: number;
+    advanceAmount?: number;
 }
 export interface PaymentsSheet {
     timestamp: string;

@@ -3,11 +3,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { API_URL, saveSession } from '@/lib/auth';
+import { Eye, EyeOff} from 'lucide-react'
 
 export default function Home() {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isVisible, setIsVisible] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -181,13 +183,20 @@ export default function Home() {
                       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </div>
                     <input
-                      type="password"
+                      type={isVisible ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="h-[52px] w-full pl-11 pr-4 text-[15px] rounded-2xl border border-zinc-200/80 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 text-zinc-900 dark:text-white outline-none focus:border-[#2fa36b] dark:focus:border-[#5ec792] focus:ring-4 focus:ring-[#2fa36b]/10 dark:focus:ring-[#5ec792]/10 transition-all shadow-sm placeholder:text-zinc-400"
                       placeholder="••••••••"
                       required
                     />
+                    <button 
+                      type='button'
+                      onClick={() => setIsVisible(!isVisible)}
+                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-zinc-400 group-focus-within/input:text-[#2fa36b] dark:group-focus-within/input:text-[#5ec792] transition-colors"
+                    >
+                      {isVisible ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
                   </div>
                 </div>
 

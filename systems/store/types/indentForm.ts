@@ -10,7 +10,7 @@ export const productSchema = z.object({
     uom: z.string().nonempty(),
     areaOfUse: z.string().nonempty(),
     priority: z.enum(['Low', 'Normal', 'High', 'Urgent'], {
-    required_error: 'Select priority',
+        message: 'Select priority',
     }),
     attachment: z.instanceof(File).optional().nullable(), // Allow null for attachment
     specifications: z.string().optional(),
@@ -22,7 +22,7 @@ export const formSchema = z.object({
     indenterName: z.string().nonempty(),
     approvedByWhom: z.string().nonempty(),
     status: z.enum(['Purchase', 'Store Out'], {
-        required_error: 'Select a status',
+        message: 'Select a status',
     }),
     products: z.array(productSchema).min(1, 'At least one product is required'),
 });

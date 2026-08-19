@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import { useEffect, useState } from 'react';
 import DataTable from '../element/DataTable';
 import { z } from 'zod';
@@ -161,7 +161,7 @@ export default () => {
 
         setPendingData(
             filteredByFirm
-                .filter((i) => i.planned7 !== '' && i.actual7 === '')
+                .filter((i) => i.hodStatus === 'Rejected' && !i.hasRejectGrn)
                 .sort((a, b) => (b.liftNumber || '').localeCompare(a.liftNumber || '', undefined, { numeric: true, sensitivity: 'base' }))
                 .map((i) => ({
                     liftNumber: i.liftNumber || '',
@@ -184,7 +184,7 @@ export default () => {
                     priceAsPerPoCheck: i.priceAsPerPoCheck || '',
                     remark: i.remark || '',
                     firmNameMatch: i.firmNameMatch || '',
-                    planned7Date: i.planned7 || '',
+                    planned7Date: i.timestamp || '',
                     timestamp: i.timestamp || '',
                     hodStatus: i.hodStatus || '',
                     hodRemark: i.hodRemark || '',
@@ -193,7 +193,7 @@ export default () => {
 
         setHistoryData(
             filteredByFirm
-                .filter((i) => i.planned7 !== '' && i.actual7 !== '')
+                .filter((i) => i.hasRejectGrn)
                 .sort((a, b) => (b.liftNumber || '').localeCompare(a.liftNumber || '', undefined, { numeric: true, sensitivity: 'base' }))
                 .map((i) => ({
                     liftNumber: i.liftNumber || '',
@@ -218,7 +218,7 @@ export default () => {
                     priceAsPerPoCheck: i.priceAsPerPoCheck || '',
                     remark: i.remark || '',
                     firmNameMatch: i.firmNameMatch || '',
-                    planned7Date: i.planned7 || '',
+                    planned7Date: i.timestamp || '',
                     timestamp: i.timestamp || '',
                 }))
         );
@@ -256,17 +256,14 @@ export default () => {
                 }
             }
 
-            const currentDateTime = new Date().toISOString();
-
             if (!selectedItem?.liftNumber) {
                 toast.error('No record selected');
                 return;
             }
 
-            console.log('📤 Updating record in Supabase...');
+            console.log('📤 Updating record...');
 
             await updateStoreInQuantityCheck(selectedItem.liftNumber, {
-                actual7: currentDateTime,
                 status: values.status,
                 billCopyAttached: billCopyAttachedUrl,
                 sendDebitNote: values.debitNote || 'No',

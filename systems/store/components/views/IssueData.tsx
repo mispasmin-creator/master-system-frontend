@@ -1,4 +1,4 @@
-import { type ColumnDef, type Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import DataTable from '../element/DataTable';
 import { useEffect, useState, useMemo } from 'react';
 import { DownloadOutlined } from '@ant-design/icons';
@@ -12,7 +12,7 @@ import {
     DialogTitle,
     DialogTrigger,
     Dialog,
-} from '@/components/ui/dialog';
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { z } from 'zod';
 import { useForm, type FieldErrors } from 'react-hook-form';
@@ -84,7 +84,7 @@ export default function IssueData() {
                     }
                 }
                 const historyRecords = latestRecords.filter(
-                    r => r.actual6 !== '' && r.receivingStatus !== 'Not Received'
+                    (r: any) => r.actual6 !== '' && r.receivingStatus !== 'Not Received'
                 );
 
                 const qtyByProduct = new Map<string, number>();
@@ -203,7 +203,7 @@ export default function IssueData() {
 
     const schema = z.object({
         status: z.enum(['Yes', 'No'], {
-            required_error: 'Please select a status',
+            message: 'Please select a status',
         }),
         givenQty: z.number().optional(),
     }).superRefine((data, ctx) => {

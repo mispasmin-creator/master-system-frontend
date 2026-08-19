@@ -1,5 +1,5 @@
 import { useSheets } from '@/context/SheetsContext';
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import { useEffect, useState } from 'react';
 import DataTable from '../element/DataTable';
 import { Button } from '../ui/button';
@@ -40,8 +40,7 @@ interface VendorUpdateData {
     quantity: number;
     uom: string;
     vendorType: 'Three Party' | 'Regular';
-    planned2: string;
-    actual2: string;
+    date: string;
     specifications: string;
     areaOfUse: string;
 }
@@ -57,8 +56,6 @@ interface HistoryData {
     rate: number;
     vendorType: 'Three Party' | 'Regular';
     date: string;
-    planned2: string;
-    actual2: string;
     specifications: string;
     firmNameMatch?: string;
     areaOfUse: string;
@@ -108,17 +105,17 @@ export default () => {
             const indents = data || [];
 
             const filtered = indents.filter((row: any) => {
-                const hasPlanned2 = row.planned2 !== null && row.planned2 !== undefined && row.planned2 !== '';
-                const noActual2 = row.actual2 === null || row.actual2 === undefined || row.actual2 === '';
-                const isNotRejected = (row.vendor_type || row.vendorType) !== 'Reject';
-                
+                const isApproved = !!row.indent_approval;
+                const noQuotationYet = !row.vendor_quotation;
+                const isNotRejected = row.indent_approval?.vendor_type !== 'Reject';
+
                 let matchFirm = true;
                 if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
                     const firm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
                     matchFirm = firm === user.firmNameMatch.trim().toLowerCase();
                 }
-                
-                return hasPlanned2 && noActual2 && isNotRejected && matchFirm;
+
+                return isApproved && noQuotationYet && isNotRejected && matchFirm;
             });
 
             filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
@@ -131,11 +128,10 @@ export default () => {
                 indenter: r.indenter_name || r.indenterName || '',
                 department: r.category || r.department || '',
                 product: r.product_name || r.productName || '',
-                quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                quantity: Number(r.indent_approval?.approved_quantity || r.quantity || 0),
                 uom: r.uom || '',
-                vendorType: (r.vendor_type || r.vendorType || 'Regular') as VendorUpdateData['vendorType'],
-                planned2: r.planned2 || '',
-                actual2: r.actual2 || '',
+                vendorType: (r.indent_approval?.vendor_type || 'Regular') as VendorUpdateData['vendorType'],
+                date: r.indent_approval?.created_at || '',
                 specifications: r.specifications || '',
                 areaOfUse: r.area_of_use || r.areaOfUse || '',
             }));
@@ -158,16 +154,15 @@ export default () => {
             const indents = data || [];
 
             const filtered = indents.filter((row: any) => {
-                const hasPlanned2 = row.planned2 !== null && row.planned2 !== undefined && row.planned2 !== '';
-                const hasActual2 = row.actual2 !== null && row.actual2 !== undefined && row.actual2 !== '';
-                
+                const hasQuotation = !!row.vendor_quotation;
+
                 let matchFirm = true;
                 if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
                     const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
                     matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
-                
-                return hasPlanned2 && hasActual2 && matchFirm;
+
+                return hasQuotation && matchFirm;
             });
 
             filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
@@ -175,26 +170,24 @@ export default () => {
             const rows = filtered as any[];
             const mappedData = rows.map((r): HistoryData => ({
                 id: r.id,
-                date: r.actual2 ? formatDate(new Date(r.actual2)) : '-',
+                date: r.vendor_quotation?.created_at || '',
                 indentNo: r.indent_number || r.indentNumber || '',
                 firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || r.firmName || '',
                 indenter: r.indenter_name || r.indenterName || '',
                 department: r.category || r.department || '',
                 product: r.product_name || r.productName || '',
-                quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                quantity: Number(r.indent_approval?.approved_quantity || r.quantity || 0),
                 uom: r.uom || '',
-                rate: parseFloat(r.approved_rate || r.approvedRate || r.rate1 || 0) || 0,
-                vendorType: (r.vendor_type || r.vendorType || 'Regular') as HistoryData['vendorType'],
-                planned2: r.planned2 || '',
-                actual2: r.actual2 || '',
+                rate: parseFloat(r.management_approval?.approved_rate || r.vendor_quotation?.rate1 || 0) || 0,
+                vendorType: (r.vendor_quotation?.vendor_type || 'Regular') as HistoryData['vendorType'],
                 specifications: r.specifications || '',
                 areaOfUse: r.area_of_use || r.areaOfUse || '',
-                vendorName1: r.vendor_name1 || r.vendorName1 || '',
-                rate1: parseFloat(r.rate1) || 0,
-                vendorName2: r.vendor_name2 || r.vendorName2 || '',
-                rate2: parseFloat(r.rate2) || 0,
-                vendorName3: r.vendor_name3 || r.vendorName3 || '',
-                rate3: parseFloat(r.rate3) || 0,
+                vendorName1: r.vendor_quotation?.vendor_name1 || '',
+                rate1: parseFloat(r.vendor_quotation?.rate1) || 0,
+                vendorName2: r.vendor_quotation?.vendor_name2 || '',
+                rate2: parseFloat(r.vendor_quotation?.rate2) || 0,
+                vendorName3: r.vendor_quotation?.vendor_name3 || '',
+                rate3: parseFloat(r.vendor_quotation?.rate3) || 0,
             }));
 
             setHistoryData(mappedData);
@@ -219,7 +212,7 @@ export default () => {
 
         if (selectedDate) {
             filtered = filtered.filter(item => {
-                const itemDate = new Date(item.planned2).toISOString().split('T')[0];
+                const itemDate = new Date(item.date).toISOString().split('T')[0];
                 return itemDate === selectedDate;
             });
         }
@@ -262,7 +255,7 @@ export default () => {
 
         if (selectedHistoryDate) {
             filtered = filtered.filter(item => {
-                const itemDate = new Date(item.actual2).toISOString().split('T')[0];
+                const itemDate = new Date(item.date).toISOString().split('T')[0];
                 return itemDate === selectedHistoryDate;
             });
         }
@@ -321,13 +314,13 @@ export default () => {
 
     const handleSaveEdit = async (id: number) => {
         try {
-            const updates = {
+            if (editValues.uom !== undefined) {
+                await storeApi.patch('indent', editingRow!, { uom: editValues.uom });
+            }
+            await storeApi.upsertByParent('indent_approval', editingRow!, {
                 approved_quantity: editValues.quantity,
-                uom: editValues.uom,
                 vendor_type: editValues.vendorType,
-            };
-
-            await storeApi.patch('indent', editingRow!, updates);
+            });
 
             toast.success(`Updated indent ${id}`);
             fetchCompletedVendorUpdates();
@@ -462,9 +455,9 @@ export default () => {
             },
         },
         {
-            accessorKey: 'planned2',
-            header: 'Planned Date',
-            cell: ({ row }) => formatDateTime(row.original.planned2)
+            accessorKey: 'date',
+            header: 'Date',
+            cell: ({ row }) => row.original.date ? formatDateTime(row.original.date) : '-'
         },
     ];
 
@@ -563,19 +556,12 @@ export default () => {
             },
         },
         {
-            accessorKey: 'planned2',
-            header: 'Planned Date',
+            id: 'quotedDate',
+            accessorKey: 'date',
+            header: 'Quoted Date',
             cell: ({ row }) =>
-                row.original.planned2
-                    ? formatDateTime(row.original.planned2)
-                    : '-',
-        },
-        {
-            accessorKey: 'actual2',
-            header: 'Actual Date',
-            cell: ({ row }) =>
-                row.original.actual2
-                    ? formatDateTime(row.original.actual2)
+                row.original.date
+                    ? formatDateTime(row.original.date)
                     : '-',
         },
     ];
@@ -597,7 +583,7 @@ export default () => {
     type RegularFormValues = z.infer<typeof regularSchema>;
 
     const regularForm = useForm<z.infer<typeof regularSchema>>({
-        resolver: zodResolver(regularSchema),
+        resolver: zodResolver(regularSchema) as any,
         defaultValues: {
             vendorName: '',
             rate: 0,
@@ -615,8 +601,6 @@ export default () => {
     async function onSubmitRegular(values: z.infer<typeof regularSchema>) {
         try {
             const updates = {
-                actual2: new Date().toISOString(),
-                planned3: new Date().toISOString(),
                 po_required: 'Yes',
                 vendor_name1: values.vendorName,
                 rate1: Number(values.rate),
@@ -624,7 +608,7 @@ export default () => {
                 vendor_type: computedVendorType,
             };
 
-            await storeApi.patch('indent', selectedIndent?.id!, updates);
+            await storeApi.upsertByParent('vendor_quotation', selectedIndent?.id!, updates);
 
             toast.success(`Updated vendor of ${selectedIndent?.indentNo}`);
             setOpenDialog(false);
@@ -695,7 +679,7 @@ export default () => {
     });
 
     const threePartyForm = useForm<z.infer<typeof threePartySchema>>({
-        resolver: zodResolver(threePartySchema),
+        resolver: zodResolver(threePartySchema) as any,
         defaultValues: {
             productCode: '',
             vendors: [
@@ -830,8 +814,6 @@ export default () => {
             const vendor3Data = processVendorData(values.vendors[2]);
 
             const updates = {
-                actual2: new Date().toISOString(),
-                planned3: new Date().toISOString(),
                 po_required: 'Yes',
 
                 // Vendor 1
@@ -853,7 +835,7 @@ export default () => {
                 vendor_type: computedVendorType,
             };
 
-            await storeApi.patch('indent', selectedIndent?.id!, updates);
+            await storeApi.upsertByParent('vendor_quotation', selectedIndent?.id!, updates);
 
             toast.success(`Updated vendors of ${selectedIndent?.indentNo}`);
             setOpenDialog(false);
@@ -876,7 +858,7 @@ export default () => {
     });
 
     const historyUpdateForm = useForm<z.infer<typeof historyUpdateSchema>>({
-        resolver: zodResolver(historyUpdateSchema),
+        resolver: zodResolver(historyUpdateSchema) as any,
         defaultValues: {
             rate: 0,
             vendors: [],
@@ -911,7 +893,6 @@ export default () => {
             if (selectedHistory?.vendorType === 'Regular') {
                 updates = {
                     rate1: values.rate !== undefined ? Number(values.rate) : undefined,
-                    approved_rate: values.rate !== undefined ? Number(values.rate) : undefined,
                 };
             } else {
                 // Three Party update
@@ -920,7 +901,7 @@ export default () => {
                 if (values.vendors?.[2]) updates.rate3 = Number(values.vendors[2].rate || 0);
             }
 
-            await storeApi.patch('indent', selectedHistory?.id!, updates);
+            await storeApi.upsertByParent('vendor_quotation', selectedHistory?.id!, updates);
 
             toast.success(`Updated history for ${selectedHistory?.indentNo}`);
             setOpenDialog(false);
@@ -1648,7 +1629,7 @@ export default () => {
                                                             <FormItem>
                                                                 <FormLabel>Basic Rate</FormLabel>
                                                                 <FormControl>
-                                                                    <Input type="number" {...field} />
+                                                                    <Input type="number" {...field} value={field.value ?? ''} />
                                                                 </FormControl>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -1713,7 +1694,7 @@ export default () => {
                                                             <FormItem>
                                                                 <FormLabel>Advance %</FormLabel>
                                                                 <FormControl>
-                                                                    <Input type="number" placeholder="Enter % e.g. 50" {...field} />
+                                                                    <Input type="number" placeholder="Enter % e.g. 50" {...field} value={field.value ?? ''} />
                                                                 </FormControl>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -1759,7 +1740,7 @@ export default () => {
                                                             <FormItem>
                                                                 <FormLabel>Delivery Time (Days)</FormLabel>
                                                                 <FormControl>
-                                                                    <Input type="number" placeholder="Days" {...field} />
+                                                                    <Input type="number" placeholder="Days" {...field} value={field.value ?? ''} />
                                                                 </FormControl>
                                                                 <FormMessage />
                                                             </FormItem>
@@ -1844,7 +1825,7 @@ export default () => {
                                             <FormItem>
                                                 <FormLabel>Approved Rate (Regular)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="number" {...field} />
+                                                    <Input type="number" {...field} value={field.value ?? ''} />
                                                 </FormControl>
                                             </FormItem>
                                         )}
@@ -1860,7 +1841,7 @@ export default () => {
                                                     <FormItem>
                                                         <FormLabel>{selectedHistory.vendorName1}</FormLabel>
                                                         <FormControl>
-                                                            <Input type="number" {...field} />
+                                                            <Input type="number" {...field} value={field.value ?? ''} />
                                                         </FormControl>
                                                     </FormItem>
                                                 )}
@@ -1874,7 +1855,7 @@ export default () => {
                                                     <FormItem>
                                                         <FormLabel>{selectedHistory.vendorName2}</FormLabel>
                                                         <FormControl>
-                                                            <Input type="number" {...field} />
+                                                            <Input type="number" {...field} value={field.value ?? ''} />
                                                         </FormControl>
                                                     </FormItem>
                                                 )}
@@ -1888,7 +1869,7 @@ export default () => {
                                                     <FormItem>
                                                         <FormLabel>{selectedHistory.vendorName3}</FormLabel>
                                                         <FormControl>
-                                                            <Input type="number" {...field} />
+                                                            <Input type="number" {...field} value={field.value ?? ''} />
                                                         </FormControl>
                                                     </FormItem>
                                                 )}

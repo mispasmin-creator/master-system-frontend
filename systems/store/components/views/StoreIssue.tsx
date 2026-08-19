@@ -2,17 +2,17 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Form, FormField, FormItem, FormLabel, FormControl } from '../ui/form';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
 import {
     Select,
     SelectTrigger,
     SelectValue,
     SelectContent,
     SelectItem,
-} from '@/components/ui/select';
+} from '../ui/select';
 import { ClipLoader as Loader } from 'react-spinners';
 import { ClipboardList, Trash, Search } from 'lucide-react';
 import { uploadFile } from '@/lib/fetchers';
@@ -61,7 +61,7 @@ export default () => {
                 }
             }
             const historyRecords = latestRecords.filter(
-                r => r.actual6 !== '' && r.receivingStatus !== 'Not Received'
+                (r: any) => r.actual6 !== '' && r.receivingStatus !== 'Not Received'
             );
 
             const qtyByProduct = new Map<string, number>();
@@ -439,6 +439,7 @@ export default () => {
                                                             <Input
                                                                 type="number"
                                                                 {...field}
+                                                                value={(field.value as any) ?? ''}
                                                                 disabled={!groupHead}
                                                             />
                                                         </FormControl>

@@ -32,13 +32,11 @@ export async function fetchPayments(): Promise<PaymentsSheet[]> {
             totalPaidAmount: Number(p.total_paid_amount) || 0,
             outstandingAmount: Number(p.outstanding_amount) || 0,
             status: p.status || '',
-            planned: p.planned || '',
-            actual: p.actual || '',
-            delay: p.delay || '',
-            status1: p.status1 || '',
             paymentForm: p.payment_form || '',
             paymentDone: p.payment_done || false,
-            firmNameMatch: p.firm_name || '',
+            firmNameMatch: p.firm_name_match || '',
+            liftId: p.lift_id || 0,
+            poId: p.po_id || 0,
             id: p.id,
         })) as unknown as PaymentsSheet[];
     } catch (error) {
@@ -49,7 +47,7 @@ export async function fetchPayments(): Promise<PaymentsSheet[]> {
 
 /**
  * Fetch payment history records from the dedicated payment-history table
- * (RefrasynthPaymentHistory — /api/refrasynth/payment-history)
+ * (StorePaymentHistory — /api/store/payment-history)
  */
 export async function fetchPaymentHistory(): Promise<PaymentHistory[]> {
     try {

@@ -1,4 +1,4 @@
-import { type ColumnDef, type Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import DataTable from '../element/DataTable';
 import { useEffect, useState, useMemo } from 'react';
 import { DownloadOutlined } from "@ant-design/icons";
@@ -12,7 +12,7 @@ import {
     DialogTitle,
     DialogTrigger,
     Dialog,
-} from '@/components/ui/dialog';
+} from '../ui/dialog';
 import { Button } from '../ui/button';
 import { z } from 'zod';
 import { useForm, type FieldErrors } from 'react-hook-form';
@@ -28,7 +28,7 @@ import { useAuth } from '@/context/AuthContext';
 import Heading from '../element/Heading';
 import { Pill } from '../ui/pill';
 import { Input } from '../ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Checkbox } from '../ui/checkbox';
 import {
     fetchIndentRecords,
     updateIndentApproval,
@@ -43,7 +43,7 @@ export default function ApproveIndent() {
     const [selectedIndent, setSelectedIndent] = useState<IndentRecord | null>(null);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingRow, setEditingRow] = useState<number | null>(null);
-    const [editValues, setEditValues] = useState<Partial<IndentRecord>>({});
+    const [editValues, setEditValues] = useState<{ approved_quantity?: number; uom?: string; vendor_type?: string }>({});
     const [downloading, setDownloading] = useState(false);
     const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
     const [editedStatuses, setEditedStatuses] = useState<Record<number, string>>({});
@@ -74,11 +74,11 @@ export default function ApproveIndent() {
     }, [user?.firmNameMatch]);
 
     const pendingData = useMemo(() => {
-        return allData.filter(i => i.planned1 && !i.actual1);
+        return allData.filter(i => !i.indent_approval);
     }, [allData]);
 
     const historyData = useMemo(() => {
-        return allData.filter(i => i.planned1 && i.actual1);
+        return allData.filter(i => !!i.indent_approval);
     }, [allData]);
 
     const handleDownload = (data: any[]) => {
@@ -108,9 +108,9 @@ export default function ApproveIndent() {
     const handleEditClick = (row: IndentRecord) => {
         setEditingRow(row.id);
         setEditValues({
-            approved_quantity: row.approved_quantity,
+            approved_quantity: row.indent_approval?.approved_quantity,
             uom: row.uom,
-            vendor_type: row.vendor_type,
+            vendor_type: row.indent_approval?.vendor_type,
         });
     };
 
@@ -137,7 +137,7 @@ export default function ApproveIndent() {
         }
     };
 
-    const handleInputChange = (field: keyof IndentRecord, value: any) => {
+    const handleInputChange = (field: 'approved_quantity' | 'uom' | 'vendor_type', value: any) => {
         setEditValues(prev => ({ ...prev, [field]: value }));
     };
 
@@ -276,11 +276,6 @@ export default function ApproveIndent() {
             accessorKey: 'timestamp',
             header: 'Date',
             cell: ({ row }) => row.original.timestamp ? formatDate(new Date(row.original.timestamp)) : '-',
-        },
-        {
-            accessorKey: 'planned1',
-            header: 'Planned Date',
-            cell: ({ row }) => row.original.planned1 ? formatDate(new Date(row.original.planned1)) : '-',
         }
     ], []);
 
@@ -300,12 +295,12 @@ export default function ApproveIndent() {
         },
         { accessorKey: 'area_of_use', header: 'Area of Use' },
         {
-            accessorKey: 'approved_quantity',
+            id: 'approved_quantity',
             header: 'Quantity',
             cell: ({ row, table }: { row: any, table: any }) => {
                 const id = row.original.id;
                 const isEditing = table.options.meta?.editingRow === id;
-                const val = table.options.meta?.editValues?.approved_quantity ?? row.original.approved_quantity;
+                const val = table.options.meta?.editValues?.approved_quantity ?? row.original.indent_approval?.approved_quantity;
                 return isEditing ? (
                     <Input
                         type="number"
@@ -315,7 +310,7 @@ export default function ApproveIndent() {
                     />
                 ) : (
                     <div className="flex items-center gap-2">
-                        {row.original.approved_quantity}
+                        {row.original.indent_approval?.approved_quantity}
                         {user.indentApprovalAction && (
                             <Button
                                 variant="ghost"
@@ -361,10 +356,10 @@ export default function ApproveIndent() {
             },
         },
         {
-            accessorKey: 'vendor_type',
+            id: 'vendor_type',
             header: 'Status',
             cell: ({ row }: { row: Row<IndentRecord> }) => {
-                const status = row.original.vendor_type;
+                const status = row.original.indent_approval?.vendor_type;
                 return (
                     <Pill
                         variant={
@@ -416,14 +411,9 @@ export default function ApproveIndent() {
             cell: ({ row }) => row.original.timestamp ? formatDate(new Date(row.original.timestamp)) : '-',
         },
         {
-            accessorKey: 'actual1',
+            id: 'approval_date',
             header: 'Approval Date',
-            cell: ({ row }) => row.original.actual1 ? formatDate(new Date(row.original.actual1)) : '-',
-        },
-        {
-            accessorKey: 'planned1',
-            header: 'Planned Date',
-            cell: ({ row }) => row.original.planned1 ? formatDate(new Date(row.original.planned1)) : '-',
+            cell: ({ row }) => row.original.indent_approval?.created_at ? formatDate(new Date(row.original.indent_approval.created_at)) : '-',
         },
         {
             id: 'editActions',
@@ -453,7 +443,7 @@ export default function ApproveIndent() {
 
     const schema = z.object({
         approval: z.enum(['Reject', 'Three Party', 'Regular'], {
-            required_error: "Please select an approval status",
+            message: "Please select an approval status",
         }),
         approvedQuantity: z.coerce.number().optional(),
     }).superRefine((data, ctx) => {
@@ -468,8 +458,13 @@ export default function ApproveIndent() {
         }
     });
 
-    const form = useForm<z.infer<typeof schema>>({
-        resolver: zodResolver(schema),
+    type FormValues = {
+        approval: 'Reject' | 'Three Party' | 'Regular';
+        approvedQuantity?: number;
+    };
+
+    const form = useForm<FormValues>({
+        resolver: zodResolver(schema) as any,
         defaultValues: { approvedQuantity: undefined, approval: 'Regular' },
     });
 
@@ -483,9 +478,7 @@ export default function ApproveIndent() {
     const handleReject = async () => {
         if (!selectedIndent) return;
         try {
-            const currentDateTime = new Date().toISOString();
             await updateIndentApproval(selectedIndent.id, {
-                actual1: currentDateTime,
                 vendor_type: 'Reject',
                 approved_quantity: 0,
             });
@@ -499,18 +492,13 @@ export default function ApproveIndent() {
         }
     };
 
-    async function onSubmit(values: z.infer<typeof schema>) {
+    async function onSubmit(values: FormValues) {
         try {
             if (!selectedIndent) return;
 
-            const currentDateTime = new Date().toISOString();
-
             await updateIndentApproval(selectedIndent.id, {
-                actual1: currentDateTime,
                 vendor_type: values.approval,
                 approved_quantity: values.approvedQuantity ?? selectedIndent.quantity,
-                // Set planned2 for approved indents (not rejected)
-                ...(values.approval !== 'Reject' && { planned2: currentDateTime }),
             });
 
             toast.success(`Updated approval status of ${selectedIndent.indent_number}`);
@@ -533,7 +521,6 @@ export default function ApproveIndent() {
 
         setBulkSubmitting(true);
         try {
-            const currentDateTime = new Date().toISOString();
             const selectedIndents = pendingData.filter(i => selectedIds.includes(String(i.id)));
 
             for (const indent of selectedIndents) {
@@ -543,10 +530,8 @@ export default function ApproveIndent() {
                     : indent.quantity;
 
                 await updateIndentApproval(indent.id, {
-                    actual1: currentDateTime,
                     vendor_type: status,
                     approved_quantity: status === 'Reject' ? 0 : Number(qtyToApprove),
-                    ...(status !== 'Reject' && { planned2: currentDateTime }),
                 });
             }
 

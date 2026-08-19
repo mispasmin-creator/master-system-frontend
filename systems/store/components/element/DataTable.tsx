@@ -1,13 +1,12 @@
 'use client';
 
-import { flexRender } from '@tanstack/react-table';
+import { flexRender, type SortingState, type RowData, type RowSelectionState } from '@tanstack/react-table';
 import {
-    type ColumnDef,
+    type LegacyColumnDef as ColumnDef,
     getCoreRowModel,
     getFilteredRowModel,
     getSortedRowModel,
     useLegacyTable as useReactTable,
-    type SortingState,
 } from '@tanstack/react-table/legacy';
 
 import {
@@ -17,7 +16,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from '@/components/ui/table';
+} from '../ui/table';
 import { useState, type ReactNode } from 'react';
 import { Input } from '../ui/input';
 import { ArrowDown, ArrowUp, ArrowUpDown, Package } from 'lucide-react';
@@ -26,7 +25,7 @@ import { ClipLoader } from 'react-spinners';
 import { ScrollArea } from '../ui/scroll-area';
 import { cn } from '@/lib/utils';
 
-interface DataTableProps<TData, TValue> {
+interface DataTableProps<TData extends RowData, TValue> {
     columns: ColumnDef<TData, TValue>[];
     data: TData[];
     searchFields?: string[];
@@ -49,7 +48,7 @@ function globalFilterFn<TData>(row: TData, columnIds: string[], filterValue: str
     });
 }
 
-export default function DataTable<TData, TValue>({
+export default function DataTable<TData extends RowData, TValue>({
     columns,
     data,
     searchFields = [],
@@ -66,7 +65,7 @@ export default function DataTable<TData, TValue>({
     const [sorting, setSorting] = useState<SortingState>([]);
     const table = useReactTable({
         data,
-        columns,
+        columns: columns as ColumnDef<TData, unknown>[],
         getCoreRowModel: getCoreRowModel(),
         getFilteredRowModel: getFilteredRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -77,7 +76,7 @@ export default function DataTable<TData, TValue>({
         onSortingChange: setSorting,
         state: {
             globalFilter,
-            rowSelection: rowSelection || {},
+            rowSelection: (rowSelection || {}) as RowSelectionState,
             sorting,
         },
         onGlobalFilterChange: setGlobalFilter,

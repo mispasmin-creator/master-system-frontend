@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import {
     Dialog,
     DialogClose,
@@ -34,7 +34,7 @@ interface RateApprovalData {
     department: string;
     product: string;
     comparisonSheet: string;
-    vendors: [string, string, string, string, string, string, string, string, string, string, string][];
+    vendors: string[][];
     date: string;
     firmNameMatch?: string;
     plannedDate: string;
@@ -50,15 +50,86 @@ interface HistoryData {
     firmNameMatch: string;
     department: string;
     product: string;
-    vendors: [string, string, string, string, string, string, string, string, string, string, string][];
+    vendors: string[][];
     date: string;
     quantity: number;
     uom: string;
     areaOfUse: string;
 }
 
+const extractVendors = (r: any): string[][] => {
+    const rawList: string[][] = [];
+    if (r.vendor_quotation?.vendor_name1 && r.vendor_quotation.vendor_name1.trim() !== '') {
+        rawList.push([
+            r.vendor_quotation.vendor_name1,
+            (r.vendor_quotation.rate1 || 0).toString(),
+            r.vendor_quotation.payment_term1 || '',
+            'Basic Rate',
+            'No',
+            '0',
+            '',
+            '',
+            r.technical_approval?.vendor1_rank || '',
+            '',
+            '',
+            '1'
+        ]);
+    }
+    if (r.vendor_quotation?.vendor_name2 && r.vendor_quotation.vendor_name2.trim() !== '') {
+        rawList.push([
+            r.vendor_quotation.vendor_name2,
+            (r.vendor_quotation.rate2 || 0).toString(),
+            r.vendor_quotation.payment_term2 || '',
+            'Basic Rate',
+            'No',
+            '0',
+            '',
+            '',
+            r.technical_approval?.vendor2_rank || '',
+            '',
+            '',
+            '2'
+        ]);
+    }
+    if (r.vendor_quotation?.vendor_name3 && r.vendor_quotation.vendor_name3.trim() !== '') {
+        rawList.push([
+            r.vendor_quotation.vendor_name3,
+            (r.vendor_quotation.rate3 || 0).toString(),
+            r.vendor_quotation.payment_term3 || '',
+            'Basic Rate',
+            'No',
+            '0',
+            '',
+            '',
+            r.technical_approval?.vendor3_rank || '',
+            '',
+            '',
+            '3'
+        ]);
+    }
+
+    if (rawList.length === 0) {
+        rawList.push([
+            r.vendor_quotation?.vendor_name1 || '',
+            (r.vendor_quotation?.rate1 || 0).toString(),
+            r.vendor_quotation?.payment_term1 || '',
+            'Basic Rate',
+            'No',
+            '0',
+            '',
+            '',
+            r.technical_approval?.vendor1_rank || '',
+            '',
+            '',
+            '1'
+        ]);
+    }
+
+    return rawList;
+};
+
 const technicalApprovalSchema = z.object({
-    ranks: z.record(z.string()),
+    ranks: z.record(z.string(), z.string()),
 }).refine(data => {
     return Object.values(data.ranks).some(val => val !== '');
 }, {
@@ -68,7 +139,7 @@ const technicalApprovalSchema = z.object({
 type TechnicalApprovalValues = z.infer<typeof technicalApprovalSchema>;
 
 const historyUpdateSchema = z.object({
-    ranks: z.record(z.string()),
+    ranks: z.record(z.string(), z.string()),
 }).refine(data => {
     return Object.values(data.ranks).some(val => val !== '');
 }, {
@@ -95,17 +166,17 @@ export default () => {
             const indents = data || [];
 
             const filtered = indents.filter((row: any) => {
-                const hasPlanned3 = row.planned3 !== null && row.planned3 !== undefined && row.planned3 !== '';
-                const noActual3 = row.actual3 === null || row.actual3 === undefined || row.actual3 === '';
-                const validVendorType = (row.vendor_type || row.vendorType) !== 'Reject';
-                
+                const hasQuotation = !!row.vendor_quotation;
+                const noTechnicalApprovalYet = !row.technical_approval;
+                const validVendorType = row.vendor_quotation?.vendor_type !== 'Reject';
+
                 let matchFirm = true;
                 if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
                     const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
                     matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
-                
-                return hasPlanned3 && noActual3 && validVendorType && matchFirm;
+
+                return hasQuotation && noTechnicalApprovalYet && validVendorType && matchFirm;
             });
 
             filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
@@ -119,53 +190,13 @@ export default () => {
                     indenter: r.indenter_name || r.indenterName || '',
                     department: r.category || r.department || '',
                     product: r.product_name || r.productName || '',
-                    comparisonSheet: r.comparison_sheet || r.comparisonSheet || '',
+                    comparisonSheet: r.vendor_quotation?.comparison_sheet || '',
                     date: r.timestamp ? formatDateTime(new Date(r.timestamp)).replace(/\//g, '-') : '-',
-                    plannedDate: r.planned3 ? formatDate(new Date(r.planned3)) : 'Not Set',
-                    quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                    plannedDate: r.vendor_quotation?.created_at ? formatDate(new Date(r.vendor_quotation.created_at)) : 'Not Set',
+                    quantity: Number(r.indent_approval?.approved_quantity || r.quantity || 0),
                     uom: r.uom || '',
                     areaOfUse: r.area_of_use || r.areaOfUse || '',
-                    vendors: [
-                        [
-                            r.vendor_name1 || r.vendorName1 || '',
-                            (r.rate1 || r.approved_rate || 0).toString(),
-                            r.payment_term1 || r.paymentTerm1 || '',
-                            r.select_rate_type1 || 'Basic Rate',
-                            r.with_tax_or_not1 || 'No',
-                            (r.tax_value1 || 0).toString(),
-                            r.quotation_no1 || '',
-                            r.quotation_date1 || '',
-                            r.vendor1_rank || '',
-                            (r.delivery_time1 || '').toString(),
-                            r.make1 || ''
-                        ],
-                        [
-                            r.vendor_name2 || r.vendorName2 || '',
-                            (r.rate2 || 0).toString(),
-                            r.payment_term2 || r.paymentTerm2 || '',
-                            r.select_rate_type2 || 'Basic Rate',
-                            r.with_tax_or_not2 || 'No',
-                            (r.tax_value2 || 0).toString(),
-                            r.quotation_no2 || '',
-                            r.quotation_date2 || '',
-                            r.vendor2_rank || '',
-                            (r.delivery_time2 || '').toString(),
-                            r.make2 || ''
-                        ],
-                        [
-                            r.vendor_name3 || r.vendorName3 || '',
-                            (r.rate3 || 0).toString(),
-                            r.payment_term3 || r.paymentTerm3 || '',
-                            r.select_rate_type3 || 'Basic Rate',
-                            r.with_tax_or_not3 || 'No',
-                            (r.tax_value3 || 0).toString(),
-                            r.quotation_no3 || '',
-                            r.quotation_date3 || '',
-                            r.vendor3_rank || '',
-                            (r.delivery_time3 || '').toString(),
-                            r.make3 || ''
-                        ],
-                    ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string][],
+                    vendors: extractVendors(r),
                 }))
             );
         } catch (err) {
@@ -189,17 +220,17 @@ export default () => {
             const indents = data || [];
 
             const filtered = indents.filter((row: any) => {
-                const hasPlanned3 = row.planned3 !== null && row.planned3 !== undefined && row.planned3 !== '';
-                const hasActual3 = row.actual3 !== null && row.actual3 !== undefined && row.actual3 !== '';
-                const validVendorType = (row.vendor_type || row.vendorType) !== 'Reject';
-                
+                const hasQuotation = !!row.vendor_quotation;
+                const hasTechnicalApproval = !!row.technical_approval;
+                const validVendorType = row.vendor_quotation?.vendor_type !== 'Reject';
+
                 let matchFirm = true;
                 if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
                     const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
                     matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
-                
-                return hasPlanned3 && hasActual3 && validVendorType && matchFirm;
+
+                return hasQuotation && hasTechnicalApproval && validVendorType && matchFirm;
             });
 
             filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
@@ -213,51 +244,11 @@ export default () => {
                     indenter: r.indenter_name || r.indenterName || '',
                     department: r.category || r.department || '',
                     product: r.product_name || r.productName || '',
-                    date: r.actual3 ? formatDate(new Date(r.actual3)) : formatDate(new Date(r.timestamp)),
-                    quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                    date: r.technical_approval?.created_at ? formatDate(new Date(r.technical_approval.created_at)) : formatDate(new Date(r.timestamp)),
+                    quantity: Number(r.indent_approval?.approved_quantity || r.quantity || 0),
                     uom: r.uom || '',
                     areaOfUse: r.area_of_use || r.areaOfUse || '',
-                    vendors: [
-                        [
-                            r.vendor_name1 || r.vendorName1 || '',
-                            (r.rate1 || r.approved_rate || 0).toString(),
-                            r.payment_term1 || r.paymentTerm1 || '',
-                            r.select_rate_type1 || 'Basic Rate',
-                            r.with_tax_or_not1 || 'No',
-                            (r.tax_value1 || 0).toString(),
-                            r.quotation_no1 || '',
-                            r.quotation_date1 || '',
-                            r.vendor1_rank || '',
-                            (r.delivery_time1 || '').toString(),
-                            r.make1 || ''
-                        ],
-                        [
-                            r.vendor_name2 || r.vendorName2 || '',
-                            (r.rate2 || 0).toString(),
-                            r.payment_term2 || r.paymentTerm2 || '',
-                            r.select_rate_type2 || 'Basic Rate',
-                            r.with_tax_or_not2 || 'No',
-                            (r.tax_value2 || 0).toString(),
-                            r.quotation_no2 || '',
-                            r.quotation_date2 || '',
-                            r.vendor2_rank || '',
-                            (r.delivery_time2 || '').toString(),
-                            r.make2 || ''
-                        ],
-                        [
-                            r.vendor_name3 || r.vendorName3 || '',
-                            (r.rate3 || 0).toString(),
-                            r.payment_term3 || r.paymentTerm3 || '',
-                            r.select_rate_type3 || 'Basic Rate',
-                            r.with_tax_or_not3 || 'No',
-                            (r.tax_value3 || 0).toString(),
-                            r.quotation_no3 || '',
-                            r.quotation_date3 || '',
-                            r.vendor3_rank || '',
-                            (r.delivery_time3 || '').toString(),
-                            r.make3 || ''
-                        ],
-                    ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string][],
+                    vendors: extractVendors(r),
                 }))
             );
         } catch (err) {
@@ -318,7 +309,7 @@ export default () => {
             accessorKey: 'vendors',
             header: 'Vendors',
             cell: ({ row }) => {
-                const vendors = row.original.vendors;
+                const vendors = row.original.vendors.filter(v => v[0] && v[0].trim() !== '');
                 return (
                     <div className="grid place-items-center">
                         <div className="flex flex-col gap-1">
@@ -367,7 +358,7 @@ export default () => {
             accessorKey: 'vendors',
             header: 'Vendors',
             cell: ({ row }) => {
-                const vendors = row.original.vendors;
+                const vendors = row.original.vendors.filter(v => v[0] && v[0].trim() !== '');
                 return (
                     <div className="grid place-items-center">
                         <div className="flex flex-col gap-1">
@@ -485,28 +476,34 @@ export default () => {
 
     const onSubmit: SubmitHandler<TechnicalApprovalValues> = async () => {
         try {
-            const updates: any = {
-                actual3: new Date().toISOString(),
-                planned4: new Date().toISOString(),
-            };
+            const rankByOrigIdx: Record<number, string> = { 1: '', 2: '', 3: '' };
+            const mgmtUpdates: any = {};
 
             Object.entries(ranking).forEach(([rank, vendorIdx]) => {
-                if (vendorIdx === null) return;
-                if (rank === 'T1' && selectedIndent) {
-                    const idx = vendorIdx + 1;
-                    const vName = (selectedIndent as any)[`vendorName${idx}`] || (selectedIndent as any)[`vendor_name${idx}`];
-                    const vRate = (selectedIndent as any)[`rate${idx}`];
-                    const vTerm = (selectedIndent as any)[`paymentTerm${idx}`] || (selectedIndent as any)[`payment_term${idx}`];
-                    if (vName) {
-                        updates.approved_vendor_name = vName;
-                        if (vRate !== undefined && vRate !== null) updates.approved_rate = Number(vRate);
-                        if (vTerm) updates.approved_payment_term = vTerm;
-                        updates.approved_date = new Date().toISOString();
-                    }
+                if (vendorIdx === null || !selectedIndent) return;
+                const vendor = selectedIndent.vendors[vendorIdx];
+                if (!vendor) return;
+
+                const origIdx = parseInt(vendor[11] || `${vendorIdx + 1}`);
+                rankByOrigIdx[origIdx] = rank;
+
+                if (rank === 'T1' && vendor[0]) {
+                    mgmtUpdates.approved_vendor_name = vendor[0];
+                    mgmtUpdates.approved_rate = Number(vendor[1]) || 0;
+                    mgmtUpdates.approved_payment_term = vendor[2] || '';
+                    mgmtUpdates.approved_date = new Date().toISOString();
                 }
             });
 
-            await storeApi.patch('indent', selectedIndent?.id!, updates);
+            await storeApi.upsertByParent('technical_approval', selectedIndent?.id!, {
+                vendor1_rank: rankByOrigIdx[1] || '',
+                vendor2_rank: rankByOrigIdx[2] || '',
+                vendor3_rank: rankByOrigIdx[3] || '',
+            });
+
+            if (Object.keys(mgmtUpdates).length > 0) {
+                await storeApi.upsertByParent('management_approval', selectedIndent?.id!, mgmtUpdates);
+            }
 
             toast.success(`Completed Department Approval for ${selectedIndent?.indentNo}`);
             setOpenDialog(false);
@@ -518,7 +515,7 @@ export default () => {
             console.error('Error approving vendor:', error);
             toast.error('Failed to update vendor');
         }
-    }
+    };
 
     const historyUpdateForm = useForm<HistoryUpdateValues>({
         resolver: zodResolver(historyUpdateSchema),
@@ -533,8 +530,8 @@ export default () => {
         if (selectedHistory) {
             const initialOrder = selectedHistory.vendors.map((_, i) => i);
             const rankedOrder = [...initialOrder].sort((a, b) => {
-                const rankA = selectedHistory.vendors[a][10] || 'T9';
-                const rankB = selectedHistory.vendors[b][10] || 'T9';
+                const rankA = selectedHistory.vendors[a][8] || 'T9';
+                const rankB = selectedHistory.vendors[b][8] || 'T9';
                 return rankA.localeCompare(rankB);
             });
             setOrderedHistoryIndices(rankedOrder);
@@ -566,24 +563,33 @@ export default () => {
 
     const onSubmitHistoryUpdate: SubmitHandler<HistoryUpdateValues> = async () => {
         try {
+            const rankByOrigIdx: Record<number, string> = { 1: '', 2: '', 3: '' };
             const updates: any = {};
             orderedHistoryIndices.forEach((originalIdx, position) => {
                 const rankVal = `T${position + 1}`;
-                if (rankVal === 'T1' && selectedHistory) {
-                    const idx = originalIdx + 1;
-                    const vName = (selectedHistory as any)[`vendorName${idx}`] || (selectedHistory as any)[`vendor_name${idx}`];
-                    const vRate = (selectedHistory as any)[`rate${idx}`];
-                    const vTerm = (selectedHistory as any)[`paymentTerm${idx}`] || (selectedHistory as any)[`payment_term${idx}`];
-                    if (vName) {
-                        updates.approved_vendor_name = vName;
-                        if (vRate !== undefined && vRate !== null) updates.approved_rate = Number(vRate);
-                        if (vTerm) updates.approved_payment_term = vTerm;
+                if (selectedHistory) {
+                    const vendor = selectedHistory.vendors[originalIdx];
+                    if (vendor) {
+                        const origIdx = parseInt(vendor[11] || `${originalIdx + 1}`);
+                        rankByOrigIdx[origIdx] = rankVal;
+
+                        if (rankVal === 'T1' && vendor[0]) {
+                            updates.approved_vendor_name = vendor[0];
+                            updates.approved_rate = Number(vendor[1]) || 0;
+                            updates.approved_payment_term = vendor[2] || '';
+                        }
                     }
                 }
             });
 
+            await storeApi.upsertByParent('technical_approval', selectedHistory?.id!, {
+                vendor1_rank: rankByOrigIdx[1] || '',
+                vendor2_rank: rankByOrigIdx[2] || '',
+                vendor3_rank: rankByOrigIdx[3] || '',
+            });
+
             if (Object.keys(updates).length > 0) {
-                await storeApi.patch('indent', selectedHistory?.id!, updates);
+                await storeApi.upsertByParent('management_approval', selectedHistory?.id!, updates);
             }
 
             toast.success(`Updated ranks for ${selectedHistory?.indentNo}`);
@@ -594,7 +600,7 @@ export default () => {
             console.error('Error updating ranks:', err);
             toast.error('Failed to update vendor');
         }
-    }
+    };
 
     function onError(e: any) {
         console.log(e);
@@ -676,90 +682,110 @@ export default () => {
                                     </div>
 
                                     {/* Progress bar */}
-                                    <div className="mt-4 flex items-center gap-3">
-                                        {['T1', 'T2', 'T3'].map((r, i) => (
-                                            <div key={r} className="flex items-center gap-1.5">
-                                                <div className={`w-2.5 h-2.5 rounded-full border-2 border-white/40 transition-all duration-300 ${ranking[r] !== null ? 'bg-white scale-110' : 'bg-white/20'}`} />
-                                                <span className="text-[10px] font-black text-green-100">{r}</span>
-                                                {i < 2 && <div className={`h-px w-4 transition-all ${ranking[r] !== null ? 'bg-white/60' : 'bg-white/20'}`} />}
+                                    {(() => {
+                                        const validVendors = selectedIndent.vendors.filter(v => v[0] && v[0].trim() !== '');
+                                        const slotsCount = Math.max(1, validVendors.length);
+                                        const slots = [
+                                            { rank: 'T1', label: 'Primary Choice', medal: '🥇' },
+                                            { rank: 'T2', label: 'Secondary Choice', medal: '🥈' },
+                                            { rank: 'T3', label: 'Backup Option', medal: '🥉' },
+                                        ].slice(0, slotsCount);
+
+                                        return (
+                                            <div className="mt-4 flex items-center gap-3">
+                                                {slots.map((slot, i) => (
+                                                    <div key={slot.rank} className="flex items-center gap-1.5">
+                                                        <div className={`w-2.5 h-2.5 rounded-full border-2 border-white/40 transition-all duration-300 ${ranking[slot.rank] !== null ? 'bg-white scale-110' : 'bg-white/20'}`} />
+                                                        <span className="text-[10px] font-black text-green-100">{slot.rank}</span>
+                                                        {i < slots.length - 1 && <div className={`h-px w-4 transition-all ${ranking[slot.rank] !== null ? 'bg-white/60' : 'bg-white/20'}`} />}
+                                                    </div>
+                                                ))}
+                                                <span className="ml-auto text-[10px] text-green-200 font-bold">
+                                                    {Object.entries(ranking).filter(([r, v]) => slots.some(s => s.rank === r) && v !== null).length} / {slots.length} assigned
+                                                </span>
                                             </div>
-                                        ))}
-                                        <span className="ml-auto text-[10px] text-green-200 font-bold">
-                                            {Object.values(ranking).filter(v => v !== null).length} / {Object.keys(ranking).length} assigned
-                                        </span>
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* ── Body ── */}
                                 <div className="overflow-y-auto max-h-[62vh] p-6 space-y-6 bg-gray-50/60">
 
                                     {/* Rank Slots */}
-                                    <div className="grid grid-cols-3 gap-4">
-                                        {[
+                                    {(() => {
+                                        const validVendors = selectedIndent.vendors.filter(v => v[0] && v[0].trim() !== '');
+                                        const slotsCount = Math.max(1, validVendors.length);
+                                        const slots = [
                                             { rank: 'T1', label: 'Primary Choice',   medal: '🥇', emptyColor: 'border-amber-300  bg-amber-50/70  hover:border-amber-400  hover:bg-amber-50',    filledBorder: 'border-amber-400',  filledBg: 'bg-gradient-to-br from-amber-50  to-orange-50',  badge: 'bg-amber-500'  },
                                             { rank: 'T2', label: 'Secondary Choice', medal: '🥈', emptyColor: 'border-slate-300   bg-slate-50/70   hover:border-slate-400   hover:bg-slate-50',    filledBorder: 'border-slate-400',  filledBg: 'bg-gradient-to-br from-slate-50  to-zinc-50',    badge: 'bg-slate-500'  },
                                             { rank: 'T3', label: 'Backup Option',    medal: '🥉', emptyColor: 'border-orange-300  bg-orange-50/70  hover:border-orange-400  hover:bg-orange-50',   filledBorder: 'border-orange-400', filledBg: 'bg-gradient-to-br from-orange-50 to-amber-50',   badge: 'bg-orange-500' },
-                                        ].map(({ rank, label, medal, emptyColor, filledBorder, filledBg, badge }) => {
-                                            const vendorIdx = ranking[rank];
-                                            const vendor    = vendorIdx !== null ? selectedIndent.vendors[vendorIdx] : null;
-                                            const validRates = selectedIndent.vendors.map(v => parseFloat(v[1]) || 0).filter(r => r > 0);
-                                            const minRate = Math.min(...validRates);
-                                            const maxRate = Math.max(...validRates);
+                                        ].slice(0, slotsCount);
 
-                                            return (
-                                                <div key={rank} className="flex flex-col items-center">
-                                                    <div
-                                                        onDragOver={handleDragOver}
-                                                        onDrop={(e) => handleDropOnBox(e, rank)}
-                                                        className={`relative w-full flex flex-col items-center min-h-[152px] rounded-2xl border-2 border-dashed transition-all duration-200 shadow-sm
-                                                            ${vendor ? `${filledBorder} ${filledBg} border-solid shadow-lg scale-[1.02]` : emptyColor}
-                                                        `}
-                                                    >
-                                                        {/* Rank badge */}
-                                                        <div className={`absolute -top-3 left-1/2 -translate-x-1/2 ${badge} text-white text-[10px] font-black px-3 py-1 rounded-full shadow-md tracking-wider`}>
-                                                            {rank}
-                                                        </div>
+                                        return (
+                                            <div className={`grid gap-4 ${slotsCount === 1 ? 'grid-cols-1 max-w-xs mx-auto' : slotsCount === 2 ? 'grid-cols-2 max-w-md mx-auto' : 'grid-cols-3'}`}>
+                                                {slots.map(({ rank, label, medal, emptyColor, filledBorder, filledBg, badge }) => {
+                                                    const vendorIdx = ranking[rank];
+                                                    const vendor    = vendorIdx !== null ? selectedIndent.vendors[vendorIdx] : null;
+                                                    const validRates = selectedIndent.vendors.map(v => parseFloat(v[1]) || 0).filter(r => r > 0);
+                                                    const minRate = validRates.length ? Math.min(...validRates) : 0;
+                                                    const maxRate = validRates.length ? Math.max(...validRates) : 0;
 
-                                                        <div className="flex flex-col items-center justify-center w-full h-full p-4 pt-6">
-                                                            {vendor ? (
-                                                                <div
-                                                                    draggable
-                                                                    onDragStart={(e) => handleDragStartBox(e, { type: 'box', indexOrRank: rank })}
-                                                                    className="w-full text-center space-y-1.5 cursor-grab active:cursor-grabbing"
-                                                                >
-                                                                    <div className="text-2xl mb-1">{medal}</div>
-                                                                    <h5 className="font-black text-xs leading-snug line-clamp-2 text-gray-800">{vendor[0]}</h5>
-                                                                    <div className="pt-2 mt-1 border-t border-black/5">
-                                                                        <p className={`text-sm font-black ${
-                                                                            parseFloat(vendor[1]) === minRate ? 'text-green-600' :
-                                                                            parseFloat(vendor[1]) === maxRate && maxRate !== minRate ? 'text-red-500' :
-                                                                            'text-gray-700'
-                                                                        }`}>
-                                                                            ₹{(parseFloat(vendor[1]) || 0).toLocaleString('en-IN')}
-                                                                        </p>
-                                                                        <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Rate</p>
-                                                                    </div>
+                                                    return (
+                                                        <div key={rank} className="flex flex-col items-center">
+                                                            <div
+                                                                onDragOver={handleDragOver}
+                                                                onDrop={(e) => handleDropOnBox(e, rank)}
+                                                                className={`relative w-full flex flex-col items-center min-h-[152px] rounded-2xl border-2 border-dashed transition-all duration-200 shadow-sm
+                                                                    ${vendor ? `${filledBorder} ${filledBg} border-solid shadow-lg scale-[1.02]` : emptyColor}
+                                                                `}
+                                                            >
+                                                                {/* Rank badge */}
+                                                                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 ${badge} text-white text-[10px] font-black px-3 py-1 rounded-full shadow-md tracking-wider`}>
+                                                                    {rank}
                                                                 </div>
-                                                            ) : (
-                                                                <div className="flex flex-col items-center gap-2">
-                                                                    <div className="w-11 h-11 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
-                                                                        <span className="text-gray-300 text-xs font-black">{rank}</span>
-                                                                    </div>
-                                                                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Empty</p>
-                                                                    <p className="text-[8px] text-gray-300 font-medium">Drop vendor here</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
 
-                                                    {/* Label below slot */}
-                                                    <p className={`mt-2 text-[9px] font-black uppercase tracking-wider transition-colors ${vendor ? 'text-green-600' : 'text-gray-400'}`}>
-                                                        {label}
-                                                    </p>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                                                                <div className="flex flex-col items-center justify-center w-full h-full p-4 pt-6">
+                                                                    {vendor ? (
+                                                                        <div
+                                                                            draggable
+                                                                            onDragStart={(e) => handleDragStartBox(e, { type: 'box', indexOrRank: rank })}
+                                                                            className="w-full text-center space-y-1.5 cursor-grab active:cursor-grabbing"
+                                                                        >
+                                                                            <div className="text-2xl mb-1">{medal}</div>
+                                                                            <h5 className="font-black text-xs leading-snug line-clamp-2 text-gray-800">{vendor[0]}</h5>
+                                                                            <div className="pt-2 mt-1 border-t border-black/5">
+                                                                                <p className={`text-sm font-black ${
+                                                                                    parseFloat(vendor[1]) === minRate ? 'text-green-600' :
+                                                                                    parseFloat(vendor[1]) === maxRate && maxRate !== minRate ? 'text-red-500' :
+                                                                                    'text-gray-700'
+                                                                                }`}>
+                                                                                    ₹{(parseFloat(vendor[1]) || 0).toLocaleString('en-IN')}
+                                                                                </p>
+                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Rate</p>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="flex flex-col items-center gap-2">
+                                                                            <div className="w-11 h-11 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
+                                                                                <span className="text-gray-300 text-xs font-black">{rank}</span>
+                                                                            </div>
+                                                                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Empty</p>
+                                                                            <p className="text-[8px] text-gray-300 font-medium">Drop vendor here</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Label below slot */}
+                                                            <p className={`mt-2 text-[9px] font-black uppercase tracking-wider transition-colors ${vendor ? 'text-green-600' : 'text-gray-400'}`}>
+                                                                {label}
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })()}
 
                                     {/* ── Vendor Pool ── */}
                                     <div

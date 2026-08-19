@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import { useEffect, useState } from 'react';
 import DataTable from '../element/DataTable';
 import { z } from 'zod';
@@ -10,7 +10,6 @@ import {
     uploadDebitNoteCopy,
     type StoreInRecord,
 } from '@/services/storeInService';
-import { createTallyEntryRecord } from '@/services/tallyEntryService';
 import {
     Dialog,
     DialogContent,
@@ -145,7 +144,7 @@ export default () => {
 
         setPendingData(
             filteredByFirm
-                .filter((i) => i.planned9 !== '' && i.actual9 === '')
+                .filter((i) => i.hasRejectGrn && !i.hasDebitNote)
                 .map((i) => ({
                     liftNumber: i.liftNumber || '',
                     indentNumber: i.indentNo || '',
@@ -163,7 +162,7 @@ export default () => {
                     amount: i.amount || 0,
                     firmNameMatch: i.firmNameMatch || '',
                     reason: i.reason || '',
-                    plannedDate: i.planned9 || '',
+                    plannedDate: i.timestamp || '',
                     timestamp: i.timestamp || '',
                     poNumber: i.poNumber || '',
                     indentQty: i.indentQty || 0,
@@ -172,7 +171,7 @@ export default () => {
 
         setHistoryData(
             filteredByFirm
-                .filter((i) => i.planned9 !== '' && i.actual9 !== '')
+                .filter((i) => i.hasDebitNote)
                 .map((i) => ({
                     liftNumber: i.liftNumber || '',
                     indentNumber: i.indentNo || '',
@@ -229,56 +228,19 @@ export default () => {
                 }
             }
 
-            const currentDateTime = new Date().toISOString();
-
             if (!selectedItem?.liftNumber) {
                 toast.error('No record selected');
                 return;
             }
 
-            console.log('📤 Updating record in Supabase...');
+            console.log('📤 Updating record...');
 
+            // updateStoreInDebitNote also syncs completion into the Audit Data wizard's
+            // final "Again Audit" stage, so no separate forward-to-audit call is needed here.
             await updateStoreInDebitNote(selectedItem.liftNumber, {
-                actual9: currentDateTime,
                 debitNoteCopy: debitNoteCopyUrl,
                 debitNoteNumber: values.debitNoteNumber || '',
             });
-
-            // ✅ Forward to Account Audit by creating a Tally Entry
-            try {
-                console.log('📝 Creating Audit Data entry from Debit Note...');
-                const formattedDateOnly = currentDateTime.split('T')[0];
-                await createTallyEntryRecord({
-                    timestamp: currentDateTime,
-                    lift_number: selectedItem.liftNumber || '',
-                    indent_number: selectedItem.indentNumber || '',
-                    po_number: selectedItem.poNumber || '',
-                    material_in_date: formattedDateOnly,
-                    product_name: selectedItem.productName || '',
-                    bill_status: 'Bill Received',
-                    qty: Number(selectedItem.qty || 0),
-                    party_name: selectedItem.vendorName || '',
-                    bill_amt: Number(selectedItem.billAmount || 0),
-                    bill_image: selectedItem.photoOfBill || '',
-                    bill_no: selectedItem.billNo || '',
-                    indent_qty: Number(selectedItem.indentQty || 0),
-                    location: '',
-                    type_of_bills: selectedItem.typeOfBill || '',
-                    product_image: '',
-                    area: '',
-                    indented_for: '',
-                    approved_party_name: selectedItem.vendorName || '',
-                    rate: Number(selectedItem.amount || 0),
-                    total_rate: Number(selectedItem.amount || 0),
-                    bill_recieved_later: 'No',
-                    firm_name_match: selectedItem.firmNameMatch || '',
-                    planned1: formattedDateOnly,
-                } as any);
-                console.log('✅ Account Audit entry created successfully');
-            } catch (auditError) {
-                console.error('❌ Failed to create Account Audit entry:', auditError);
-                toast.error('Processed Debit Note, but failed to forward to Account Audit');
-            }
 
             console.log('✅ Update successful');
             toast.success(`Updated status for ${selectedItem.indentNumber}`);

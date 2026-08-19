@@ -13,8 +13,6 @@ const StoreIssue = dynamic(() => import('@/systems/store/components/views/StoreI
 const IssueData = dynamic(() => import('@/systems/store/components/views/IssueData'), { ssr: false });
 const Inventory = dynamic(() => import('@/systems/store/components/views/Inventory'), { ssr: false });
 const StoreMaster = dynamic(() => import('@/systems/store/components/views/Master'), { ssr: false });
-const StoreReceived = dynamic(() => import('@/systems/store/components/views/Received'), { ssr: false });
-const StoreStock = dynamic(() => import('@/systems/store/components/views/Stock'), { ssr: false });
 const CreateIndent = dynamic(() => import('@/systems/store/components/views/CreateIndent'), { ssr: false });
 const ApproveIndent = dynamic(() => import('@/systems/store/components/views/ApproveIndent'), { ssr: false });
 const VendorUpdate = dynamic(() => import('@/systems/store/components/views/VendorUpdate'), { ssr: false });
@@ -26,14 +24,11 @@ const Order = dynamic(() => import('@/systems/store/components/views/Order'), { 
 const GetLift = dynamic(() => import('@/systems/store/components/views/GetLift'), { ssr: false });
 const StoreIn = dynamic(() => import('@/systems/store/components/views/StoreIn'), { ssr: false });
 const HodStoreApproval = dynamic(() => import('@/systems/store/components/views/HodStoreApproval'), { ssr: false });
-const FullKitting = dynamic(() => import('@/systems/store/components/views/FullKitting'), { ssr: false });
-const PaymentStatus = dynamic(() => import('@/systems/store/components/views/PaymentStatus'), { ssr: false });
 const MakePayment = dynamic(() => import('@/systems/store/components/views/MakePayment'), { ssr: false });
 const QuantityCheckInReceiveItem = dynamic(() => import('@/systems/store/components/views/QuantityCheckInReceiveItem'), { ssr: false });
 const SendDebitNote = dynamic(() => import('@/systems/store/components/views/SendDebitNote'), { ssr: false });
 const AuditData = dynamic(() => import('@/systems/store/components/views/AuditData'), { ssr: false });
 const BillNotReceived = dynamic(() => import('@/systems/store/components/views/BillNotReceived'), { ssr: false });
-const Administration = dynamic(() => import('@/systems/store/components/views/Administration'), { ssr: false });
 
 const storeTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },
@@ -42,8 +37,6 @@ const storeTabs = [
   { id: "issue-data", label: "Issue Data", path: "/Issue-data" },
   { id: "inventory", label: "Inventory", path: "/inventory" },
   { id: "master", label: "Master", path: "/master" },
-  { id: "received", label: "Received", path: "/received" },
-  { id: "stock", label: "Stock", path: "/stock" },
   { id: "create-indent", label: "Create Indent", path: "/create-indent" },
   { id: "approve-indent", label: "Group Indent Approval", path: "/approve-indent" },
   { id: "vendor-rate-update", label: "Vendor Rate Update", path: "/vendor-rate-update" },
@@ -55,14 +48,11 @@ const storeTabs = [
   { id: "get-lift", label: "Material Receipt / Store In", path: "/get-lift" },
   { id: "store-in", label: "HOD Check", path: "/store-in" },
   { id: "hod-store-check", label: "Transporting Update", path: "/hod-store-check" },
-  { id: "full-kitting", label: "Freight Payment", path: "/Full-Kiting" },
-  { id: "payment-status", label: "Process for Payment / Debit Note", path: "/Payment-Status" },
   { id: "make-payment", label: "Make Payment", path: "/Make-Payment" },
   { id: "quality-check", label: "Reject For GRN", path: "/Quality-Check-In-Received-Item" },
   { id: "send-debit-note", label: "Send Debit Note", path: "/Send-Debit-Note" },
   { id: "audit-data", label: "Audit Data", path: "/audit-data" },
-  { id: "bill-not-received", label: "Bill Not Received", path: "/Bill-Not-Received" },
-  { id: "administration", label: "Adminstration", path: "/administration" }
+  { id: "bill-not-received", label: "Bill Not Received", path: "/Bill-Not-Received" }
 ];
 
 const renderStoreComponent = (tabId: string) => {
@@ -73,8 +63,6 @@ const renderStoreComponent = (tabId: string) => {
     case 'issue-data': return <IssueData />;
     case 'inventory': return <Inventory />;
     case 'master': return <StoreMaster />;
-    case 'received': return <StoreReceived />;
-    case 'stock': return <StoreStock />;
     case 'create-indent': return <CreateIndent />;
     case 'approve-indent': return <ApproveIndent />;
     case 'vendor-rate-update': return <VendorUpdate />;
@@ -86,14 +74,11 @@ const renderStoreComponent = (tabId: string) => {
     case 'get-lift': return <GetLift />;
     case 'store-in': return <StoreIn />;
     case 'hod-store-check': return <HodStoreApproval />;
-    case 'full-kitting': return <FullKitting />;
-    case 'payment-status': return <PaymentStatus />;
     case 'make-payment': return <MakePayment />;
     case 'quality-check': return <QuantityCheckInReceiveItem />;
     case 'send-debit-note': return <SendDebitNote />;
     case 'audit-data': return <AuditData />;
     case 'bill-not-received': return <BillNotReceived />;
-    case 'administration': return <Administration />;
     default: return <Dashboard />;
   }
 };

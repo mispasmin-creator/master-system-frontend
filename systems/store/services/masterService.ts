@@ -142,7 +142,7 @@ export async function fetchMasterOptions(): Promise<MasterData> {
             }));
 
         // Deduplicate vendors by name
-        const uniqueVendors: MasterData['vendors'] = Array.from(new Map(vendors.map((v: any) => [v.vendorName, v])).values());
+        const uniqueVendors: MasterData['vendors'] = Array.from(new Map(vendors.map((v: any) => [v.vendorName, v])).values()) as MasterData['vendors'];
         const vendorNames: string[] = uniqueVendors.map((v) => v.vendorName);
 
         // Map group heads to departments and products to group heads

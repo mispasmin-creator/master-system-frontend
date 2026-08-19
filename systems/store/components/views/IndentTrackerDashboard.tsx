@@ -288,8 +288,6 @@ const PROCUREMENT_STAGES = [
 ];
 
 const POST_RECEIPT_STAGES = [
-    { name: 'Freight Payment', icon: <CreditCard size={13} />, pcKey: 'Freight Payment' },
-    { name: 'Process for Payment', icon: <RefreshCw size={13} />, pcKey: 'Process for Payment / Debit Note' },
     { name: 'Make Payment', icon: <CreditCard size={13} />, pcKey: 'Make Payment' },
     { name: 'Reject For GRN', icon: <XCircle size={13} />, pcKey: 'Reject For GRN' },
     { name: 'Send Debit Note', icon: <SendIcon size={13} />, pcKey: 'Send Debit Note' },
@@ -350,7 +348,7 @@ export default function IndentTrackerDashboard() {
 
     // ── Lifecycle Rows ──
     const lifecycleRows = useMemo((): LifecycleRow[] => {
-        return indents.map(r => {
+        return (indents as any[]).map((r: any) => {
             const receiptDate = receiptMap.get(r.indent_number) || '';
             const approvalDate = r.actual1 || '';
             const rfqDate = r.actual2 || '';
@@ -431,7 +429,7 @@ export default function IndentTrackerDashboard() {
     const pendingItems = useMemo((): PendingItem[] => {
         const items: PendingItem[] = [];
 
-        indents.forEach(r => {
+        (indents as any[]).forEach((r: any) => {
             let pendingStage = '';
             let plannedDate = '';
             let stageColor = '';

@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import { useEffect, useState } from 'react';
 import DataTable from '../element/DataTable';
 import { z } from 'zod';
@@ -169,7 +169,7 @@ export default () => {
         }
 
         const groupedMap = new Map<string, any>();
-        const pendingItems = latestRecords.filter((i) => i.planned6 !== '' && i.actual6 === '');
+        const pendingItems = latestRecords.filter((i) => i.planned6 !== '' && (!i.actual6 || i.actual6 === ''));
 
         pendingItems.forEach((i) => {
             const billNo = String(i.billNo || '');
@@ -234,7 +234,7 @@ export default () => {
 
         setHistoryData(
             latestRecords
-                .filter((i) => i.actual6 !== '')
+                .filter((i) => i.actual6 && i.actual6 !== '')
                 .map((i) => ({
                     liftNumber: i.liftNumber || '',
                     indentNo: i.indentNo || '',
@@ -301,6 +301,7 @@ export default () => {
             header: 'Timestamp',
             cell: ({ getValue }) => <div>{getValue() ? formatDateTime(parseCustomDate(getValue())) : '-'}</div>,
         },
+        { accessorKey: 'liftNumber', header: 'Lift No.', cell: textWrapCell },
         { accessorKey: 'poNumber', header: 'PO Number', cell: textWrapCell },
         { accessorKey: 'vendorName', header: 'Vendor Name', cell: textWrapCell },
         { accessorKey: 'billNo', header: 'Bill No.', cell: textWrapCell },
@@ -434,7 +435,7 @@ export default () => {
 
     // ── Schema ──────────────────────────────────────────────
     const schema = z.object({
-        status: z.enum(['Received', 'Not Received'], { required_error: 'Status is required' }),
+        status: z.enum(['Received', 'Not Received'], { message: 'Status is required' }),
         remark: z.string().optional(),
     });
     type FormValues = z.infer<typeof schema>;
@@ -455,29 +456,29 @@ export default () => {
     async function onSubmit(values: FormValues) {
         if (!selectedIndent) return;
         try {
-            const currentDateTime = new Date().toISOString();
-            for (const item of (selectedIndent.originalItems || [])) {
+            const items = selectedIndent.originalItems || [];
+            for (const item of items) {
                 const isRejected = values.status === 'Not Received';
-                // Rejected: go directly to Reject For GRN (planned7), skip Transporting Update (hod_planned)
-                // Received: go to Transporting Update (hod_planned), no planned7
-                const updatePayload: Record<string, any> = {
-                    actual6: currentDateTime,
-                    remark: values.remark || '',
-                };
-                if (isRejected) {
-                    updatePayload.planned7 = currentDateTime;
-                    updatePayload.hod_status = 'Rejected';
-                    updatePayload.actual_hod = currentDateTime;
-                } else {
-                    updatePayload.planned_hod = currentDateTime;
-                    updatePayload.hod_status = 'Pending';
-                }
                 const targetId = item.id || item.liftNumber || item.lift_number;
-                await storeApi.patch('store_in', targetId, updatePayload);
+
+                // 1. Create / Upsert StoreCheck record for this lift
+                await storeApi.upsertByParent('check', targetId, {
+                    material_status: values.status,
+                    remark: values.remark || '',
+                });
+
+                // 2. If rejected, also mark HOD approval as Rejected
+                if (isRejected) {
+                    await storeApi.upsertByParent('lift_hod_approval', targetId, {
+                        hod_status: 'Rejected',
+                        hod_remark: values.remark || 'Rejected during store check',
+                    });
+                }
             }
-            toast.success(`Store In completed for ${(selectedIndent.originalItems || []).length} item(s)!`);
+            toast.success(`Store In completed for ${items.length} item(s)!`);
             setOpenDialog(false);
             setSelectedIndent(null);
+            fetchAllData();
         } catch (error: any) {
             toast.error('Failed to store in: ' + (error?.message || ''));
         }

@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import {
     Dialog,
     DialogClose,
@@ -34,7 +34,7 @@ interface RateApprovalData {
     department: string;
     product: string;
     comparisonSheet: string;
-    vendors: [string, string, string, string, string, string, string, string, string, string, string, string, string][];
+    vendors: string[][];
     date: string;
     firmNameMatch?: string;
     plannedDate: string;
@@ -58,6 +58,81 @@ interface HistoryData {
     areaOfUse: string;
 }
 
+const extractRateVendors = (r: any): string[][] => {
+    const rawList: string[][] = [];
+    if (r.vendor_quotation?.vendor_name1 && r.vendor_quotation.vendor_name1.trim() !== '') {
+        rawList.push([
+            r.vendor_quotation.vendor_name1,
+            (r.vendor_quotation.rate1 || 0).toString(),
+            r.vendor_quotation.payment_term1 || '',
+            'Basic Rate',
+            'No',
+            '0',
+            '',
+            '',
+            r.technical_approval?.vendor1_rank || '',
+            '',
+            '',
+            '',
+            '',
+        ]);
+    }
+    if (r.vendor_quotation?.vendor_name2 && r.vendor_quotation.vendor_name2.trim() !== '') {
+        rawList.push([
+            r.vendor_quotation.vendor_name2,
+            (r.vendor_quotation.rate2 || 0).toString(),
+            r.vendor_quotation.payment_term2 || '',
+            'Basic Rate',
+            'No',
+            '0',
+            '',
+            '',
+            r.technical_approval?.vendor2_rank || '',
+            '',
+            '',
+            '',
+            '',
+        ]);
+    }
+    if (r.vendor_quotation?.vendor_name3 && r.vendor_quotation.vendor_name3.trim() !== '') {
+        rawList.push([
+            r.vendor_quotation.vendor_name3,
+            (r.vendor_quotation.rate3 || 0).toString(),
+            r.vendor_quotation.payment_term3 || '',
+            'Basic Rate',
+            'No',
+            '0',
+            '',
+            '',
+            r.technical_approval?.vendor3_rank || '',
+            '',
+            '',
+            '',
+            '',
+        ]);
+    }
+
+    if (rawList.length === 0) {
+        rawList.push([
+            r.vendor_quotation?.vendor_name1 || '',
+            (r.vendor_quotation?.rate1 || 0).toString(),
+            r.vendor_quotation?.payment_term1 || '',
+            'Basic Rate',
+            'No',
+            '0',
+            '',
+            '',
+            r.technical_approval?.vendor1_rank || '',
+            '',
+            '',
+            '',
+            '',
+        ]);
+    }
+
+    return rawList;
+};
+
 export default () => {
     const { user } = useAuth();
 
@@ -76,17 +151,17 @@ export default () => {
             const indents = data || [];
 
             const filtered = indents.filter((row: any) => {
-                const hasPlanned4 = row.planned4 !== null && row.planned4 !== undefined && row.planned4 !== '';
-                const noApprovedVendor = !row.approved_vendor_name || row.approved_vendor_name === '';
-                const validVendorType = (row.vendor_type || row.vendorType) !== 'Reject';
-                
+                const hasTechnicalApproval = !!row.technical_approval;
+                const noManagementApprovalYet = !row.management_approval?.approved_vendor_name;
+                const validVendorType = row.vendor_quotation?.vendor_type !== 'Reject';
+
                 let matchFirm = true;
                 if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
                     const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
                     matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
-                
-                return hasPlanned4 && noApprovedVendor && validVendorType && matchFirm;
+
+                return hasTechnicalApproval && noManagementApprovalYet && validVendorType && matchFirm;
             });
 
             filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
@@ -100,59 +175,13 @@ export default () => {
                     indenter: r.indenter_name || r.indenterName || '',
                     department: r.category || r.department || '',
                     product: r.product_name || r.productName || '',
-                    comparisonSheet: r.comparison_sheet || r.comparisonSheet || '',
+                    comparisonSheet: r.vendor_quotation?.comparison_sheet || '',
                     date: r.timestamp ? formatDateTime(new Date(r.timestamp)).replace(/\//g, '-') : '-',
-                    plannedDate: r.planned4 ? formatDate(new Date(r.planned4)) : 'Not Set',
-                    quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                    plannedDate: r.technical_approval?.created_at ? formatDate(new Date(r.technical_approval.created_at)) : 'Not Set',
+                    quantity: Number(r.indent_approval?.approved_quantity || r.quantity || 0),
                     uom: r.uom || '',
                     areaOfUse: r.area_of_use || r.areaOfUse || '',
-                    vendors: [
-                        [
-                            r.vendor_name1 || r.vendorName1 || '',
-                            (r.rate1 || r.approved_rate || 0).toString(),
-                            r.payment_term1 || r.paymentTerm1 || '',
-                            r.select_rate_type1 || 'Basic Rate',
-                            r.with_tax_or_not1 || 'No',
-                            (r.tax_value1 || 0).toString(),
-                            r.quotation_no1 || '',
-                            r.quotation_date1 || '',
-                            r.vendor1_rank || '',
-                            (r.delivery_time1 || '').toString(),
-                            r.make1 || '',
-                            (r.advance_percent1 || '').toString(),
-                            r.transport_type1 || '',
-                        ],
-                        [
-                            r.vendor_name2 || r.vendorName2 || '',
-                            (r.rate2 || 0).toString(),
-                            r.payment_term2 || r.paymentTerm2 || '',
-                            r.select_rate_type2 || 'Basic Rate',
-                            r.with_tax_or_not2 || 'No',
-                            (r.tax_value2 || 0).toString(),
-                            r.quotation_no2 || '',
-                            r.quotation_date2 || '',
-                            r.vendor2_rank || '',
-                            (r.delivery_time2 || '').toString(),
-                            r.make2 || '',
-                            (r.advance_percent2 || '').toString(),
-                            r.transport_type2 || '',
-                        ],
-                        [
-                            r.vendor_name3 || r.vendorName3 || '',
-                            (r.rate3 || 0).toString(),
-                            r.payment_term3 || r.paymentTerm3 || '',
-                            r.select_rate_type3 || 'Basic Rate',
-                            r.with_tax_or_not3 || 'No',
-                            (r.tax_value3 || 0).toString(),
-                            r.quotation_no3 || '',
-                            r.quotation_date3 || '',
-                            r.vendor3_rank || '',
-                            (r.delivery_time3 || '').toString(),
-                            r.make3 || '',
-                            (r.advance_percent3 || '').toString(),
-                            r.transport_type3 || '',
-                        ],
-                    ].filter(vendor => vendor[0] !== '') as [string, string, string, string, string, string, string, string, string, string, string, string, string][],
+                    vendors: extractRateVendors(r),
                 }))
             );
         } catch (err) {
@@ -176,17 +205,16 @@ export default () => {
             const indents = data || [];
 
             const filtered = indents.filter((row: any) => {
-                const hasPlanned4 = row.planned4 !== null && row.planned4 !== undefined && row.planned4 !== '';
-                const hasApprovedVendor = Boolean(row.approved_vendor_name && row.approved_vendor_name !== '');
-                const validVendorType = (row.vendor_type || row.vendorType) !== 'Reject';
-                
+                const hasApprovedVendor = Boolean(row.management_approval?.approved_vendor_name);
+                const validVendorType = row.vendor_quotation?.vendor_type !== 'Reject';
+
                 let matchFirm = true;
                 if (user?.firmNameMatch && user.firmNameMatch.toLowerCase() !== 'all') {
                     const itemFirm = (row.firm_name_match || row.firm_name || row.firmNameMatch || row.firmName || '').trim().toLowerCase();
                     matchFirm = itemFirm === user.firmNameMatch.trim().toLowerCase();
                 }
-                
-                return hasPlanned4 && hasApprovedVendor && validVendorType && matchFirm;
+
+                return hasApprovedVendor && validVendorType && matchFirm;
             });
 
             filtered.sort((a: any, b: any) => String(b.indent_number || b.indentNumber || '').localeCompare(String(a.indent_number || a.indentNumber || '')));
@@ -200,10 +228,10 @@ export default () => {
                     indenter: r.indenter_name || r.indenterName || '',
                     department: r.category || r.department || '',
                     product: r.product_name || r.productName || '',
-                    date: r.actual4 ? formatDate(new Date(r.actual4)) : (r.timestamp ? formatDateTime(new Date(r.timestamp)).replace(/\//g, '-') : '-'),
-                    vendor: [r.approved_vendor_name || '', (r.approved_rate || 0).toString()],
-                    rank: r.vendor_rate || '',
-                    quantity: Number(r.approved_quantity || r.approvedQuantity || r.quantity || 0),
+                    date: r.management_approval?.created_at ? formatDate(new Date(r.management_approval.created_at)) : (r.timestamp ? formatDateTime(new Date(r.timestamp)).replace(/\//g, '-') : '-'),
+                    vendor: [r.management_approval?.approved_vendor_name || '', (r.management_approval?.approved_rate || 0).toString()],
+                    rank: '',
+                    quantity: Number(r.indent_approval?.approved_quantity || r.quantity || 0),
                     uom: r.uom || '',
                     areaOfUse: r.area_of_use || r.areaOfUse || '',
                 }))
@@ -269,7 +297,7 @@ export default () => {
             accessorKey: 'vendors',
             header: 'Vendors',
             cell: ({ row }) => {
-                const vendors = row.original.vendors;
+                const vendors = row.original.vendors.filter(v => v[0] && v[0].trim() !== '');
                 return (
                     <div className="grid place-items-center">
                         <div className="flex flex-col gap-1">
@@ -344,7 +372,7 @@ export default () => {
     });
 
     const form = useForm<z.infer<typeof schema>>({
-        resolver: zodResolver(schema),
+        resolver: zodResolver(schema) as any,
         defaultValues: {
             vendor: undefined,
         },
@@ -360,13 +388,13 @@ export default () => {
 
             const updates = {
                 approved_date: new Date().toISOString(),
-                po_required: 'Yes',
                 approved_vendor_name: selectedVendor[0] || '',
                 approved_rate: rate,
                 approved_payment_term: selectedVendor[2] || '',
             };
 
-            await storeApi.patch('indent', selectedIndent?.id!, updates);
+            await storeApi.upsertByParent('management_approval', selectedIndent?.id!, updates);
+            await storeApi.upsertByParent('vendor_quotation', selectedIndent?.id!, { po_required: 'Yes' });
 
             toast.success(`Approved vendor for ${selectedIndent?.indentNo}`);
             setOpenDialog(false);
@@ -386,7 +414,7 @@ export default () => {
     })
 
     const historyUpdateForm = useForm<z.infer<typeof historyUpdateSchema>>({
-        resolver: zodResolver(historyUpdateSchema),
+        resolver: zodResolver(historyUpdateSchema) as any,
         defaultValues: {
             rate: 0,
         },
@@ -400,7 +428,7 @@ export default () => {
 
     async function onSubmitHistoryUpdate(values: z.infer<typeof historyUpdateSchema>) {
         try {
-            await storeApi.patch('indent', selectedHistory?.id!, { approved_rate: Number(values.rate || 0) });
+            await storeApi.upsertByParent('management_approval', selectedHistory?.id!, { approved_rate: Number(values.rate || 0) });
 
             toast.success(`Updated rate of ${selectedHistory?.indentNo}`);
             setOpenDialog(false);

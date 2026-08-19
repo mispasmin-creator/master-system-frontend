@@ -2,13 +2,50 @@ import { storeApi } from '../lib/api';
 
 /**
  * Indent Service
- * Handles all Supabase operations for Indents
+ * Handles all API operations for Indents
  */
 
 // ==================== INTERFACES ====================
 
+export interface IndentApproval {
+    approved_quantity: number;
+    vendor_type: string;
+    created_at: string;
+}
+
+export interface VendorQuotation {
+    vendor_type: string;
+    po_required: string;
+    vendor_name1: string;
+    rate1: number;
+    payment_term1: string;
+    vendor_name2: string;
+    rate2: number;
+    payment_term2: string;
+    vendor_name3: string;
+    rate3: number;
+    payment_term3: string;
+    comparison_sheet: string;
+    created_at: string;
+}
+
+export interface TechnicalApproval {
+    vendor1_rank: string;
+    vendor2_rank: string;
+    vendor3_rank: string;
+    created_at: string;
+}
+
+export interface ManagementApproval {
+    approved_vendor_name: string;
+    approved_rate: number;
+    approved_payment_term: string;
+    approved_date: string;
+    created_at: string;
+}
+
 export interface IndentRecord {
-    id: number; // Added
+    id: number;
     indent_number: string;
     indenter_name: string;
     department: string;
@@ -17,61 +54,33 @@ export interface IndentRecord {
     uom: string;
     attachment: string;
     specifications: string;
-    area_of_use: string; // Added
-    vendor_type: string;
+    area_of_use: string;
     indent_status: string;
     indent_type: string;
-    no_day: number;
-    planned1: string;
-    actual1: string;
     firm_name_match: string;
-    approved_quantity: number;
     timestamp: string;
-    price: number;
-    total_rate: number;
-    // Approval fields
     indent_approved_by: string;
-    approved_date: string;
-    // Stage 2 fields
-    planned2: string;
-    actual2: string;
-    vendor_name: string;
-    negotiated_rate: number;
-    // Stage 3 fields
-    planned3: string;
-    actual3: string;
-    attachment3: string;
-    comparative_analysis: string;
-    // Stage 4 fields
-    planned4: string;
-    actual4: string;
-    po_number: string;
-    po_date: string;
-    po_copy: string;
-    // Stage 5 fields
-    planned5: string;
-    actual5: string;
-    transportation_include: string;
-    tax_extra: string;
-    credit_days: number;
-    remarks5: string;
-    status: string;
     lifting_status?: string;
-    po_qty?: number;
-    received_quantity?: number;
     pending_qty?: number;
-    vendor1_rank?: string;
-    vendor2_rank?: string;
-    vendor3_rank?: string;
+    pending_po_qty?: number;
+    total_qty?: number;
+    received_qty?: number;
+    pending_lift_qty?: number;
     expected_req_date: string;
     group_head: string;
     firm_name: string;
+    // Per-page child records (Phase 1 backend redesign — one table per workflow page)
+    indent_approval?: IndentApproval | null;
+    vendor_quotation?: VendorQuotation | null;
+    technical_approval?: TechnicalApproval | null;
+    management_approval?: ManagementApproval | null;
 }
 
 // ==================== FETCH FUNCTIONS ====================
 
 /**
- * Fetch all indent records from Supabase
+ * Fetch all indent records, with each stage's child record nested
+ * (indent_approval / vendor_quotation / technical_approval / management_approval)
  */
 export async function fetchIndentRecords(): Promise<IndentRecord[]> {
     try {
@@ -89,49 +98,61 @@ export async function fetchIndentRecords(): Promise<IndentRecord[]> {
             attachment: r.attachment || '',
             specifications: r.specifications || '',
             area_of_use: r.area_of_use || r.areaOfUse || '',
-            vendor_type: r.vendor_type || r.vendorType || 'Pending',
             indent_status: r.indent_status || r.indentStatus || '',
             indent_type: r.indent_type || r.indentType || '',
-            no_day: Number(r.no_day) || 0,
-            planned1: r.planned1 || r.planned_1 || '',
-            actual1: r.actual1 || r.actual_1 || '',
             firm_name_match: r.firm_name_match || r.firmNameMatch || r.firm_name || r.firmName || '',
-            approved_quantity: Number(r.approved_quantity || r.approvedQuantity) || 0,
             timestamp: r.timestamp || '',
-            price: Number(r.price) || 0,
-            total_rate: Number(r.total_rate) || 0,
             indent_approved_by: r.indent_approved_by || r.indentApprovedBy || '',
-            approved_date: r.approved_date || r.approvedDate || '',
-            planned2: r.planned2 || r.planned_2 || '',
-            actual2: r.actual2 || r.actual_2 || '',
-            vendor_name: r.vendor_name || r.vendorName || '',
-            negotiated_rate: Number(r.negotiated_rate) || 0,
-            planned3: r.planned3 || r.planned_3 || '',
-            actual3: r.actual3 || r.actual_3 || '',
-            attachment3: r.attachment3 || '',
-            comparative_analysis: r.comparative_analysis || '',
-            planned4: r.planned4 || r.planned_4 || '',
-            actual4: r.actual4 || r.actual_4 || '',
-            po_number: r.po_number || r.poNumber || '',
-            po_date: r.po_date || r.poDate || '',
-            po_copy: r.po_copy || r.poCopy || '',
-            planned5: r.planned5 || r.planned_5 || '',
-            actual5: r.actual5 || r.actual_5 || '',
-            transportation_include: r.transportation_include || '',
-            tax_extra: r.tax_extra || '',
-            credit_days: Number(r.credit_days) || 0,
-            remarks5: r.remarks5 || '',
-            status: r.status || '',
             lifting_status: r.lifting_status || r.liftingStatus || '',
-            po_qty: Number(r.po_qty) || 0,
-            received_quantity: Number(r.received_quantity) || 0,
             pending_qty: Number(r.pending_qty) || 0,
-            vendor1_rank: r.vendor1_rank || '',
-            vendor2_rank: r.vendor2_rank || '',
-            vendor3_rank: r.vendor3_rank || '',
+            pending_po_qty: Number(r.pending_po_qty) || 0,
+            total_qty: Number(r.total_qty) || 0,
+            received_qty: Number(r.received_qty) || 0,
+            pending_lift_qty: Number(r.pending_lift_qty) || 0,
             expected_req_date: r.expected_req_date || '',
             group_head: r.group_head || r.groupHead || r.group_name || '',
             firm_name: r.firm_name || r.firmName || r.firm_name_match || '',
+            indent_approval: r.indent_approval
+                ? {
+                      approved_quantity: Number(r.indent_approval.approved_quantity) || 0,
+                      vendor_type: r.indent_approval.vendor_type || '',
+                      created_at: r.indent_approval.created_at || '',
+                  }
+                : null,
+            vendor_quotation: r.vendor_quotation
+                ? {
+                      vendor_type: r.vendor_quotation.vendor_type || '',
+                      po_required: r.vendor_quotation.po_required || '',
+                      vendor_name1: r.vendor_quotation.vendor_name1 || '',
+                      rate1: Number(r.vendor_quotation.rate1) || 0,
+                      payment_term1: r.vendor_quotation.payment_term1 || '',
+                      vendor_name2: r.vendor_quotation.vendor_name2 || '',
+                      rate2: Number(r.vendor_quotation.rate2) || 0,
+                      payment_term2: r.vendor_quotation.payment_term2 || '',
+                      vendor_name3: r.vendor_quotation.vendor_name3 || '',
+                      rate3: Number(r.vendor_quotation.rate3) || 0,
+                      payment_term3: r.vendor_quotation.payment_term3 || '',
+                      comparison_sheet: r.vendor_quotation.comparison_sheet || '',
+                      created_at: r.vendor_quotation.created_at || '',
+                  }
+                : null,
+            technical_approval: r.technical_approval
+                ? {
+                      vendor1_rank: r.technical_approval.vendor1_rank || '',
+                      vendor2_rank: r.technical_approval.vendor2_rank || '',
+                      vendor3_rank: r.technical_approval.vendor3_rank || '',
+                      created_at: r.technical_approval.created_at || '',
+                  }
+                : null,
+            management_approval: r.management_approval
+                ? {
+                      approved_vendor_name: r.management_approval.approved_vendor_name || '',
+                      approved_rate: Number(r.management_approval.approved_rate) || 0,
+                      approved_payment_term: r.management_approval.approved_payment_term || '',
+                      approved_date: r.management_approval.approved_date || '',
+                      created_at: r.management_approval.created_at || '',
+                  }
+                : null,
         }));
     } catch (error) {
         console.error('Error fetching indent records:', error);
@@ -142,23 +163,19 @@ export async function fetchIndentRecords(): Promise<IndentRecord[]> {
 // ==================== UPDATE FUNCTIONS ====================
 
 /**
- * Update indent record for Stage 1: Approval
+ * Group Indent Approval — upserts the indent's StoreIndentApproval child record
  */
 export async function updateIndentApproval(
     id: number,
     updateData: {
-        actual1: string;
         vendor_type: string;
         approved_quantity: number;
-        planned2?: string;
     }
 ) {
     try {
-        await storeApi.patch('indent', id, {
-            actual1: updateData.actual1,
+        await storeApi.upsertByParent('indent_approval', id, {
             vendor_type: updateData.vendor_type,
             approved_quantity: updateData.approved_quantity,
-            planned2: updateData.planned2,
         });
         return true;
     } catch (error) {
@@ -181,7 +198,8 @@ export async function updateIndentSpecifications(id: number, specifications: str
 }
 
 /**
- * Update indent fields from history edit
+ * Update indent fields from history edit — uom stays on the indent itself,
+ * approved_quantity/vendor_type belong to its StoreIndentApproval child record
  */
 export async function updateIndentHistoryFields(
     id: number,
@@ -192,7 +210,15 @@ export async function updateIndentHistoryFields(
     }
 ) {
     try {
-        await storeApi.patch('indent', id, updateData);
+        if (updateData.uom !== undefined) {
+            await storeApi.patch('indent', id, { uom: updateData.uom });
+        }
+        if (updateData.approved_quantity !== undefined || updateData.vendor_type !== undefined) {
+            await storeApi.upsertByParent('indent_approval', id, {
+                ...(updateData.approved_quantity !== undefined ? { approved_quantity: updateData.approved_quantity } : {}),
+                ...(updateData.vendor_type !== undefined ? { vendor_type: updateData.vendor_type } : {}),
+            });
+        }
         return true;
     } catch (error) {
         console.error('Error updating indent history fields:', error);
@@ -201,135 +227,41 @@ export async function updateIndentHistoryFields(
 }
 
 /**
- * Update indent for Stage 2: Vendor Selection
+ * Vendor Rate Update — upserts the indent's StoreVendorQuotation child record
+ * (covers both the Regular single-vendor path and the Three-Party triplicate path)
  */
-export async function updateIndentVendorSelection(
-    indentNumber: string,
-    updateData: {
-        actual2: string;
-        vendor_name: string;
-        negotiated_rate: number;
-        planned3: string;
-    }
-) {
+export async function updateVendorQuotation(id: number, updateData: Partial<VendorQuotation>) {
     try {
-        await storeApi.patch('indent', indentNumber, {
-            actual2: updateData.actual2,
-            vendor_name: updateData.vendor_name,
-            negotiated_rate: updateData.negotiated_rate,
-            planned3: updateData.planned3,
-        });
+        await storeApi.upsertByParent('vendor_quotation', id, updateData);
         return true;
     } catch (error) {
-        console.error('Error updating indent vendor selection:', error);
+        console.error('Error updating vendor quotation:', error);
         throw error;
     }
 }
 
 /**
- * Update indent for Stage 3: HOD Approval (Comparative Analysis)
+ * Technical Approval — upserts the indent's StoreTechnicalApproval child record (T1/T2/T3 ranking)
  */
-export async function updateIndentHODApproval(
-    indentNumber: string,
-    updateData: {
-        actual3: string;
-        comparative_analysis: string;
-        attachment3: string;
-        planned4: string;
-    }
-) {
+export async function updateTechnicalApproval(id: number, updateData: Partial<TechnicalApproval>) {
     try {
-        await storeApi.patch('indent', indentNumber, {
-            actual3: updateData.actual3,
-            comparative_analysis: updateData.comparative_analysis,
-            attachment3: updateData.attachment3,
-            planned4: updateData.planned4,
-        });
+        await storeApi.upsertByParent('technical_approval', id, updateData);
         return true;
     } catch (error) {
-        console.error('Error updating indent HOD approval:', error);
+        console.error('Error updating technical approval:', error);
         throw error;
     }
 }
 
 /**
- * Update indent for Stage 4: PO Creation
+ * Mgmt Approval — upserts the indent's StoreManagementApproval child record (final vendor/rate pick)
  */
-export async function updateIndentPOCreation(
-    indentNumber: string,
-    updateData: {
-        actual4: string;
-        po_number: string;
-        po_date: string;
-        po_copy: string;
-        planned5: string;
-    }
-) {
+export async function updateManagementApproval(id: number, updateData: Partial<ManagementApproval>) {
     try {
-        await storeApi.patch('indent', indentNumber, {
-            actual4: updateData.actual4,
-            po_number: updateData.po_number,
-            po_date: updateData.po_date,
-            po_copy: updateData.po_copy,
-            planned5: updateData.planned5,
-        });
+        await storeApi.upsertByParent('management_approval', id, updateData);
         return true;
     } catch (error) {
-        console.error('Error updating indent PO creation:', error);
-        throw error;
-    }
-}
-
-/**
- * Update indent for Stage 5: Payment Terms (Final Stage)
- */
-export async function updateIndentPaymentTerms(
-    indentNumber: string,
-    updateData: {
-        actual5: string;
-        transportation_include: string;
-        tax_extra: string;
-        credit_days: number;
-        remarks5: string;
-    }
-) {
-    try {
-        await storeApi.patch('indent', indentNumber, {
-            actual5: updateData.actual5,
-            transportation_include: updateData.transportation_include,
-            tax_extra: updateData.tax_extra,
-            credit_days: updateData.credit_days,
-            remarks5: updateData.remarks5,
-        });
-        return true;
-    } catch (error) {
-        console.error('Error updating indent payment terms:', error);
-        throw error;
-    }
-}
-
-/**
- * Update indent for Store Out Approval
- */
-export async function updateIndentStoreOutApproval(
-    indentNumber: string,
-    updateData: {
-        approved_by: string;
-        approved_date: string;
-        approved_quantity: number;
-        status: string; // 'Approved' or 'Rejected'
-    }
-) {
-    try {
-        await storeApi.patch('indent', indentNumber, {
-            indent_approved_by: updateData.approved_by,
-            approved_date: updateData.approved_date,
-            approved_quantity: updateData.approved_quantity,
-            indent_status: updateData.status,
-        });
-        return true;
-    } catch (error) {
-        console.error('Error updating Store Out Approval:', error);
+        console.error('Error updating management approval:', error);
         throw error;
     }
 }

@@ -1,7 +1,7 @@
 import { Package2 } from 'lucide-react';
 import Heading from '../element/Heading';
 import { useEffect, useState } from 'react';
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import DataTable from '../element/DataTable';
 import { useAuth } from '@/context/AuthContext';
 import { formatDateTime, parseCustomDate, formatDate } from '@/lib/utils';

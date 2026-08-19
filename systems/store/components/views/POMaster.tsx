@@ -1,7 +1,7 @@
 import { ListTodo } from 'lucide-react';
 import Heading from '../element/Heading';
 import { useEffect, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef } from '@tanstack/react-table/legacy';
 import { formatDate } from '@/lib/utils';
 import DataTable from '../element/DataTable';
 
@@ -71,7 +71,7 @@ export default () => {
             setDataLoading(true);
             const data = await fetchPoMaster();
             setTableData(
-                data.map((sheet) => ({
+                data.map((sheet: any) => ({
                     ...sheet,
                     timestamp: sheet.timestamp ? formatDate(new Date(sheet.timestamp)) : '',
                     quotationDate: sheet.quotationDate ? formatDate(new Date(sheet.quotationDate)) : '',

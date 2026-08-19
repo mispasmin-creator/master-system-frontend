@@ -1,4 +1,4 @@
-export type Sheet = 'INDENT' | 'RECEIVED' | 'MASTER' | 'USER' | 'PO MASTER' | "INVENTORY" | "ISSUE" | "STORE IN" | "TALLY ENTRY" | "PC REPORT" | "Fullkitting" | "Payment History" | "Payments";
+export type Sheet = 'INDENT' | 'RECEIVED' | 'MASTER' | 'USER' | 'PO MASTER' | "INVENTORY" | "ISSUE" | "STORE IN" | "TALLY ENTRY" | "PC REPORT" | "Payment History" | "Payments";
 
 export type IndentSheet = {
     issuedStatus: any;
@@ -170,8 +170,9 @@ export type InventorySheet = {
 
 
 export type PoMasterSheet = {
-    discountPercent: number;
-    gstPercent: number;
+    indentId?: number;
+    discountPercent?: number;
+    gstPercent?: number;
     timestamp: string;
     partyName: string;
     poNumber: string;
@@ -190,31 +191,34 @@ export type PoMasterSheet = {
     packagingAndForwarding?: number;
     // preparedBy: string;
     // approvedBy: string;
-    pdf: string;
-    quotationNumber: string;
-    quotationDate: string;
-    enquiryNumber: string;
-    enquiryDate: string;
-    term1: string;
-    term2: string;
-    term3: string;
-    term4: string;
-    term5: string;
-    term6: string;
-    term7: string;
-    term8: string;
-    term9: string;
-    term10: string;
-    deliveryDays: number;
-    deliveryType: string;
-    firmNameMatch: string;
+    pdf?: string;
+    quotationNumber?: string;
+    quotationDate?: string | null;
+    enquiryNumber?: string;
+    enquiryDate?: string | null;
+    term1?: string;
+    term2?: string;
+    term3?: string;
+    term4?: string;
+    term5?: string;
+    term6?: string;
+    term7?: string;
+    term8?: string;
+    term9?: string;
+    term10?: string;
+    deliveryDays?: number;
+    deliveryType?: string;
+    firmNameMatch?: string;
     totalPaidAmount?: number;
     outstandingAmount?: number;
     status?: string; // This is the most important field
-    deliveryDate?: string;
+    deliveryDate?: string | Date | null;
     paymentTerms?: string;
     rowIndex?: number;
-
+    companyEmail?: string;
+    numberOfDays?: number;
+    advancePercent?: number;
+    advanceAmount?: number;
 };
 
 export type Vendor = {
@@ -296,9 +300,7 @@ export type UserPermissions = {
     issueData: boolean;
     inventory: boolean;
     pendingPo: boolean;
-    fullKiting: boolean;
     makePayment: boolean;
-    paymentStatus: boolean;
 };
 
 export interface PaymentsSheet {
@@ -365,9 +367,7 @@ export const allPermissionKeys = [
     "issueData",
     "inventory",
     "pendingPo",
-    "fullKiting",
     "makePayment",
-    "paymentStatus",
 ] as const;
 
 
@@ -577,32 +577,3 @@ export type PcReportSheet = {
 };
 
 
-export type FullkittingSheet = {
-    rowIndex?: number;
-    timestamp: string;
-    indentNumber: string;
-    vendorName: string;
-    productName: string;
-    qty: number;
-    billNo: string;
-    transportingInclude: string;
-    transporterName: string;
-    amount: number;
-    vehicleNo: string;
-    driverName: string;
-    driverMobileNo: string;
-    planned: string;
-    actual: string;
-    timeDelay: string;
-    fmsName: string;
-    status?: string;
-    vehicleNumber?: string;
-    from?: string;
-    to?: string;
-    materialLoadDetails?: string;
-    biltyNumber?: number;
-    rateType?: string;
-    amount1: number;
-    biltyImage?: string;
-    firmNameMatch: string;
-};

@@ -1,7 +1,7 @@
 import Heading from '../element/Heading';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef } from '@tanstack/react-table/legacy';
 import { Plus, Store } from 'lucide-react';
 import DataTable from '../element/DataTable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -51,7 +51,7 @@ export default () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const minQtyForm = useForm<z.infer<typeof minQtyReqSchema>>({
-        resolver: zodResolver(minQtyReqSchema),
+        resolver: zodResolver(minQtyReqSchema) as any,
         defaultValues: { itemName: '', uom: '', minQtyReq: '' as any },
     });
 
@@ -117,7 +117,7 @@ export default () => {
             }
 
             const historyRecords = latestRecords.filter(
-                r => r.actual6 !== '' && r.receivingStatus !== 'Not Received'
+                (r: any) => r.actual6 !== '' && r.receivingStatus !== 'Not Received'
             );
 
             const grouped = new Map<string, InventoryRecord>();

@@ -1,7 +1,7 @@
 import { Package2 } from 'lucide-react';
 import Heading from '../element/Heading';
 import { useEffect, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef } from '@tanstack/react-table/legacy';
 import DataTable from '../element/DataTable';
 import { Pill } from '../ui/pill';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -68,13 +68,13 @@ export default function POHistory() {
                 // Create sets for quick lookup
                 const indentPoNumbers = new Set(
                     (indentData || [])
-                        .map(r => r.po_number)
+                        .map((r: any) => r.po_number)
                         .filter(Boolean)
                 );
 
                 const receivedPoNumbers = new Set(
                     (receivedData || [])
-                        .map(r => r.po_number)
+                        .map((r: any) => r.po_number)
                         .filter(Boolean)
                 );
 

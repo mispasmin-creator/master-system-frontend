@@ -1,6 +1,6 @@
 import Heading from '../element/Heading';
 import { useEffect, useMemo, useState } from 'react';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef } from '@tanstack/react-table/legacy';
 import { Database, Plus, RefreshCw } from 'lucide-react';
 import DataTable from '../element/DataTable';
 import { Button } from '../ui/button';

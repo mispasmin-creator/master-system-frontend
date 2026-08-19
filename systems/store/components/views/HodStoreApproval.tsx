@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import { useEffect, useState } from 'react';
 import DataTable from '../element/DataTable';
 import { z } from 'zod';
@@ -8,10 +8,10 @@ import {
     fetchStoreInRecords,
     updateStoreInHodApproval,
     createPaymentEntry,
+    createTransportPaymentEntry,
     type StoreInRecord,
 } from '@/services/storeInService';
-import { createTallyEntryRecord } from '@/services/tallyEntryService';
-import { insertFullkittingRecord, createFreightPaymentEntry } from '@/services/fullkittingService';
+import { createAuditRecord } from '@/services/tallyEntryService';
 import { useSheets } from '@/context/SheetsContext';
 
 import {
@@ -25,7 +25,7 @@ import {
     DialogClose,
 } from '../ui/dialog';
 import { Button } from '../ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '../ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../ui/form';
 import { PuffLoader as Loader } from 'react-spinners';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -58,6 +58,11 @@ interface HodPendingData {
     photoOfBill: string;
     typeOfBill: string;
     transportationInclude: string;
+    transporterName?: string;
+    vehicleNo?: string;
+    driverName?: string;
+    driverMobileNo?: string;
+    amount?: number;
     billNo?: string;
     paymentTerms: string;
     indentQty: number;
@@ -119,7 +124,7 @@ const schema = z
                     message: 'Driver mobile number is required when transportation is included',
                 });
             }
-            if (!data.amount || data.amount <= 0) {
+            if (data.amount === undefined || data.amount === null || isNaN(data.amount) || Number(data.amount) <= 0) {
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     path: ['amount'],
@@ -143,7 +148,7 @@ export default () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(schema),
+        resolver: zodResolver(schema) as any,
         defaultValues: {
             transportationInclude: '',
             transporterName: '',
@@ -155,6 +160,20 @@ export default () => {
     });
 
     const transportationInclude = form.watch('transportationInclude');
+
+    // Reset form when selected item changes
+    useEffect(() => {
+        if (selectedItem) {
+            form.reset({
+                transportationInclude: selectedItem.transportationInclude || '',
+                transporterName: selectedItem.transporterName || '',
+                vehicleNo: selectedItem.vehicleNo || '',
+                driverName: selectedItem.driverName || '',
+                driverMobileNo: selectedItem.driverMobileNo || '',
+                amount: selectedItem.amount || 0,
+            });
+        }
+    }, [selectedItem, form]);
 
     // Reset transportation details when "No" is selected
     useEffect(() => {
@@ -191,7 +210,7 @@ export default () => {
 
         setPendingData(
             filteredByFirm
-                .filter((i) => i.plannedHod !== '' && i.actualHod === '')
+                .filter((i) => (i.hasCheck || (i.plannedHod && i.plannedHod !== '')) && !i.hasHodApproval && i.receivingStatus !== 'Not Received')
                 .map((i) => ({
                     id: i.id,
                     liftNumber: i.liftNumber || '',
@@ -205,7 +224,7 @@ export default () => {
                     quantityAsPerBill: i.quantityAsPerBill || '',
                     priceAsPerPoCheck: i.priceAsPerPoCheck || '',
                     remark: i.remark || '',
-                    plannedHod: i.plannedHod || '',
+                    plannedHod: i.plannedHod || i.timestamp || '',
                     timestamp: i.timestamp || '',
                     firmNameMatch: i.firmNameMatch || '',
                     poNumber: i.poNumber || '',
@@ -213,6 +232,11 @@ export default () => {
                     photoOfBill: i.photoOfBill || '',
                     typeOfBill: i.typeOfBill || '',
                     transportationInclude: i.transportationInclude || '',
+                    transporterName: i.transporterName || '',
+                    vehicleNo: i.vehicleNo || '',
+                    driverName: i.driverName || '',
+                    driverMobileNo: i.driverMobileNo || '',
+                    amount: Number(i.amount) || 0,
                     billNo: i.billNo || '',
                     paymentTerms: i.paymentTerms || '',
                     indentQty: Number(i.indentQty) || 0,
@@ -221,7 +245,7 @@ export default () => {
 
         setHistoryData(
             filteredByFirm
-                .filter((i) => i.plannedHod !== '' && i.actualHod !== '')
+                .filter((i) => i.hasHodApproval || (i.actualHod && i.actualHod !== ''))
                 .map((i) => ({
                     liftNumber: i.liftNumber || '',
                     indentNo: i.indentNo || '',
@@ -229,7 +253,7 @@ export default () => {
                     productName: i.productName || '',
                     qty: Number(i.qty) || 0,
                     hodStatus: i.hodStatus || '',
-                    hodDate: i.actualHod ? formatDateTime(new Date(i.actualHod)) : '',
+                    hodDate: i.actualHod ? formatDateTime(parseCustomDate(i.actualHod)) : (i.timestamp ? formatDateTime(parseCustomDate(i.timestamp)) : ''),
                     firmNameMatch: i.firmNameMatch || '',
                     transportationInclude: i.transportationInclude || '',
                     transporterName: i.transporterName || '',
@@ -247,35 +271,18 @@ export default () => {
         setIsSubmitting(true);
         try {
             const currentDateTime = new Date().toISOString();
-            const targetId = selectedItem.id || selectedItem.liftNumber;
+            const liftId = selectedItem.id;
+            const targetId = liftId || selectedItem.liftNumber;
             await updateStoreInHodApproval(targetId, {
-                actualHod: currentDateTime,
                 hodStatus: 'Approved',
                 hodRemark: '',
-                triggerStage7: false,
                 transportationInclude: values.transportationInclude,
                 transporterName: values.transporterName || '',
                 vehicleNo: values.vehicleNo || '',
                 driverName: values.driverName || '',
                 driverMobileNo: values.driverMobileNo || '',
-                amount: values.amount || 0,
+                amount: Number(values.amount) || 0,
             });
-
-            // ✅ Create Freight Payment Entry if transportation is included
-            if (values.transportationInclude === 'Yes' && values.amount && values.amount > 0) {
-                console.log('🚚 Creating freight payment entry from Transporting Update...');
-                await createFreightPaymentEntry({
-                    indentNumber: selectedItem.indentNo || '',
-                    transporterName: values.transporterName || 'Freight Transporter',
-                    poNumber: selectedItem.poNumber || '',
-                    freightAmount: values.amount || 0,
-                    biltyImage: selectedItem.photoOfBill || '',
-                    productName: selectedItem.productName || '',
-                    firmNameMatch: selectedItem.firmNameMatch || '',
-                    biltyNumber: selectedItem.billNo || '',
-                    vehicleNumber: values.vehicleNo || '',
-                });
-            }
 
             // ✅ Create Payment Entry ONLY if transportation is not included
             const terms = (selectedItem.paymentTerms || '').toString().toLowerCase();
@@ -284,9 +291,10 @@ export default () => {
                                  terms.includes('100% advance') ||
                                  terms.includes('advance');
 
-            if (isAdvanceTerm && values.transportationInclude !== 'Yes' && selectedItem.typeOfBill !== 'common') {
+            if (isAdvanceTerm && values.transportationInclude !== 'Yes' && selectedItem.typeOfBill !== 'common' && liftId) {
                 console.log('✅ Advance payment detected. Creating payment entry...');
                 await createPaymentEntry({
+                    liftId,
                     indent_number: selectedItem.indentNo,
                     vendor_name: selectedItem.vendorName || '',
                     po_number: selectedItem.poNumber || '',
@@ -298,52 +306,47 @@ export default () => {
                 });
             }
 
-            // ✅ Create entry in Tally Entry (Audit Data) table
-            try {
-                console.log('📝 Creating Audit Data entry from HOD Approval...');
-                const formattedDateOnly = currentDateTime.split('T')[0];
-                await createTallyEntryRecord({
-                    timestamp: currentDateTime,
-                    lift_number: selectedItem.liftNumber || '',
-                    indent_number: selectedItem.indentNo || '',
-                    po_number: selectedItem.poNumber || '',
-                    material_in_date: formattedDateOnly,
-                    product_name: selectedItem.productName || '',
-                    bill_status: 'Bill Received',
-                    qty: Number(selectedItem.receivedQuantity || selectedItem.qty || 0),
-                    party_name: selectedItem.vendorName || '',
-                    bill_amt: Number(selectedItem.billAmount || 0),
-                    bill_image: selectedItem.photoOfBill || '',
-                    bill_no: selectedItem.billNo || '',
-                    indent_qty: Number(selectedItem.indentQty || 0),
-                    planned1: formattedDateOnly,
-                    firm_name_match: selectedItem.firmNameMatch || user?.firmNameMatch || '',
-                } as any);
-            } catch (auditError) {
-                console.error('Failed to create audit entry during HOD Approval:', auditError);
+            // ✅ Always create/refresh the Audit Data entry (first stage of the Audit Data wizard)
+            if (liftId) {
+                try {
+                    console.log('📝 Creating Audit Data entry from HOD Approval...');
+                    const formattedDateOnly = currentDateTime.split('T')[0];
+                    await createAuditRecord(liftId, {
+                        timestamp: currentDateTime,
+                        liftNumber: selectedItem.liftNumber || '',
+                        indentNumber: selectedItem.indentNo || '',
+                        poNumber: selectedItem.poNumber || '',
+                        materialInDate: formattedDateOnly,
+                        productName: selectedItem.productName || '',
+                        billNo: selectedItem.billNo || '',
+                        qty: Number(selectedItem.receivedQuantity || selectedItem.qty || 0),
+                        partyName: selectedItem.vendorName || '',
+                        billAmt: Number(selectedItem.billAmount || 0),
+                        billImage: selectedItem.photoOfBill || '',
+                        indentQty: Number(selectedItem.indentQty || 0),
+                        hodStatus: 'Approved',
+                        firmNameMatch: selectedItem.firmNameMatch || user?.firmNameMatch || '',
+                    });
+                } catch (auditError) {
+                    console.error('Failed to create audit entry during HOD Approval:', auditError);
+                }
             }
 
-            // ✅ If transportation included, create a Full Kitting record
-            if (values.transportationInclude === 'Yes') {
+            // ✅ If transportation included, go straight to Make Payment (Freight Payment page removed)
+            if (values.transportationInclude === 'Yes' && liftId) {
                 try {
-                    await insertFullkittingRecord({
+                    await createTransportPaymentEntry({
+                        liftId,
                         indentNumber: selectedItem.indentNo,
-                        vendorName: selectedItem.vendorName || '',
-                        productName: selectedItem.productName || '',
-                        qty: Number(selectedItem.qty || 0),
-                        billNo: selectedItem.billNo || '',
-                        transportingInclude: values.transportationInclude,
                         transporterName: values.transporterName || '',
-                        amount: values.amount || 0,
-                        vehicalNo: values.vehicleNo || '',
-                        driverName: values.driverName || '',
-                        driverMobileNo: values.driverMobileNo || '',
-                        planned: currentDateTime,
+                        poNumber: selectedItem.poNumber || '',
+                        freightAmount: Number(values.amount) || 0,
+                        productName: selectedItem.productName || '',
                         firmNameMatch: selectedItem.firmNameMatch || '',
-                        timestamp: currentDateTime,
+                        vehicleNo: values.vehicleNo || '',
                     });
-                } catch (fkError) {
-                    console.error('Failed to create Full Kitting record:', fkError);
+                } catch (payError) {
+                    console.error('Failed to create transport payment entry:', payError);
                 }
             }
 
@@ -359,15 +362,19 @@ export default () => {
         }
     }
 
-    const pendingColumns: ColumnDef<HodPendingData>[] = [
+    const pendingColumns: any[] = [
         {
             header: 'Action',
-            cell: ({ row }) => (
-                <DialogTrigger asChild>
-                    <Button variant="outline" onClick={() => setSelectedItem(row.original)}>
-                        Check
-                    </Button>
-                </DialogTrigger>
+            cell: ({ row }: any) => (
+                <Button
+                    variant="outline"
+                    onClick={() => {
+                        setSelectedItem(row.original);
+                        setOpenDialog(true);
+                    }}
+                >
+                    Check
+                </Button>
             ),
         },
         { accessorKey: 'liftNumber', header: 'Lift No.' },
@@ -379,7 +386,7 @@ export default () => {
         {
             accessorKey: 'damageOrder',
             header: 'Physical Good?',
-            cell: ({ getValue }) => {
+            cell: ({ getValue }: any) => {
                 const val = getValue() as string;
                 return (
                     <Pill variant={val === 'Yes' ? 'default' : 'reject'}>
@@ -390,13 +397,14 @@ export default () => {
         },
     ];
 
-    const historyColumns: ColumnDef<HodHistoryData>[] = [
+    const historyColumns: any[] = [
         { accessorKey: 'liftNumber', header: 'Lift No.' },
         { accessorKey: 'indentNo', header: 'Indent No.' },
+        { accessorKey: 'firmNameMatch', header: 'Firm Name' },
         { accessorKey: 'productName', header: 'Product' },
         {
             accessorKey: 'hodStatus', header: 'HOD Status',
-            cell: ({ getValue }) => {
+            cell: ({ getValue }: any) => {
                 const val = (getValue() || '') as string;
                 return (
                     <Pill variant={val === 'Approved' ? 'default' : 'reject'}>
@@ -416,7 +424,10 @@ export default () => {
 
     return (
         <div>
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+            <Dialog open={openDialog} onOpenChange={(open) => {
+                setOpenDialog(open);
+                if (!open) setSelectedItem(null);
+            }}>
                 <Tabs defaultValue="pending">
                     <Heading
                         heading="Transporting Update"
@@ -432,7 +443,7 @@ export default () => {
                         <DataTable data={pendingData} columns={pendingColumns} searchFields={['liftNumber', 'indentNo', 'productName']} dataLoading={dataLoading} />
                     </TabsContent>
                     <TabsContent value="history">
-                        <DataTable data={historyData} columns={historyColumns} searchFields={['liftNumber', 'indentNo', 'productName']} dataLoading={dataLoading} />
+                        <DataTable data={historyData} columns={historyColumns} searchFields={['liftNumber', 'indentNo', 'productName', 'firmNameMatch']} dataLoading={dataLoading} />
                     </TabsContent>
                 </Tabs>
 
@@ -492,7 +503,7 @@ export default () => {
                                                 render={({ field }) => (
                                                     <FormItem className="space-y-1">
                                                         <FormLabel className="text-[10px] font-bold uppercase text-slate-400 pl-1">Transportation Include</FormLabel>
-                                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                        <Select onValueChange={field.onChange} value={field.value || ''}>
                                                             <FormControl>
                                                                 <SelectTrigger className="h-10 border-slate-200">
                                                                     <SelectValue placeholder="Select" />
@@ -503,6 +514,7 @@ export default () => {
                                                                 <SelectItem value="No">No</SelectItem>
                                                             </SelectContent>
                                                         </Select>
+                                                        <FormMessage className="text-[10px]" />
                                                     </FormItem>
                                                 )}
                                             />
@@ -515,8 +527,9 @@ export default () => {
                                                             <FormItem className="space-y-1">
                                                                 <FormLabel className="text-[10px] font-bold uppercase text-slate-400 pl-1">Transporter Name</FormLabel>
                                                                 <FormControl>
-                                                                    <Input placeholder="Enter transporter name" {...field} className="h-10 border-slate-200" />
+                                                                    <Input placeholder="Enter transporter name" {...field} value={field.value ?? ''} className="h-10 border-slate-200" />
                                                                 </FormControl>
+                                                                <FormMessage className="text-[10px]" />
                                                             </FormItem>
                                                         )}
                                                     />
@@ -527,8 +540,9 @@ export default () => {
                                                             <FormItem className="space-y-1">
                                                                 <FormLabel className="text-[10px] font-bold uppercase text-slate-400 pl-1">Vehicle No.</FormLabel>
                                                                 <FormControl>
-                                                                    <Input placeholder="Enter Vehicle No." {...field} className="h-10 border-slate-200" />
+                                                                    <Input placeholder="Enter Vehicle No." {...field} value={field.value ?? ''} className="h-10 border-slate-200" />
                                                                 </FormControl>
+                                                                <FormMessage className="text-[10px]" />
                                                             </FormItem>
                                                         )}
                                                     />
@@ -539,8 +553,9 @@ export default () => {
                                                             <FormItem className="space-y-1">
                                                                 <FormLabel className="text-[10px] font-bold uppercase text-slate-400 pl-1">Driver Name</FormLabel>
                                                                 <FormControl>
-                                                                    <Input placeholder="Enter Driver name" {...field} className="h-10 border-slate-200" />
+                                                                    <Input placeholder="Enter Driver name" {...field} value={field.value ?? ''} className="h-10 border-slate-200" />
                                                                 </FormControl>
+                                                                <FormMessage className="text-[10px]" />
                                                             </FormItem>
                                                         )}
                                                     />
@@ -551,8 +566,9 @@ export default () => {
                                                             <FormItem className="space-y-1">
                                                                 <FormLabel className="text-[10px] font-bold uppercase text-slate-400 pl-1">Driver Mobile No.</FormLabel>
                                                                 <FormControl>
-                                                                    <Input placeholder="Enter Driver Mobile No." {...field} className="h-10 border-slate-200" />
+                                                                    <Input placeholder="Enter Driver Mobile No." {...field} value={field.value ?? ''} className="h-10 border-slate-200" />
                                                                 </FormControl>
+                                                                <FormMessage className="text-[10px]" />
                                                             </FormItem>
                                                         )}
                                                     />
@@ -563,8 +579,16 @@ export default () => {
                                                             <FormItem className="space-y-1">
                                                                 <FormLabel className="text-[10px] font-bold uppercase text-slate-400 pl-1">Amount</FormLabel>
                                                                 <FormControl>
-                                                                    <Input type="number" placeholder="0" {...field} className="h-10 border-slate-200" />
+                                                                    <Input
+                                                                        type="number"
+                                                                        placeholder="0"
+                                                                        {...field}
+                                                                        onChange={(e) => field.onChange(e.target.value === '' ? '' : Number(e.target.value))}
+                                                                        value={field.value ?? ''}
+                                                                        className="h-10 border-slate-200"
+                                                                    />
                                                                 </FormControl>
+                                                                <FormMessage className="text-[10px]" />
                                                             </FormItem>
                                                         )}
                                                     />

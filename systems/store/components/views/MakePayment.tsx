@@ -2,7 +2,7 @@ import { FileText, Building, DollarSign, CheckCircle, AlertCircle, ExternalLink,
 import { storeApi } from '@/systems/store/lib/api';
 import Heading from '../element/Heading';
 import { useEffect, useState } from 'react';
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import DataTable from '../element/DataTable';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '../ui/button';
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { uploadFile } from '@/lib/fetchers';
 import { toast } from 'sonner';
 import { Checkbox } from '../ui/checkbox';
-import { formatDate, formatDateTime as formatTimestamp } from '@/lib/utils';
+import { formatDateTime as formatTimestamp } from '@/lib/utils';
 
 interface PaymentsRecord {
     rowIndex?: number;
@@ -32,10 +32,6 @@ interface PaymentsRecord {
     totalPaidAmount?: string | number;
     outstandingAmount?: string | number;
     status?: string;
-    planned?: string;
-    actual?: string;
-    delay?: string;
-    status1?: string;
     paymentForm?: string;
     firmNameMatch?: string;
     paymentDone?: boolean;
@@ -75,10 +71,6 @@ interface DisplayPayment {
     totalPaidAmount: number;
     outstandingAmount: number;
     status: string;
-    planned: string;
-    actual: string;
-    delay: string;
-    status1: string;
     paymentForm: string;
     firmNameMatch: string;
     billImageStatus?: string;
@@ -97,7 +89,6 @@ interface DisplayPaymentHistory {
     amountToBePaid: number;
     remarks: string;
     anyAttachments: string;
-    planned: string;
     paymentTerms: string;
     billImage: string;
     poImage: string;
@@ -123,13 +114,6 @@ interface DisplayPaymentHistory {
     vehicle_no: string;
     driver_name: string;
     driver_mobile_no: string;
-}
-
-interface UpdatePayload {
-    rowIndex: number;
-    actual: string;
-    status: string;
-    status1: string;
 }
 
 export default function MakePayment() {
@@ -192,7 +176,7 @@ export default function MakePayment() {
                 const paymentsData = allPayments || [];
                 paymentsData.sort((a: any, b: any) => Number(b.id) - Number(a.id));
 
-                const { data: allStoreIn } = await storeApi.get('store_in');
+                const { data: allStoreIn } = await storeApi.get('lift');
                 const storeInData = allStoreIn || [];
                 storeInData.sort((a: any, b: any) => String(b.indent_no).localeCompare(String(a.indent_no)));
 
@@ -207,7 +191,7 @@ export default function MakePayment() {
                         const indentKey = item.indent_no || item.indent_number || '';
                         if (indentKey) {
                             storeInMap.set(indentKey, {
-                                billImageStatus: item.bill_image_status || '',
+                                billImageStatus: item.bill_not_received?.bill_image_status || '',
                                 billNo: item.bill_no || ''
                             });
                         }
@@ -235,9 +219,6 @@ export default function MakePayment() {
                     totalPaidAmount: r.total_paid_amount,
                     outstandingAmount: r.outstanding_amount,
                     status: r.status,
-                    planned: r.planned,
-                    actual: r.actual,
-                    delay: r.delay,
                     paymentForm: r.payment_form,
                     firmNameMatch: r.firm_name_match || r.firm_name || r.firmNameMatch || '',
                     paymentDone: r.payment_done || false,
@@ -249,14 +230,12 @@ export default function MakePayment() {
                 setOriginalData(mappedPayments);
                 setPaymentsSheet(mappedPayments);
 
-                // Filter Pending: Has planned date and status is not 'Completed'
+                // Filter Pending: status is 'Pending' (or unset) — no longer gated behind a
+                // separate "planned" activation step; a payment shows up as soon as it's created.
                 const pendingBasic = mappedPayments
                     .filter((sheet: PaymentsRecord) => {
-                        const plannedValue = String(sheet?.planned || '').trim();
-                        const hasPlanned = plannedValue !== '';
                         const status = String(sheet?.status || '').toLowerCase();
-                        const isCompleted = status === 'completed';
-                        return hasPlanned && !isCompleted;
+                        return status === 'pending' || status === '';
                     });
 
                 // Filter to show only the latest record for each Indent Number and Product
@@ -288,10 +267,6 @@ export default function MakePayment() {
                     totalPaidAmount: Number(sheet?.totalPaidAmount || 0),
                     outstandingAmount: Number(sheet?.outstandingAmount || 0),
                     status: sheet?.status || 'Pending',
-                    planned: sheet?.planned || '',
-                    actual: sheet?.actual || '',
-                    delay: sheet?.delay || '',
-                    status1: sheet?.status1 || '',
                     paymentForm: sheet?.paymentForm || '',
                     firmNameMatch: sheet?.firmNameMatch || '',
                     billImageStatus: sheet?.billImageStatus || '',
@@ -342,7 +317,6 @@ export default function MakePayment() {
                         amountToBePaid: Number(r.amount_to_be_paid) || 0,
                         remarks: r.remarks || '',
                         anyAttachments: r.any_attachments || '',
-                        planned: r.planned || '',
                         paymentTerms: r.payment_terms || '',
                         billImage: r.photo_of_bill || r.any_attachments || '',
                         poImage: r.any_attachments || '',
@@ -438,9 +412,6 @@ export default function MakePayment() {
 
         setIsSubmitting(true);
         const isoNow = new Date().toISOString();
-        const currentDateOnly = isoNow.split('T')[0];
-        const currentDateTime = isoNow;
-        const legacyFormatDate = formatCurrentDate(); // Keep for history remarks if needed
 
         try {
             // Get the selected items
@@ -448,8 +419,9 @@ export default function MakePayment() {
 
             console.log('🔍 Selected items to update:', selectedItems);
 
-            // Prepare IDs and update payments table in Supabase
-            const ids = selectedItems.map(item => item.rowIndex).filter(Boolean);
+            // Prepare IDs and update payments table (grouped rows carry every underlying
+            // payment id in rowIds, so update all of them, not just the group's first row)
+            const ids = selectedItems.flatMap(item => item.rowIds && item.rowIds.length ? item.rowIds : [item.rowIndex]).filter(Boolean);
             if (ids.length === 0) {
                 toast.error('Could not find matching records to update');
                 setIsSubmitting(false);
@@ -459,9 +431,7 @@ export default function MakePayment() {
             // Update payments rows in bulk
             try {
                 await Promise.all(ids.map(id => storeApi.patch('payments', id, {
-                    actual: currentDateOnly,
                     status: 'Completed',
-                    status1: 'ok',
                     payment_done: true
                 })));
             } catch (updateError: any) {
@@ -493,31 +463,30 @@ export default function MakePayment() {
                     remarks: item.remark || `Payment completed for ${item.uniqueNo}`,
                     any_attachments: item.file || item.pdf || '',
                     timestamp1: isoNow,
-                    planned: item.planned || '',
                     payment_terms: item.paymentTerms || '',
                     indent_no: item.internalCode,
                     po_number: item.poNumber,
                     product_name: item.product,
-                    // Additional fields from store_in if found
-                    lift_number: storeIn?.liftNumber || '',
-                    bill_status: storeIn?.billStatus || '',
-                    bill_no: String(storeIn?.billNo || ''),
+                    // Additional fields from the lift record if found
+                    lift_number: storeIn?.lift_number || '',
+                    bill_status: storeIn?.check?.bill_status || '',
+                    bill_no: String(storeIn?.bill_no || ''),
                     qty: String(storeIn?.qty || ''),
-                    vendor_name: storeIn?.vendorName || item.partyName,
-                    type_of_bill: storeIn?.typeOfBill || '',
-                    bill_amount: String(storeIn?.billAmount || ''),
-                    discount_amount: String(storeIn?.discountAmount || ''),
-                    payment_type: storeIn?.paymentType || '',
-                    advance_amount_if_any: String(storeIn?.advanceAmountIfAny || ''),
-                    photo_of_bill: storeIn?.photoOfBill || item.file || '',
-                    transportation_include: storeIn?.transportationInclude || '',
-                    transporter_name: storeIn?.transporterName || '',
+                    vendor_name: storeIn?.vendor_name || item.partyName,
+                    type_of_bill: storeIn?.type_of_bill || '',
+                    bill_amount: String(storeIn?.bill_amount || ''),
+                    discount_amount: String(storeIn?.discount_amount || ''),
+                    payment_type: storeIn?.payment_type || '',
+                    advance_amount_if_any: String(storeIn?.advance_amount_if_any || ''),
+                    photo_of_bill: storeIn?.photo_of_bill || item.file || '',
+                    transportation_include: storeIn?.transportation_include || '',
+                    transporter_name: storeIn?.transporter_name || '',
                     amount: String(storeIn?.amount || ''),
-                    lead_time_to_lift_material: String(storeIn?.leadTimeToLiftMaterial || ''),
-                    vehicle_no: storeIn?.vehicleNo || '',
-                    driver_name: storeIn?.driverName || '',
-                    driver_mobile_no: storeIn?.driverMobileNo || '',
-                    bill_remark: storeIn?.billRemark || item.remark || '',
+                    lead_time_to_lift_material: String(storeIn?.lead_time_to_lift_material || ''),
+                    vehicle_no: storeIn?.vehicle_no || '',
+                    driver_name: storeIn?.driver_name || '',
+                    driver_mobile_no: storeIn?.driver_mobile_no || '',
+                    bill_remark: storeIn?.check?.bill_remark || item.remark || '',
                 };
             });
 
@@ -597,15 +566,6 @@ export default function MakePayment() {
                     </div>
                 );
             },
-        },
-        {
-            accessorKey: 'planned',
-            header: 'Planned Date',
-            cell: ({ row }) => (
-                <span className="text-sm font-medium text-green-600">
-                    {formatDate(row.original.planned) || '-'}
-                </span>
-            )
         },
         {
             accessorKey: 'uniqueNo',
@@ -854,15 +814,6 @@ export default function MakePayment() {
                     </span>
                 );
             }
-        },
-        {
-            accessorKey: 'planned',
-            header: 'Planned Date',
-            cell: ({ row }) => (
-                <span className="text-sm text-gray-600">
-                    {formatDate(row.original.planned) || '-'}
-                </span>
-            )
         },
         {
             id: 'bill_image',
@@ -1141,7 +1092,7 @@ export default function MakePayment() {
                                                             {selectedRows.size} payment(s) selected
                                                         </span>
                                                         <span className="text-sm text-green-600">
-                                                            - Will update: Actual date to {formatCurrentDate()}, Status to "Completed", Status1 to "ok"
+                                                            - Will update: Status to "Completed"
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center gap-2">
@@ -1160,7 +1111,7 @@ export default function MakePayment() {
                                         )}
 
                                         {/* Data Table */}
-                                        <DataTable<DisplayPayment, ColumnDef<DisplayPayment>>
+                                        <DataTable<DisplayPayment, any>
                                             data={pendingData}
                                             columns={pendingColumns}
                                             searchFields={['uniqueNo', 'poNumber', 'partyName', 'product', 'internalCode', 'firmNameMatch']}
@@ -1211,7 +1162,7 @@ export default function MakePayment() {
                                             </div>
                                         </div>
 
-                                        <DataTable<DisplayPaymentHistory, ColumnDef<DisplayPaymentHistory>>
+                                        <DataTable<DisplayPaymentHistory, any>
                                             data={historyData}
                                             columns={historyColumns}
                                             searchFields={['apPaymentNumber', 'uniqueNumber', 'fmsName', 'payTo', 'remarks']}

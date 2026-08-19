@@ -8,14 +8,13 @@ import { storeApi } from '../lib/api';
 // ==================== INTERFACES ====================
 
 export interface GetLiftIndentRecord {
+    id: number;
     indentNumber: string;
     firmNameMatch: string;
     approvedVendorName: string;
     poNumber: string;
-    actual4: string;
+    poTimestamp: string;
     deliveryDate: string;
-    planned5: string;
-    actual5: string;
     productName: string;
     totalQty: number;
     quantity: number;
@@ -118,40 +117,36 @@ export async function fetchIndentRecords() {
         const response = await storeApi.get('indent');
         const data = response.data;
 
-        console.log('fetchIndentRecords', data);
-        return (data || []).map((r: any) => ({
-            indentNumber: r.indent_number || '',
-            firmNameMatch: r.firm_name_match || r.firm_name || '',
-            approvedVendorName: r.approved_vendor_name || '',
-            poNumber: r.po_number || '',
-            actual4: r.actual4 || '',
-            deliveryDate: r.delivery_date || '',
-            planned5: r.planned5 || '',
-            actual5: r.actual5 || '',
-            productName: r.product_name || '',
-            totalQty: Number(r.total_qty) || 0,
-            quantity: Number(r.quantity) || 0,
-            pendingQty: Number(r.pending_qty) || 0,
-            liftingStatus: r.lifting_status || '',
-            cancelQty: Number(r.cancel_qty) || 0,
-            approvedRate: r.approved_rate || '',
-            taxValue: Number(r.tax_value4) || 0,
-            withTax: r.with_tax_or_not4 || 'No',
-            department: r.category || '',
-            areaOfUse: r.area_of_use || '',
-            timestamp: r.timestamp || '',
-            expectedDate: r.expected_req_date || '',
-            approvedQuantity: Number(r.approved_quantity) || 0,
-            receivedQuantity: Number(r.received_quantity) || 0,
-            uom: r.uom || '',
-            approvedTransportType: (() => {
-                if (r.vendor1_rank === 'T1') return r.transport_type1 || '';
-                if (r.vendor2_rank === 'T1') return r.transport_type2 || '';
-                if (r.vendor3_rank === 'T1') return r.transport_type3 || '';
-                return r.transport_type1 || '';
-            })(),
-            poCopy: r.po_copy || '',
-        }));
+        return (data || []).map((r: any) => {
+            const poLine = Array.isArray(r.po_lines) && r.po_lines.length > 0 ? r.po_lines[0] : null;
+            return {
+                id: r.id,
+                indentNumber: r.indent_number || '',
+                firmNameMatch: r.firm_name_match || r.firm_name || '',
+                approvedVendorName: r.management_approval?.approved_vendor_name || r.vendor_quotation?.vendor_name1 || '',
+                poNumber: poLine?.po_number || '',
+                poTimestamp: poLine?.timestamp || '',
+                deliveryDate: poLine?.delivery_date || '',
+                productName: r.product_name || '',
+                totalQty: Number(r.total_qty) || 0,
+                quantity: Number(r.quantity) || 0,
+                pendingQty: Number(r.pending_qty) || 0,
+                liftingStatus: r.lifting_status || '',
+                cancelQty: 0,
+                approvedRate: r.management_approval?.approved_rate || '',
+                taxValue: 0,
+                withTax: 'No',
+                department: r.category || '',
+                areaOfUse: r.area_of_use || '',
+                timestamp: r.timestamp || '',
+                expectedDate: r.expected_req_date || '',
+                approvedQuantity: Number(r.indent_approval?.approved_quantity) || 0,
+                receivedQuantity: Number(r.received_qty) || 0,
+                uom: r.uom || '',
+                approvedTransportType: '',
+                poCopy: poLine?.pdf || '',
+            };
+        });
     } catch (error) {
         console.error('Error fetching indent records:', error);
         throw error;
@@ -159,21 +154,21 @@ export async function fetchIndentRecords() {
 }
 
 /**
- * Fetch all store-in records
+ * Fetch all lift records
  * Used for calculating received quantities and history
  */
 export async function fetchStoreInRecords() {
     try {
-        const response = await storeApi.get('store_in');
+        const response = await storeApi.get('lift');
         const data = response.data;
 
         return (data || []).map((r: any) => ({
-            liftNumber: r.lift_number || '',
+            liftNumber: r.lift_number || r.liftNumber || (r.id ? `LIFT-${String(r.id).padStart(4, '0')}` : ''),
             indentNo: r.indent_no || '',
             firmNameMatch: r.firm_name_match || '',
             vendorName: r.vendor_name || '',
             qty: Number(r.qty) || 0,
-            receivedQuantity: Number(r.received_quantity) || 0,
+            receivedQuantity: Number(r.check?.received_quantity) || 0,
             photoOfBill: r.photo_of_bill || '',
             timestamp: r.timestamp || '',
             billNo: r.bill_no || '',
@@ -185,8 +180,8 @@ export async function fetchStoreInRecords() {
             driverName: r.driver_name || '',
             driverMobileNo: r.driver_mobile_no || '',
             amount: Number(r.amount) || 0,
-            billRemark: r.bill_remark || '',
-            billStatus: r.bill_status || '',
+            billRemark: r.check?.bill_remark || '',
+            billStatus: r.check?.bill_status || '',
         }));
     } catch (error) {
         console.error('Error fetching store-in records:', error);
@@ -219,12 +214,25 @@ export const fetchVendorOptions = async (): Promise<string[]> => {
 // ==================== INSERT/UPDATE FUNCTIONS ====================
 
 /**
- * Insert a new store-in record
+ * Insert a new lift record. Resolves the indent number to its real numeric id
+ * so the lift's indentId FK is populated for real (fixes the pre-Phase-1 gap
+ * where cross-model links were only ever done by string-matching).
  */
 export async function insertStoreInRecord(storeInData: StoreInInsertData) {
     try {
+        let indentId: number | null = null;
+        if (storeInData.indentNo) {
+            try {
+                const indentRes = await storeApi.getOne('indent', storeInData.indentNo);
+                indentId = indentRes?.data?.id ?? null;
+            } catch (lookupErr) {
+                console.warn('Could not resolve indent id for lift record:', lookupErr);
+            }
+        }
+
         const mappedData: any = {
             timestamp: storeInData.timestamp ? new Date(storeInData.timestamp).toISOString() : new Date().toISOString(),
+            indent_id: indentId,
             indent_no: storeInData.indentNo || '',
             bill_no: storeInData.billNo || '',
             vendor_name: storeInData.vendorName || '',
@@ -240,45 +248,22 @@ export async function insertStoreInRecord(storeInData: StoreInInsertData) {
             transportation_include: storeInData.transportationInclude || '',
             transporter_name: storeInData.transporterName || '',
             amount: Number(storeInData.amount) || 0,
-            bill_status: storeInData.billStatus || '',
-            received_quantity: Number(storeInData.receivedQuantity) || 0,
             po_number: storeInData.poNumber || '',
             vehicle_no: storeInData.vehicleNo || '',
             driver_name: storeInData.driverName || '',
             driver_mobile_no: storeInData.driverMobileNo || '',
-            bill_remark: storeInData.billRemark || '',
             firm_name_match: storeInData.firmNameMatch || '',
-            planned6: storeInData.timestamp ? new Date(storeInData.timestamp).toISOString() : new Date().toISOString(),
-            photo_of_product: storeInData.photoOfProduct || '',
-            damage_order: storeInData.damageOrder || '',
-            location: storeInData.location || '',
-            remark: storeInData.remark || '',
         };
 
-        console.log('📤 Inserting store-in record:', mappedData);
+        console.log('📤 Inserting lift record:', mappedData);
 
-        const response = await storeApi.post('store_in', [mappedData]);
+        const response = await storeApi.post('lift', [mappedData]);
         const data = response.data;
 
-        console.log('✅ Store-in record inserted:', data);
+        console.log('✅ Lift record inserted:', data);
         return data;
     } catch (error) {
         console.error('Error inserting store-in record:', error);
-        throw error;
-    }
-}
-
-/**
- * Update actual5 timestamp for an indent (Material Receipt Date)
- */
-export async function updateActual5Timestamp(indentNumber: string) {
-    try {
-        const currentDateTime = new Date().toISOString();
-        await storeApi.patch('indent', indentNumber, { actual5: currentDateTime });
-        console.log(`✅ Updated actual5 for indent ${indentNumber}: ${currentDateTime}`);
-        return true;
-    } catch (error) {
-        console.error('Error updating actual5 timestamp:', error);
         throw error;
     }
 }

@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import { useEffect, useState, useMemo } from 'react';
 import DataTable from '../element/DataTable';
 import { z } from 'zod';
@@ -289,7 +289,7 @@ export default function TallyEntry() {
 
     const schema = z.object({
         status4: z.enum(['Done', 'Not Done'], {
-            required_error: 'Please select a status',
+            message: 'Please select a status',
         }),
         remarks4: z.string().min(1, 'Remarks are required'),
     });

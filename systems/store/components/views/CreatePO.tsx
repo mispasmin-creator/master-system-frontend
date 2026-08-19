@@ -25,12 +25,12 @@ import {
 } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ClipLoader as Loader } from 'react-spinners';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Textarea } from '../ui/textarea';
 import { pdf, PDFViewer } from '@react-pdf/renderer';
 import POPdf, { type POPdfProps } from '../element/POPdf';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { fetchIndents, fetchPoMaster, fetchMasterData, insertPoRecords, updateIndentsAfterPoCreation } from '@/services/poService';
+import { fetchIndents, fetchPoMaster, fetchMasterData, insertPoRecords, updateIndentsAfterPoCreation, type MasterDetails } from '@/services/poService';
 import Heading from '../element/Heading';
 
 function generatePoNumber(poNumbers: string[]): string {
@@ -130,35 +130,6 @@ interface IndentSheetItem {
     approvedAdvancePercent?: string;
 }
 
-interface MasterDetails {
-    destinationAddress?: string;
-    defaultTerms?: string[];
-    vendors?: Array<{
-        vendorName?: string;
-        address?: string;
-        gstin?: string;
-        vendorEmail?: string;
-        email?: string;
-    }>;
-    firmCompanyMap?: Record<string, {
-        companyName?: string;
-        companyAddress?: string;
-        destinationAddress?: string;
-        companyEmail?: string;
-        companyPhone?: string;
-        companyGstin?: string;
-        companyPan?: string;
-    }>;
-    companyName?: string;
-    paymentTerms?: string[];
-    companyPhone?: string;
-    companyGstin?: string;
-    companyPan?: string;
-    companyAddress?: string;
-    billingAddress?: string;
-}
-
-
 const schema = z.object({
     poNumber: z.string().nonempty(),
     poDate: z.coerce.date(),
@@ -177,22 +148,22 @@ const schema = z.object({
             quotationNumber: z.string().optional(),
             productName: z.string().optional(),
             specifications: z.string().optional(),
-            gst: z.coerce.number(),
-            discount: z.coerce.number().default(0).optional(),
-            quantity: z.coerce.number().optional(),
+            gst: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).optional(),
+            discount: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).default(0).optional(),
+            quantity: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).optional(),
             unit: z.string().optional(),
-            rate: z.coerce.number().optional(),
-            packaging: z.coerce.number().default(0).optional(),
-            forwarding: z.coerce.number().default(0).optional(),
-            packagingAndForwarding: z.coerce.number().default(0).optional(),
+            rate: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).optional(),
+            packaging: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).default(0).optional(),
+            forwarding: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).default(0).optional(),
+            packagingAndForwarding: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).default(0).optional(),
         })
     ),
     terms: z.array(z.string().nonempty()).max(10),
     deliveryDate: z.coerce.date(),
-    deliveryDays: z.coerce.number().optional(),
+    deliveryDays: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).optional(),
     deliveryType: z.enum(['for', 'exfactory']).optional(),
     paymentTerms: z.string().nonempty(),
-    numberOfDays: z.coerce.number().optional(),
+    numberOfDays: z.preprocess(v => (v === '' || v === undefined || v === null ? 0 : v), z.coerce.number()).optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -249,7 +220,7 @@ const CreatePO = () => {
         }
     }, [details]);
     const form = useForm<FormData>({
-        resolver: zodResolver(schema),
+        resolver: zodResolver(schema) as any,
         defaultValues: {
             poNumber: '',
             poDate: new Date(),
@@ -361,13 +332,13 @@ const CreatePO = () => {
         if (matchingIndents.length > 0) {
             const first = matchingIndents[0];
             form.setValue('paymentTerms', first.approvedPaymentTerm || '');
-            form.setValue('numberOfDays', Number(first.approvedAdvancePercent) || 0);
+            form.setValue('numberOfDays', Number(first.approvedAdvancePercent) > 0 ? Number(first.approvedAdvancePercent) : ('' as any));
         }
 
         form.setValue(
             'indents',
             matchingIndents.map((i: IndentSheetItem) => {
-                let gstValue = 0;
+                let gstValue: number | string = '';
 
                 if (i.taxValue1 && !isNaN(Number(i.taxValue1)) && Number(i.taxValue1) > 0) {
                     gstValue = Number(i.taxValue1);
@@ -382,14 +353,14 @@ const CreatePO = () => {
                     quotationNumber: i.quotationNumber || '',
                     productName: i.productName || '',
                     specifications: i.specifications || '',
-                    gst: gstValue,
-                    discount: 0,
-                    quantity: i.approvedQuantity || 0,
+                    gst: gstValue as any,
+                    discount: '' as any,
+                    quantity: (i.approvedQuantity !== undefined && i.approvedQuantity !== null && i.approvedQuantity > 0) ? i.approvedQuantity : ('' as any),
                     unit: i.uom || '',
-                    rate: i.approvedRate || 0,
-                    packaging: 0,
-                    forwarding: 0,
-                    packagingAndForwarding: 0,
+                    rate: (i.approvedRate !== undefined && i.approvedRate !== null && i.approvedRate > 0) ? i.approvedRate : ('' as any),
+                    packaging: '' as any,
+                    forwarding: '' as any,
+                    packagingAndForwarding: '' as any,
                 };
             })
         );
@@ -494,10 +465,10 @@ const CreatePO = () => {
                 form.setValue('ourEnqNo', firstPoItem.enquiryNumber || '');
                 form.setValue('enquiryDate', parseCustomDate(firstPoItem.enquiryDate));
                 form.setValue('deliveryDate', parseCustomDate(firstPoItem.deliveryDate));
-                form.setValue('deliveryDays', firstPoItem.deliveryDays || 0);
+                form.setValue('deliveryDays', firstPoItem.deliveryDays ? firstPoItem.deliveryDays : ('' as any));
                 form.setValue('deliveryType', (firstPoItem.deliveryType === 'for' || firstPoItem.deliveryType === 'exfactory') ? firstPoItem.deliveryType : undefined);
                 form.setValue('paymentTerms', firstPoItem.paymentTerms as any || undefined);
-                form.setValue('numberOfDays', firstPoItem.numberOfDays || 0);
+                form.setValue('numberOfDays', firstPoItem.numberOfDays ? firstPoItem.numberOfDays : ('' as any));
 
                 const poIndents = poItems.map((poItem) => {
                     const originalIndent = indentSheet.find(i =>
@@ -510,14 +481,14 @@ const CreatePO = () => {
                         quotationNumber: poItem.quotationNumber || '',
                         productName: poItem.product || '',
                         specifications: poItem.description || '',
-                        gst: poItem.gstPercent || 18,
-                        discount: poItem.discountPercent || 0,
-                        quantity: poItem.quantity || 0,
+                        gst: (poItem.gstPercent !== undefined && poItem.gstPercent !== null && Number(poItem.gstPercent) > 0) ? Number(poItem.gstPercent) : ('' as any),
+                        discount: (poItem.discountPercent !== undefined && poItem.discountPercent !== null && Number(poItem.discountPercent) > 0) ? Number(poItem.discountPercent) : ('' as any),
+                        quantity: (poItem.quantity !== undefined && poItem.quantity !== null && Number(poItem.quantity) > 0) ? Number(poItem.quantity) : ('' as any),
                         unit: poItem.unit || '',
-                        rate: poItem.rate || 0,
-                        packaging: poItem.packaging || 0,
-                        forwarding: poItem.forwarding || 0,
-                        packagingAndForwarding: poItem.packagingAndForwarding || ((poItem.packaging || 0) + (poItem.forwarding || 0)),
+                        rate: (poItem.rate !== undefined && poItem.rate !== null && Number(poItem.rate) > 0) ? Number(poItem.rate) : ('' as any),
+                        packaging: (poItem.packaging !== undefined && poItem.packaging !== null && Number(poItem.packaging) > 0) ? Number(poItem.packaging) : ('' as any),
+                        forwarding: (poItem.forwarding !== undefined && poItem.forwarding !== null && Number(poItem.forwarding) > 0) ? Number(poItem.forwarding) : ('' as any),
+                        packagingAndForwarding: (poItem.packagingAndForwarding !== undefined && poItem.packagingAndForwarding !== null && Number(poItem.packagingAndForwarding) > 0) ? Number(poItem.packagingAndForwarding) : ('' as any),
                     };
                 });
                 form.setValue('indents', poIndents);
@@ -791,6 +762,7 @@ const CreatePO = () => {
 
 
                 return {
+                    indentId: v.id,
                     timestamp: values.poDate.toISOString(),
                     partyName: values.supplierName,
                     poNumber,
@@ -800,7 +772,7 @@ const CreatePO = () => {
                     quantity: v.quantity || 0,
                     unit: v.unit || '',
                     rate: v.rate || 0,
-                    gst: v.gst,
+                    gst: v.gst || 0,
                     companyEmail: values.companyEmail || '',
                     discount: v.discount || 0,
                     amount: (() => {
@@ -817,38 +789,37 @@ const CreatePO = () => {
                     forwarding: v.forwarding || 0,
                     packagingAndForwarding: (v.packaging || 0) + (v.forwarding || 0),
                     pdf: url,
-                    quotationNumber: v.quotationNumber || '',
-                    quotationDate: null,
+                    quotationNumber: v.quotationNumber || indent?.quotationNumber || '',
+                    quotationDate: indent?.quotationDate || null,
                     enquiryNumber: values.ourEnqNo || '',
-                    enquiryDate: values.enquiryDate || null,
-                    term1: values.terms[0],
-                    term2: values.terms[1],
-                    term3: values.terms[2],
-                    term4: values.terms[3],
-                    term5: values.terms[4],
-                    term6: values.terms[5],
-                    term7: values.terms[6],
-                    term8: values.terms[7],
-                    term9: values.terms[8],
-                    term10: values.terms[9],
+                    enquiryDate: values.enquiryDate ? values.enquiryDate.toISOString() : null,
+                    term1: values.terms[0] || '',
+                    term2: values.terms[1] || '',
+                    term3: values.terms[2] || '',
+                    term4: values.terms[3] || '',
+                    term5: values.terms[4] || '',
+                    term6: values.terms[5] || '',
+                    term7: values.terms[6] || '',
+                    term8: values.terms[7] || '',
+                    term9: values.terms[8] || '',
+                    term10: values.terms[9] || '',
                     discountPercent: v.discount || 0,
-                    gstPercent: v.gst,
-                    deliveryDate: values.deliveryDate,
+                    gstPercent: v.gst || 0,
+                    deliveryDate: values.deliveryDate ? values.deliveryDate.toISOString() : '',
                     paymentTerms: values.paymentTerms,
                     numberOfDays: values.numberOfDays || 0,
                     deliveryDays: values.deliveryDays || 0,
                     deliveryType: values.deliveryType || '',
                     firmNameMatch: (indent as any)?.firmNameMatch ?? '',
                     advancePercent: (values.paymentTerms.toLowerCase().includes('partly') && (values.paymentTerms.toLowerCase().includes('advance') || values.paymentTerms.toLowerCase().includes('pi'))) ? (values.numberOfDays || 0) : 0,
-                    advanceAmount: (values.paymentTerms.toLowerCase().includes('partly') && (values.paymentTerms.toLowerCase().includes('advance') || values.paymentTerms.toLowerCase().includes('pi'))) ? (calculateTotal(v.rate || 0, v.gst, v.discount || 0, v.quantity || 0) * (values.numberOfDays || 0)) / 100 : 0
+                    advanceAmount: (values.paymentTerms.toLowerCase().includes('partly') && (values.paymentTerms.toLowerCase().includes('advance') || values.paymentTerms.toLowerCase().includes('pi'))) ? (calculateTotal(v.rate || 0, v.gst || 0, v.discount || 0, v.quantity || 0) * (values.numberOfDays || 0)) / 100 : 0
                 };
             });
 
             await insertPoRecords(rows);
 
-            // Update indents to mark PO as created (set actual4 and delivery_date)
+            // Update indents to mark PO as created
             const indentIds = values.indents.map(v => v.id).filter(id => id > 0);
-            // Use ISO string for database compatibility to avoid "out of range" error
             const databaseDeliveryDate = values.deliveryDate.toISOString();
             if (indentIds.length > 0) {
                 await updateIndentsAfterPoCreation(indentIds, databaseDeliveryDate, poNumber, url || undefined);
@@ -980,7 +951,7 @@ const CreatePO = () => {
                                                                                 typeof vendorName === 'string' &&
                                                                                 vendorName.trim() !== '' &&
                                                                                 i.planned4 !== '' &&
-                                                                                i.actual4 === ''
+                                                                                (!i.actual4 || i.actual4 === '')
                                                                             );
                                                                         })
                                                                         .map((i) => i.approvedVendorName as string)
@@ -1095,7 +1066,16 @@ const CreatePO = () => {
                                                     {form.watch('paymentTerms').toLowerCase().includes('partly') ? 'Advance %' : 'Number of Days'}
                                                 </FormLabel>
                                                 <FormControl>
-                                                    <Input className="h-9" type="number" placeholder={form.watch('paymentTerms').toLowerCase().includes('partly') ? 'Enter advance %' : 'Enter number of days'} {...field} />
+                                                    <Input 
+                                                        className="h-9" 
+                                                        type="number" 
+                                                        placeholder={form.watch('paymentTerms').toLowerCase().includes('partly') ? 'Enter advance %' : 'Enter number of days'} 
+                                                        value={!field.value ? '' : field.value}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            field.onChange(val === '' ? '' : Number(val));
+                                                        }}
+                                                    />
                                                 </FormControl>
                                             </FormItem>
                                         )} />
@@ -1278,7 +1258,7 @@ const CreatePO = () => {
                                                             <FormField control={form.control} name={`indents.${index}.quantity`} render={({ field }) => (
                                                                 <FormItem className="flex justify-center">
                                                                     <FormControl>
-                                                                        <Input type="number" readOnly className="h-9 w-20 text-center bg-gray-50 cursor-not-allowed" value={field.value || 0} onChange={field.onChange} />
+                                                                        <Input type="number" readOnly className="h-9 w-20 text-center bg-gray-50 cursor-not-allowed" value={!field.value ? '' : field.value} onChange={field.onChange} />
                                                                     </FormControl>
                                                                 </FormItem>
                                                             )} />
@@ -1296,7 +1276,7 @@ const CreatePO = () => {
                                                             <FormField control={form.control} name={`indents.${index}.rate`} render={({ field }) => (
                                                                 <FormItem className="flex justify-center">
                                                                     <FormControl>
-                                                                        <Input type="number" readOnly className="h-9 w-24 text-center bg-gray-50 cursor-not-allowed" value={field.value || 0} onChange={field.onChange} />
+                                                                        <Input type="number" readOnly className="h-9 w-24 text-center bg-gray-50 cursor-not-allowed" value={!field.value ? '' : field.value} onChange={field.onChange} />
                                                                     </FormControl>
                                                                 </FormItem>
                                                             )} />
@@ -1307,8 +1287,9 @@ const CreatePO = () => {
                                                                     <FormControl>
                                                                         <Input 
                                                                              type="number" 
+                                                                             placeholder="0"
                                                                              className="h-9 w-24 text-center" 
-                                                                             value={field.value === undefined || field.value === null ? '' : field.value} 
+                                                                             value={!field.value ? '' : field.value} 
                                                                              onChange={(e) => {
                                                                                  const val = e.target.value;
                                                                                  field.onChange(val === '' ? '' : Number(val));
@@ -1324,8 +1305,9 @@ const CreatePO = () => {
                                                                     <FormControl>
                                                                         <Input 
                                                                              type="number" 
+                                                                             placeholder="0"
                                                                              className="h-9 w-24 text-center" 
-                                                                             value={field.value === undefined || field.value === null ? '' : field.value} 
+                                                                             value={!field.value ? '' : field.value} 
                                                                              onChange={(e) => {
                                                                                  const val = e.target.value;
                                                                                  field.onChange(val === '' ? '' : Number(val));
@@ -1339,7 +1321,10 @@ const CreatePO = () => {
                                                             <FormField control={form.control} name={`indents.${index}.gst`} render={({ field }) => (
                                                                 <FormItem className="flex items-center justify-center gap-1">
                                                                     <FormControl>
-                                                                        <Input type="number" min={0} max={100} className="h-9 w-16 text-center" value={field.value || 0} onChange={(e) => field.onChange(Number(e.target.value))} />
+                                                                        <Input type="number" min={0} max={100} placeholder="0" className="h-9 w-16 text-center" value={!field.value ? '' : field.value} onChange={(e) => {
+                                                                                const val = e.target.value;
+                                                                                field.onChange(val === '' ? '' : Number(val));
+                                                                            }} />
                                                                     </FormControl>
                                                                     <span>%</span>
                                                                 </FormItem>
@@ -1349,7 +1334,10 @@ const CreatePO = () => {
                                                             <FormField control={form.control} name={`indents.${index}.discount`} render={({ field }) => (
                                                                 <FormItem className="flex items-center justify-center gap-1">
                                                                     <FormControl>
-                                                                        <Input type="number" min={0} max={100} className="h-9 w-16 text-center" value={field.value || 0} onChange={(e) => field.onChange(Number(e.target.value))} />
+                                                                        <Input type="number" min={0} max={100} placeholder="0" className="h-9 w-16 text-center" value={!field.value ? '' : field.value} onChange={(e) => {
+                                                                                const val = e.target.value;
+                                                                                field.onChange(val === '' ? '' : Number(val));
+                                                                            }} />
                                                                     </FormControl>
                                                                     <span>%</span>
                                                                 </FormItem>

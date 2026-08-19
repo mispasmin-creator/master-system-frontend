@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { DayPicker } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
-import { buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "./button"
 
 function Calendar({
   className,
@@ -58,15 +58,15 @@ function Calendar({
           "aria-selected:bg-accent aria-selected:text-accent-foreground",
         day_hidden: "invisible",
         ...classNames,
-      }}
+      } as any}
       components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn("size-4", className)} {...props} />
+        IconLeft: ({ className: _className, ...rest }: any) => (
+          <ChevronLeft className={cn("size-4", _className)} {...rest} />
         ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn("size-4", className)} {...props} />
+        IconRight: ({ className: _className, ...rest }: any) => (
+          <ChevronRight className={cn("size-4", _className)} {...rest} />
         ),
-      }}
+      } as any}
       {...props}
     />
   )

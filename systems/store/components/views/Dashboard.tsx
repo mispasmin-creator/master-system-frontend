@@ -186,10 +186,10 @@ export default function Dashboard() {
         }).length;
 
         // Pending approvals breakdown
-        const pendingDeptApproval = indents.filter(i => !i.actual1).length;
-        const pendingVendorAssign = indents.filter(i => i.actual1 && !i.actual2).length;
-        const pendingTechApproval = indents.filter(i => i.actual2 && !i.actual3).length;
-        const pendingPOCreation = indents.filter(i => i.actual4 === '' || !i.actual4).length;
+        const pendingDeptApproval = indents.filter((i: any) => !i.actual1).length;
+        const pendingVendorAssign = indents.filter((i: any) => i.actual1 && !i.actual2).length;
+        const pendingTechApproval = indents.filter((i: any) => i.actual2 && !i.actual3).length;
+        const pendingPOCreation = indents.filter((i: any) => i.actual4 === '' || !i.actual4).length;
         const totalPendingApprovals = pendingDeptApproval + pendingVendorAssign + pendingTechApproval;
 
         return {
@@ -295,9 +295,9 @@ export default function Dashboard() {
 
     // ─── Pending Liftings List ────────────────────────────────────────────────
     const pendingLiftingsList = useMemo(() => {
-        return indents
-            .filter(i => i.actual4 && !i.actual5)
-            .map(i => ({
+        return (indents as any[])
+            .filter((i: any) => i.actual4 && !i.actual5)
+            .map((i: any) => ({
                 indentNo: i.indent_number, vendor: i.vendor_name || '-',
                 product: i.product_name, qty: i.approved_quantity || i.quantity,
                 planned: i.planned5 || '-',
@@ -317,7 +317,7 @@ export default function Dashboard() {
         payments.slice(0,5).forEach(p => {
             if (p.timestamp) acts.push({ time: p.timestamp, type: 'Payment', text: `₹${Number(p.payAmount).toLocaleString()} — ${p.partyName}`, color: 'text-blue-600' });
         });
-        indents.filter(i => i.actual1).slice(0,3).forEach(i => {
+        (indents as any[]).filter((i: any) => i.actual1).slice(0,3).forEach((i: any) => {
             if (i.timestamp) acts.push({ time: i.timestamp, type: 'Indent', text: `${i.indent_number} — ${i.product_name}`, color: 'text-amber-600' });
         });
         return acts.sort((a,b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0,8);

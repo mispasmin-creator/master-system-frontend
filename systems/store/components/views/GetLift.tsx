@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import { useEffect, useState, useMemo } from 'react';
 import DataTable from '../element/DataTable';
 import { Button } from '../ui/button';
@@ -32,7 +32,7 @@ import {
 } from 'recharts';
 import {
     fetchIndentRecords, fetchStoreInRecords, fetchVendorOptions,
-    insertStoreInRecord, updateCancelQuantity, updateActual5Timestamp,
+    insertStoreInRecord, updateCancelQuantity,
     updateLiftingStatus, type GetLiftIndentRecord, type GetLiftStoreInRecord,
 } from '@/services/getLiftService';
 import {
@@ -264,7 +264,7 @@ export default function GetPurchase() {
             const orderedQty = Number(r.approvedQuantity) || Number(r.quantity) || 0;
             const remainingQty = Math.max(0, orderedQty - liftedQty);
             const completionPct = orderedQty > 0 ? Math.min(100, (liftedQty / orderedQty) * 100) : 0;
-            const plannedDate = r.planned5 || '';
+            const plannedDate = r.deliveryDate || '';
             const d = safeParseDate(plannedDate);
             const today = new Date(); today.setHours(0, 0, 0, 0);
             const daysRemaining = d ? differenceInDays(d, today) : 0;
@@ -278,10 +278,10 @@ export default function GetPurchase() {
                 firmNameMatch: r.firmNameMatch || '',
                 vendorName: r.approvedVendorName || '',
                 poNumber: r.poNumber || '',
-                poDate: r.actual4 ? formatDate(parseCustomDate(r.actual4)) : '',
+                poDate: r.poTimestamp ? formatDate(parseCustomDate(r.poTimestamp)) : '',
                 deliveryDate: r.deliveryDate ? formatDate(parseCustomDate(r.deliveryDate)) : '',
                 plannedDate,
-                actualDate: r.actual5 || '',
+                actualDate: lastLiftDate || '',
                 productName: r.productName || '',
                 orderedQty,
                 liftedQty,
@@ -321,7 +321,6 @@ export default function GetPurchase() {
             totalQtyOrdered: processedRecords.reduce((s, r) => s + r.orderedQty, 0),
             totalQtyLifted: processedRecords.reduce((s, r) => s + r.liftedQty, 0),
             remainingQty: processedRecords.reduce((s, r) => s + r.remainingQty, 0),
-            totalPlanned: processedRecords.filter(r => r.plannedDate).length,
         };
     }, [processedRecords]);
 
@@ -341,10 +340,9 @@ export default function GetPurchase() {
             const pendingPoQty = approvedQtySafe - receivedQty;
             return { ...sheet, pendingPoQty, receivedQty };
         }).filter(item => {
-            const hasPlanned5 = item.planned5 && item.planned5.toString().trim() !== '';
-            const hasActual5 = item.actual5 && item.actual5.toString().trim() !== '';
+            const hasPO = item.poNumber && item.poNumber.toString().trim() !== '';
             const isPending = item.liftingStatus === 'Pending' || item.liftingStatus === '' || item.liftingStatus === null || !item.liftingStatus;
-            return isPending && hasPlanned5 && !hasActual5 && item.pendingPoQty > 0;
+            return isPending && hasPO && item.pendingPoQty > 0;
         });
         const groupedMap = new Map<string, any>();
         processedData.forEach(item => {
@@ -353,9 +351,9 @@ export default function GetPurchase() {
                 groupedMap.set(key, {
                     indentNo: item.indentNumber?.toString() || '', firmNameMatch: item.firmNameMatch || '',
                     vendorName: item.approvedVendorName || '', poNumber: item.poNumber || '',
-                    poDate: item.actual4 ? formatDate(parseCustomDate(item.actual4)) : '',
+                    poDate: item.poTimestamp ? formatDate(parseCustomDate(item.poTimestamp)) : '',
                     deliveryDate: item.deliveryDate ? formatDate(parseCustomDate(item.deliveryDate)) : '',
-                    plannedDate: item.planned5 ? formatDate(parseCustomDate(item.planned5)) : 'Not Set',
+                    plannedDate: item.deliveryDate ? formatDate(parseCustomDate(item.deliveryDate)) : 'Not Set',
                     product: item.productName || '', quantity: 0, pendingLiftQty: 0, receivedQty: 0, pendingPoQty: 0,
                     approvedRate: item.approvedRate || '', timestamp: item.timestamp || '',
                     department: item.department || '', areaOfUse: item.areaOfUse || '',
@@ -387,11 +385,11 @@ export default function GetPurchase() {
             !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === 'all' || (sheet.firmNameMatch || '').trim().toLowerCase() === user.firmNameMatch.trim().toLowerCase()
         );
         const completedIndents = filteredByFirm.filter(sheet =>
-            sheet.planned5 && sheet.planned5.toString().trim() !== ''
+            sheet.poNumber && sheet.poNumber.toString().trim() !== ''
         );
         const indentDataMap = new Map(completedIndents.map(sheet => [
             String(sheet.indentNumber || '').trim(),
-            { poNumber: sheet.poNumber || '', poDate: sheet.actual4 ? formatDate(parseCustomDate(sheet.actual4)) : '', deliveryDate: sheet.deliveryDate ? formatDate(parseCustomDate(sheet.deliveryDate)) : '', approvedVendorName: sheet.approvedVendorName || '', productName: sheet.productName || '', approvedQuantity: sheet.quantity || 0, pendingLiftQty: sheet.pendingQty || 0, firmNameMatch: sheet.firmNameMatch || '' },
+            { poNumber: sheet.poNumber || '', poDate: sheet.poTimestamp ? formatDate(parseCustomDate(sheet.poTimestamp)) : '', deliveryDate: sheet.deliveryDate ? formatDate(parseCustomDate(sheet.deliveryDate)) : '', approvedVendorName: sheet.approvedVendorName || '', productName: sheet.productName || '', approvedQuantity: sheet.quantity || 0, pendingLiftQty: sheet.pendingQty || 0, firmNameMatch: sheet.firmNameMatch || '' },
         ]));
         const filteredStoreIn = storeInRecords.filter(sheet =>
             !user?.firmNameMatch || user.firmNameMatch.toLowerCase() === 'all' || (sheet.firmNameMatch || '').trim().toLowerCase() === user.firmNameMatch.trim().toLowerCase()
@@ -441,7 +439,7 @@ export default function GetPurchase() {
             const key = `${item.indentNo}-${item.productName}`;
             if (!seen.has(key)) { seen.add(key); latestRecords.push(item); }
         }
-        const pendingItems = latestRecords.filter(i => i.planned6 !== '' && i.actual6 === '');
+        const pendingItems = latestRecords.filter(i => !i.hasCheck);
         const groupedMap = new Map<string, SIPendingData>();
         pendingItems.forEach(i => {
             const billNo = String(i.billNo || '');
@@ -457,7 +455,7 @@ export default function GetPurchase() {
                     vendor: i.vendor || '', indentNumber: i.indentNumber || '', product: i.product || '',
                     uom: i.uom || '', poCopy: i.poCopy || '', billStatus: i.billStatus || '',
                     leadTimeToLiftMaterial: i.leadTimeToLiftMaterial || 0, discountAmount: i.discountAmount || 0,
-                    firmNameMatch: i.firmNameMatch || '', planned6Date: i.planned6 || '',
+                    firmNameMatch: i.firmNameMatch || '', planned6Date: i.timestamp || '',
                     timestamp: i.timestamp || '', priceAsPerPo: i.priceAsPerPo || 0, remark: i.remark || '',
                     products: [], indentNumbers: [], originalItems: [],
                 });
@@ -483,7 +481,7 @@ export default function GetPurchase() {
             if (!seen.has(key)) { seen.add(key); latestRecords.push(item); }
         }
         setSiHistoryData(
-            latestRecords.filter(i => i.actual6 !== '').map(i => ({
+            latestRecords.filter(i => i.hasCheck).map(i => ({
                 liftNumber: i.liftNumber || '', indentNo: i.indentNo || '',
                 billNo: String(i.billNo) || '', vendorName: i.vendorName || '',
                 productName: i.productName || '', qty: i.qty || 0,
@@ -502,14 +500,14 @@ export default function GetPurchase() {
                 timestamp: i.timestamp ? formatDateTime(parseCustomDate(i.timestamp)) : '',
                 leadTimeToLiftMaterial: i.leadTimeToLiftMaterial || 0,
                 discountAmount: i.discountAmount || 0, firmNameMatch: i.firmNameMatch || '',
-                planned6Date: i.planned6 || '',
+                planned6Date: i.timestamp || '',
             }))
         );
     }, [siServiceRecords, user?.firmNameMatch]);
 
     // ── StoreIn form schema ─────────────────────────────────────────────
     const siSchema = z.object({
-        status: z.enum(['Received', 'Not Received'], { required_error: 'Status is required' }),
+        status: z.enum(['Received', 'Not Received'], { message: 'Status is required' }),
         remark: z.string().optional(),
     });
 
@@ -531,13 +529,20 @@ export default function GetPurchase() {
     async function onSISubmit(values: SIFormValues) {
         if (!selectedSI) return;
         try {
-            const currentDateTime = new Date().toISOString();
             for (const item of selectedSI.originalItems) {
-                await storeApi.patch('store_in', item.liftNumber, {
-                    actual6: currentDateTime,
+                await updateStoreInReceiving(item.liftNumber, {
+                    receivingStatus: values.status,
+                    receivedQuantity: item.qty || 0,
+                    photoOfProduct: '',
+                    damageOrder: '',
+                    quantityAsPerBill: '',
                     remark: values.remark || '',
-                    planned_hod: currentDateTime,
-                    hod_status: 'Pending',
+                    location: '',
+                    priceAsPerPoCheck: '',
+                    billNo: item.billNo || '',
+                    billRemark: '',
+                    billAmount: item.billAmount || 0,
+                    photoOfBill: item.photoOfBill || '',
                 });
             }
             toast.success(`Store In completed for ${selectedSI.originalItems.length} item(s)!`);
@@ -697,24 +702,26 @@ export default function GetPurchase() {
                 if (values.billCopy instanceof File) {
                     billCopyUrl = await uploadBillCopy(values.billCopy, selectedHistory.liftNumber || selectedHistory.indentNo || '');
                 }
-                const updatedRecord = {
+                await storeApi.patch('lift', selectedHistory.liftNumber, {
                     vendor_name: values.vendorName || selectedHistory.vendorName || '',
-                    qty: newLiftQty.toString(),
+                    qty: newLiftQty,
+                    bill_no: values.billNo || selectedHistory.billNo || '',
+                    type_of_bill: values.typeOfBill || selectedHistory.typeOfBill || '',
+                    bill_amount: Number(values.billAmount) || selectedHistory.billAmount || 0,
+                });
+                await storeApi.upsertByParent('check', selectedHistory.liftNumber, {
                     bill_no: values.billNo || selectedHistory.billNo || '',
                     bill_status: values.billStatus || selectedHistory.billStatus || '',
-                    type_of_bill: values.typeOfBill || selectedHistory.typeOfBill || '',
                     bill_amount: Number(values.billAmount) || selectedHistory.billAmount || 0,
                     bill_remark: values.billRemark || selectedHistory.billRemark || '',
                     ...(billCopyUrl ? { photo_of_bill: billCopyUrl } : {}),
-                    receiving_status: values.receivingStatus || '',
+                    material_status: values.receivingStatus || '',
                     location: values.location || '',
                     ...(photoProductUrl ? { photo_of_product: photoProductUrl } : {}),
                     damage_order: values.damageOrder || '',
                     quantity_as_per_bill: values.quantityAsPerBill || newLiftQty.toString(),
-                    bill_received2: values.priceAsPerPoCheck || '',
                     remark: values.remark || '',
-                };
-                await storeApi.patch('store_in', selectedHistory.liftNumber, updatedRecord);
+                });
                 const originalPending = (selectedHistory.pendingLiftQty || 0) + (selectedHistory.qty || 0);
                 const remaining = originalPending - newLiftQty;
                 await updateLiftingStatus(selectedHistory.indentNo, remaining <= 0 ? 'Complete' : 'Pending');
@@ -731,7 +738,6 @@ export default function GetPurchase() {
             }
             if (values.cancelPendingQty && values.cancelPendingQty > 0 && selectedIndent?.indentNo) {
                 await updateCancelQuantity(selectedIndent.indentNo, values.cancelPendingQty);
-                await updateActual5Timestamp(selectedIndent.indentNo);
                 toast.success(`Cancelled ${values.cancelPendingQty} quantity`);
             }
             if (values.items && values.items.length > 0) {

@@ -24,6 +24,7 @@
       "@/*": ["./*"],
       "@/services/*": ["./systems/store/services/*"],
       "@/context/*": ["./systems/store/context/*"],
+      "@/types": ["./systems/store/types/index.ts"],
       "@/types/*": ["./systems/store/types/*"],
       "@/lib/fetchers": ["./systems/store/lib/fetchers"],
       "@/lib/pcReportUtils": ["./systems/store/lib/pcReportUtils"],

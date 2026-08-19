@@ -1,4 +1,4 @@
-import type { ColumnDef, Row } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef, LegacyRow as Row } from '@tanstack/react-table/legacy';
 import { useEffect, useState } from 'react';
 import DataTable from '../element/DataTable';
 import { z } from 'zod';
@@ -102,7 +102,7 @@ export default () => {
 
         setTableData(
             filteredByFirm
-                .filter((i) => i.planned11 !== '' && i.actual11 === '')
+                .filter((i) => !i.hasBillNotReceived && !i.billNo)
                 .map((i) => ({
                     liftNumber: i.liftNumber || '',
                     indentNo: i.indentNo || '',
@@ -119,7 +119,7 @@ export default () => {
                     transporterName: i.transporterName || '',
                     amount: i.amount || 0,
                     poDate: i.poDate || '',
-                    plannedDate: i.planned11 || '',
+                    plannedDate: i.timestamp || '',
                     poNumber: i.poNumber || '',
                     vendor: i.vendor || '',
                     indentNumber: i.indentNumber || '',
@@ -300,8 +300,6 @@ export default () => {
                 }
             }
 
-            const currentDateTime = new Date().toISOString();
-
             if (!selectedIndent?.liftNumber) {
                 toast.error('No record selected');
                 return;
@@ -310,7 +308,6 @@ export default () => {
             console.log('📤 Updating record');
 
             await updateStoreInBillStatus(selectedIndent.liftNumber, {
-                actual11: currentDateTime,
                 billStatusNew: values.status,
                 billImageStatus: billImageUrl || '',
             });

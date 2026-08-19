@@ -2,25 +2,25 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Form, FormField, FormItem, FormLabel, FormControl } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Form, FormField, FormItem, FormLabel, FormControl } from '../ui/form';
+import { Input } from '../ui/input';
+import { Button } from '../ui/button';
+import { Textarea } from '../ui/textarea';
 import {
     Select,
     SelectTrigger,
     SelectValue,
     SelectContent,
     SelectItem,
-} from '@/components/ui/select';
+} from '../ui/select';
 import { ClipLoader as Loader } from 'react-spinners';
 import { useState, useEffect } from 'react';
 import { storeApi } from '@/systems/store/lib/api';
 import { useAuth } from '@/context/AuthContext';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Label } from '../ui/label';
 import DataTable from '../element/DataTable';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { LegacyColumnDef as ColumnDef } from '@tanstack/react-table/legacy';
 import { formatDate } from '@/lib/utils';
 import { ClipboardList, Trash, Search, PlusCircle, History } from 'lucide-react';
 import { useSheets } from '@/context/SheetsContext';
@@ -66,7 +66,7 @@ export default () => {
                     }
                 }
                 const historyRecords = latestRecords.filter(
-                    r => r.actual6 !== '' && r.receivingStatus !== 'Not Received'
+                    (r: any) => r.actual6 !== '' && r.receivingStatus !== 'Not Received'
                 );
 
                 const qtyByProduct = new Map<string, number>();
@@ -93,7 +93,7 @@ export default () => {
         indenterName: z.string().nonempty(),
         firmName: z.string().nonempty({ message: 'Select Firm Name' }),
         indentStatus: z.enum(['Critical', 'Non-Critical'], {
-            required_error: 'Select indent status',
+            message: 'Select indent status',
         }),
         products: z
             .array(
@@ -245,7 +245,6 @@ export default () => {
                 // Map to database schema (snake_case)
                 const row = {
                     timestamp: new Date().toISOString(),
-                    planned1: new Date().toISOString(),
                     indent_number: nextIndentNumber,
                     indenter_name: data.indenterName,
                     department: product.department,
@@ -874,6 +873,7 @@ export default () => {
                                                                     <Input
                                                                         type="number"
                                                                         {...field}
+                                                                        value={(field.value as any) ?? ''}
                                                                         disabled={!currentGroupHead}
                                                                     />
                                                                 </FormControl>
@@ -892,6 +892,7 @@ export default () => {
                                                                     <Input
                                                                         type="number"
                                                                         {...field}
+                                                                        value={(field.value as any) ?? ''}
                                                                         placeholder="Enter min stock qty"
                                                                         disabled={!currentGroupHead}
                                                                     />
@@ -985,7 +986,7 @@ export default () => {
                                                             <FormControl>
                                                                 <Input
                                                                     type="file"
-                                                                    onChange={(e) =>
+                                                                    onChange={(e: any) =>
                                                                         field.onChange(e.target.files?.[0])
                                                                     }
                                                                 />

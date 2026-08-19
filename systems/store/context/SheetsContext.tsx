@@ -15,10 +15,6 @@ import {
     type TallyEntryRecord
 } from '@/services/tallyEntryService';
 import {
-    fetchFullkittingRecords,
-    type FullkittingRecord
-} from '@/services/fullkittingService';
-import {
     fetchPayments,
     fetchPaymentHistory
 } from '@/services/paymentService';
@@ -44,10 +40,9 @@ import type {
     IssueSheet,
     TallyEntrySheet,
     PcReportSheet,
-    FullkittingSheet,
     PaymentHistory,
-} from '@/types';
-import type { PaymentsSheet } from '@/types/sheets';
+    PaymentsSheet
+} from '../types/sheets';
 
 import { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -87,10 +82,6 @@ interface SheetsState {
 
     updatePcReportSheet: () => void;
 
-    fullkittingSheet: FullkittingSheet[];
-    fullkittingLoading: boolean;
-    updateFullkittingSheet: () => void;
-
     // ✅ ADD PAYMENT HISTORY HERE
     paymentHistorySheet: PaymentHistory[];
     paymentHistoryLoading: boolean;
@@ -111,8 +102,6 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
     const [masterSheet, setMasterSheet] = useState<MasterSheet>();
 
     const [tallyEntrySheet, setTallyEntrySheet] = useState<TallyEntrySheet[]>([]);
-    const [fullkittingSheet, setFullkittingSheet] = useState<FullkittingSheet[]>([]);
-    const [fullkittingLoading, setFullkittingLoading] = useState(true);
 
     const [tallyEntryLoading, setTallyEntryLoading] = useState(true);
 
@@ -139,13 +128,12 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
             indentSheet,
             storeSheet,
             issueSheet,
-            fullkittingSheet,
             tallyEntrySheet,
             paymentsSheet,
             poMasterSheet,
             paymentHistorySheet
         );
-    }, [indentSheet, storeSheet, issueSheet, fullkittingSheet, tallyEntrySheet, paymentsSheet, poMasterSheet, paymentHistorySheet]);
+    }, [indentSheet, storeSheet, issueSheet, tallyEntrySheet, paymentsSheet, poMasterSheet, paymentHistorySheet]);
 
     const sheets = storeSheet;
 
@@ -201,40 +189,40 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
         setIndentLoading(true);
         fetchIndentRecords()
             .then((res) => {
-                const mapped = res.map(r => ({
-                    indentNumber: r.indent_number,
-                    indenterName: r.indenter_name,
-                    department: r.department,
-                    productName: r.product_name,
-                    quantity: r.quantity,
-                    uom: r.uom,
-                    attachment: r.attachment,
-                    specifications: r.specifications,
-                    areaOfUse: r.area_of_use,
-                    vendorType: r.vendor_type,
-                    indentStatus: r.indent_status,
-                    indentType: r.indent_type,
-                    planned1: r.planned1,
-                    actual1: r.actual1,
-                    firmNameMatch: r.firm_name_match,
-                    approvedQuantity: r.approved_quantity,
-                    timestamp: r.timestamp,
-                    planned2: r.planned2,
-                    actual2: r.actual2,
-                    planned3: r.planned3,
-                    actual3: r.actual3,
-                    approvedVendorName: r.vendor_name || '',
-                    planned4: r.planned4,
-                    actual4: r.actual4,
-                    poNumber: r.po_number,
-                    planned5: r.planned5,
-                    actual5: r.actual5,
+                const mapped = res.map((r: any) => ({
+                    indentNumber: r.indent_number || '',
+                    indenterName: r.indenter_name || '',
+                    department: r.department || '',
+                    productName: r.product_name || '',
+                    quantity: Number(r.quantity) || 0,
+                    uom: r.uom || '',
+                    attachment: r.attachment || '',
+                    specifications: r.specifications || '',
+                    areaOfUse: r.area_of_use || '',
+                    vendorType: r.vendor_type || r.indent_approval?.vendor_type || '',
+                    indentStatus: r.indent_status || '',
+                    indentType: r.indent_type || '',
+                    planned1: r.planned1 || r.timestamp || '',
+                    actual1: r.actual1 || '',
+                    firmNameMatch: r.firm_name_match || '',
+                    approvedQuantity: r.indent_approval?.approved_quantity || r.quantity || 0,
+                    timestamp: r.timestamp || '',
+                    planned2: r.planned2 || '',
+                    actual2: r.actual2 || '',
+                    planned3: r.planned3 || '',
+                    actual3: r.actual3 || '',
+                    approvedVendorName: r.management_approval?.approved_vendor_name || r.vendor_quotation?.vendor_name1 || r.vendor_name || '',
+                    planned4: r.management_approval?.created_at || (r.vendor_quotation?.po_required === 'Yes' ? (r.vendor_quotation?.created_at || 'planned') : '') || r.planned4 || '',
+                    actual4: r.actual4 || '',
+                    poNumber: r.po_number || '',
+                    planned5: r.planned5 || '',
+                    actual5: r.actual5 || '',
                     status: r.status || r.indent_status || 'Pending',
                     poRequred: r.po_number ? 'Yes' : (r.actual4 ? 'Yes' : ''), // Helper for notification logic
                     liftingStatus: r.lifting_status || 'Pending',
                     poQty: r.po_qty || 0,
-                    pendingPoQty: (r.approved_quantity || 0) - (Number(r.po_qty) || 0),
-                    pendingLiftQty: (r.approved_quantity || 0) - (Number(r.received_quantity) || 0),
+                    pendingPoQty: (r.indent_approval?.approved_quantity || r.quantity || 0) - (Number(r.po_qty) || 0),
+                    pendingLiftQty: (r.indent_approval?.approved_quantity || r.quantity || 0) - (Number(r.received_qty || r.received_quantity) || 0),
                 }));
                 setIndentSheet(mapped as unknown as IndentSheet[]);
                 setIndentLoading(false);
@@ -250,7 +238,7 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
         // Using StoreIn service for received items as they are related
         fetchStoreInRecords()
             .then((res) => {
-                const mapped = res.filter(r => r.actual6 !== '').map(r => ({
+                const mapped = res.filter((r: any) => r.hasCheck || (r.actual6 && r.actual6 !== '')).map((r: any) => ({
                     timestamp: r.timestamp,
                     indentNumber: r.indentNo,
                     poDate: r.poDate,
@@ -264,7 +252,7 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
                     billNumber: r.billNo,
                     billAmount: r.billAmount,
                     photoOfBill: r.photoOfBill,
-                    actual6: r.actual6,
+                    actual6: r.actual6 || (r.hasCheck ? (r.timestamp || 'received') : ''),
                 }));
                 setReceivedSheet(mapped as unknown as ReceivedSheet[]);
                 setReceivedLoading(false);
@@ -311,23 +299,6 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
             });
     }
 
-    function updateFullkittingSheet() {
-        setFullkittingLoading(true);
-        fetchFullkittingRecords()
-            .then((res) => {
-                const mapped = res.map(r => ({
-                    ...r,
-                    vehicleNo: r.vehicalNo, // Matching naming variants
-                }));
-                setFullkittingSheet(mapped as unknown as FullkittingSheet[]);
-                setFullkittingLoading(false);
-            })
-            .catch((error) => {
-                console.error('Error fetching FULLKITTING from backend API:', error);
-                setFullkittingLoading(false);
-            });
-    }
-
     function updatePaymentsSheet() {
         setPaymentsLoading(true);
         fetchPayments()
@@ -366,7 +337,6 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
         updateIssueSheet();
         updateTallyEntrySheet();
         updatePcReportSheet();
-        updateFullkittingSheet();
 
         updatePaymentHistorySheet();
         updatePaymentsSheet();
@@ -425,22 +395,18 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
                     totalRate: r.totalRate,
                     planned1: r.planned1,
                     actual1: r.actual1,
-                    delay1: r.delay1,
                     status1: r.status1,
                     remarks1: r.remarks1,
                     planned2: r.planned2,
                     actual2: r.actual2,
-                    delay2: r.delay2,
                     status2: r.status2,
                     remarks2: r.remarks2,
                     planned3: r.planned3,
                     actual3: r.actual3,
-                    delay3: r.delay3,
                     status3: r.status3,
                     remarks3: r.remarks3,
                     planned4: r.planned4,
                     actual4: r.actual4,
-                    delay4: r.delay4,
                     status4: r.status4,
                     remarks4: r.remarks4,
                     planned5: r.planned5,
@@ -503,10 +469,6 @@ export const SheetsProvider = ({ children }: { children: React.ReactNode }) => {
 
                 pcReportSheet,
                 updatePcReportSheet,
-
-                fullkittingSheet,
-                fullkittingLoading,
-                updateFullkittingSheet,
 
                 // ✅ ADD PAYMENT HISTORY TO CONTEXT VALUE
                 paymentHistorySheet,
