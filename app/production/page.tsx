@@ -25,7 +25,6 @@ const SfproductionEntry = dynamic(() => import('@/systems/production/components/
 const FullKitting = dynamic(() => import('@/systems/production/components/FullKitting'), { ssr: false });
 const Management = dynamic(() => import('@/systems/production/components/Management'), { ssr: false });
 const ManagementApp = dynamic(() => import('@/systems/production/components/ManagementApp'), { ssr: false });
-const Settings = dynamic(() => import('@/systems/production/components/Settings'), { ssr: false });
 const Kyc = dynamic(() => import('@/systems/production/components/Kyc'), { ssr: false });
 const Check = dynamic(() => import('@/systems/production/components/Check'), { ssr: false });
 const ProductionTracking = dynamic(() => import('@/systems/production/components/ProductionTracking'), { ssr: false });
@@ -50,7 +49,6 @@ const productionTabs = [
   { id: "sfproduction-entry", label: "Production Entry", stepName: "SF Production Entry", path: "/sfproduction-entry", isSf: true },
   { id: "crushing", label: "Crushing", stepName: "Crushing", path: "/crushing", isSf: true },
   { id: "tally-entry", label: "Tally Entry", stepName: "Tally Entry", path: "/tally-entry", isSf: true },
-  { id: "settings", label: "Settings", stepName: "Settings", path: "/settings" },
   { id: "chemical-test", label: "Chemical Test", stepName: "Chemical Test", path: "/chemical-test", hidden: true },
   { id: "management", label: "Management Approval", stepName: "Management", path: "/management", hidden: true },
   { id: "check", label: "Check", stepName: "Check", path: "/check", hidden: true }
@@ -77,7 +75,6 @@ const renderProductionComponent = (tabId: string) => {
     case 'full-kitting': return <FullKitting />;
     case 'management': return <Management />;
     case 'management-app': return <ManagementApp />;
-    case 'settings': return <Settings />;
     case 'kyc': return <Kyc />;
     case 'production-tracking': return <ProductionTracking />;
     case 'check': return <Check />;

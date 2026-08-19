@@ -150,7 +150,6 @@ export const SYSTEM_REGISTRY = {
       { key: "SF Production Entry", label: "Production Entry",     path: "/sfproduction-entry" },
       { key: "Crushing",            label: "Crushing",             path: "/crushing" },
       { key: "Tally Entry",         label: "Tally Entry",          path: "/tally-entry" },
-      { key: "Settings",            label: "Settings",             path: "/settings" },
       { key: "Chemical Test",       label: "Chemical Test",        path: "/chemical-test",       hidden: true },
       { key: "Management",          label: "Management Approval",  path: "/management",          hidden: true },
       { key: "Check",               label: "Check",                path: "/check",               hidden: true },
@@ -242,7 +241,6 @@ export const SYSTEM_REGISTRY = {
       { key: "Account Audit",    label: "Account Audit",    path: "/account-audit" },
       { key: "Posting",          label: "Posting",          path: "/posting" },
       { key: "Freight",          label: "Freight Payments", path: "/freight-release" },
-      { key: "Users",            label: "User Management",  path: "/users" },
     ],
   },
 
@@ -285,7 +283,6 @@ export const SYSTEM_REGISTRY = {
       { key: "Payment Approval", label: "Payment Approval", path: "/payment-approval" },
       { key: "Posting",          label: "Posting",          path: "/posting" },
       { key: "Make Payment",     label: "Make Payment",     path: "/make-payment" },
-      { key: "User Management",  label: "User Management",  path: "/user-management" },
     ],
   },
 
@@ -302,8 +299,6 @@ export const SYSTEM_REGISTRY = {
       { key: "Repair_CheckMachine", label: "Check Machine",   path: "/check-machine" },
       { key: "Repair_StoreIn",      label: "Store In",        path: "/store-in" },
       { key: "Repair_MakePayment",  label: "Make Payment",    path: "/make-payment" },
-      { key: "Repair_Accounts",     label: "Accounts",        path: "/accounts" },
-      { key: "Repair_Users",        label: "User Management", path: "/users" },
     ],
   },
 
@@ -321,7 +316,6 @@ export const SYSTEM_REGISTRY = {
       { key: "Services_Tally",     label: "Tally Entry",      path: "/tally" },
       { key: "Services_Utility",   label: "Utility Payments", path: "/utility" },
       { key: "Services_Reports",   label: "Reports",          path: "/reports" },
-      { key: "Services_Users",     label: "User Management",  path: "/users" },
     ],
   },
 };

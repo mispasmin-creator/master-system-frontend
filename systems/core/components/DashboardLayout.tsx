@@ -66,7 +66,6 @@ const productionTabs = [
   { id: "sfproduction-entry", label: "Production Entry", stepName: "SF Production Entry", path: "/sfproduction-entry", isSf: true },
   { id: "crushing", label: "Crushing", stepName: "Crushing", path: "/crushing", isSf: true },
   { id: "tally-entry", label: "Tally Entry", stepName: "Tally Entry", path: "/tally-entry", isSf: true },
-  { id: "settings", label: "Settings", stepName: "Settings", path: "/settings" },
   { id: "chemical-test", label: "Chemical Test", stepName: "Chemical Test", path: "/chemical-test", hidden: true },
   { id: "management", label: "Management Approval", stepName: "Management", path: "/management", hidden: true },
   { id: "check", label: "Check", stepName: "Check", path: "/check", hidden: true }
@@ -167,8 +166,7 @@ const freightPaymentTabs = [
   { id: "checkkitting", label: "Account Checking", path: "/checkkitting" },
   { id: "posting", label: "Account Audit", path: "/posting" },
   { id: "makepayment", label: "Posting", path: "/makepayment" },
-  { id: "freight", label: "Freight", path: "/freight" },
-  { id: "users", label: "Users", path: "/users" }
+  { id: "freight", label: "Freight", path: "/freight" }
 ];
 
 const inventoryTabs = [
@@ -187,8 +185,7 @@ const paymentTabs = [
   { id: "channel-funding", label: "Channel Funding", path: "/channel-funding" },
   { id: "payment-approval", label: "Payment Approval", path: "/payment-approval" },
   { id: "posting", label: "Posting", path: "/posting" },
-  { id: "make-payment", label: "Make Payment", path: "/make-payment" },
-  { id: "user-management", label: "User Management", path: "/user-management" }
+  { id: "make-payment", label: "Make Payment", path: "/make-payment" }
 ];
 
 const servicesTabs = [
@@ -198,8 +195,7 @@ const servicesTabs = [
   { id: "bills", label: "Bills", path: "/bills" },
   { id: "tally", label: "Tally", path: "/tally" },
   { id: "utility", label: "Utility", path: "/utility" },
-  { id: "reports", label: "Reports", path: "/reports" },
-  { id: "users", label: "User Management", path: "/users" }
+  { id: "reports", label: "Reports", path: "/reports" }
 ];
 
 const repairTabs = [
@@ -208,9 +204,7 @@ const repairTabs = [
   { id: "sent-to-vendor", label: "Sent to Vendor", path: "/sent-to-vendor" },
   { id: "check-machine", label: "Check Machine", path: "/check-machine" },
   { id: "store-in", label: "Store In", path: "/store-in" },
-  { id: "make-payment", label: "Make Payment", path: "/make-payment" },
-  { id: "accounts", label: "Accounts", path: "/accounts" },
-  { id: "users", label: "User Management", path: "/users" }
+  { id: "make-payment", label: "Make Payment", path: "/make-payment" }
 ];
 
 export default function DashboardLayout({
@@ -714,7 +708,7 @@ export default function DashboardLayout({
               if (basePath !== '/dashboard') {
                 router.push('/dashboard');
               } else {
-                navigate('/overview');
+                navigate('/master');
               }
               setMobileNavOpen(false);
             }}
@@ -796,6 +790,7 @@ export default function DashboardLayout({
                 <div className="overflow-hidden">
                   <div className="space-y-1 max-h-[50vh] overflow-y-auto scrollbar-none pr-1">
                     {[
+                      { id: 'order-dashboard', label: 'Dashboard', path: '/dashboard' },
                       { id: 'order', label: 'Order', path: '/order' },
                       { id: 'check-po', label: 'Check PO', path: '/check-po' },
                       { id: 'received-accounts', label: 'Received Accounts', path: '/received-accounts' },
@@ -819,7 +814,6 @@ export default function DashboardLayout({
                       { id: 'mgmt-approval', label: 'Mgmt Approval', path: '/mgmt-approval' },
                       { id: 'debit-note', label: 'Debit Note', path: '/debit-note' },
                       { id: 'return-material', label: 'Return of Material', path: '/return-of-material' },
-                      { id: 'order-dashboard', label: 'Dashboard', path: '/dashboard' },
                     ].map((tab) => {
                       const isActive = isTabActive('/order', tab.path);
                       return (

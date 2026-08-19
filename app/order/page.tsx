@@ -35,6 +35,7 @@ const OrderDashboard     = dynamic(() => import('@/systems/order/components/Dash
 const ManageUsers        = dynamic(() => import('@/systems/purchase/components/ManageUsers'),     { ssr: false });
 
 export const orderTabs = [
+  { id: 'order-dashboard',   label: 'Dashboard',           stepName: 'dashboard',              path: '/dashboard' },
   { id: 'order',              label: 'Order',               stepName: 'New Order',              path: '/order' },
   { id: 'check-po',          label: 'Check PO',            stepName: 'Check PO',               path: '/check-po' },
   { id: 'received-accounts', label: 'Received Accounts',   stepName: 'received accounts',      path: '/received-accounts' },
@@ -58,7 +59,6 @@ export const orderTabs = [
   { id: 'mgmt-approval',     label: 'Mgmt Approval',       stepName: 'management approval',    path: '/mgmt-approval' },
   { id: 'debit-note',        label: 'Debit Note',          stepName: 'debit note',             path: '/debit-note' },
   { id: 'return-material',   label: 'Return of Material',  stepName: 'return of material',     path: '/return-of-material' },
-  { id: 'order-dashboard',   label: 'Dashboard',           stepName: 'dashboard',              path: '/dashboard' },
   { id: 'manage-users',      label: 'Manage Users',        stepName: 'admin',                  path: '/manage-users', hidden: true },
 ];
 

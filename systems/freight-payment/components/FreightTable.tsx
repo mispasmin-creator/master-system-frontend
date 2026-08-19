@@ -337,8 +337,8 @@ export function FreightTable({
         
         const childAmounts: number[] = [];
         selectedChildren.forEach((child: FreightPayment) => {
-          let childAmount = child.Amount;
-          if (totalAmountInPaise !== undefined) {
+          let childAmount = child.Amount ?? 0;
+          if (totalAmountInPaise !== undefined && amt !== undefined) {
             if (selectedChildren.length === 1) {
               childAmount = amt;
             } else {
@@ -434,7 +434,7 @@ export function FreightTable({
         label: "Date",
         width: "135px",
         render: (p, g) => {
-          let dateVal = "";
+          let dateVal: string | undefined = "";
           if (activeTab === "makepayment") dateVal = p.Actual;
           else if (activeTab === "freight") dateVal = p.Actual2;
           else if (activeTab === "posting") dateVal = p.Actual3;
@@ -580,26 +580,24 @@ export function FreightTable({
         </div>
 
         <Popover>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 min-w-[140px] max-w-[200px] justify-between bg-card border-border text-foreground hover:bg-slate-50 dark:hover:bg-white/5 text-xs"
-              />
-            }
-          >
-            <span className="flex items-center truncate">
-              <Building2 className="w-4 h-4 mr-2 text-slate-400 shrink-0" />
-              <span className="truncate">
-                {firmFilter.length === 0
-                  ? "All firms"
-                  : firmFilter.length === 1
-                  ? firmFilter[0]
-                  : `${firmFilter.length} Selected`}
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 min-w-[140px] max-w-[200px] justify-between bg-card border-border text-foreground hover:bg-slate-50 dark:hover:bg-white/5 text-xs"
+            >
+              <span className="flex items-center truncate">
+                <Building2 className="w-4 h-4 mr-2 text-slate-400 shrink-0" />
+                <span className="truncate">
+                  {firmFilter.length === 0
+                    ? "All firms"
+                    : firmFilter.length === 1
+                    ? firmFilter[0]
+                    : `${firmFilter.length} Selected`}
+                </span>
               </span>
-            </span>
-            <ChevronRight className="w-4 h-4 ml-2 text-slate-400 shrink-0 rotate-90" />
+              <ChevronRight className="w-4 h-4 ml-2 text-slate-400 shrink-0 rotate-90" />
+            </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[200px] p-2 bg-card border border-border text-foreground rounded-lg shadow-md" align="start">
             <div className="space-y-1">
