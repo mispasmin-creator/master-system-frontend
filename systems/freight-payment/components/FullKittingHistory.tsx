@@ -1013,26 +1013,24 @@ export function FullKittingHistory({
         </select>
 
         <Popover>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 min-w-[130px] max-w-[200px] justify-between bg-card border border-border text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5 text-[12px] px-2 rounded-lg"
-              />
-            }
-          >
-            <span className="flex items-center truncate">
-              <Building2 className="w-3.5 h-3.5 mr-2 text-slate-400 shrink-0" />
-              <span className="truncate text-muted-foreground">
-                {searchFirms.length === 0
-                  ? "All firms"
-                  : searchFirms.length === 1
-                  ? searchFirms[0]
-                  : `${searchFirms.length} Selected`}
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 min-w-[130px] max-w-[200px] justify-between bg-card border border-border text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5 text-[12px] px-2 rounded-lg"
+            >
+              <span className="flex items-center truncate">
+                <Building2 className="w-3.5 h-3.5 mr-2 text-slate-400 shrink-0" />
+                <span className="truncate text-muted-foreground">
+                  {searchFirms.length === 0
+                    ? "All firms"
+                    : searchFirms.length === 1
+                    ? searchFirms[0]
+                    : `${searchFirms.length} Selected`}
+                </span>
               </span>
-            </span>
-            <ChevronRight className="w-3.5 h-3.5 ml-2 text-slate-400 shrink-0 rotate-90" />
+              <ChevronRight className="w-3.5 h-3.5 ml-2 text-slate-400 shrink-0 rotate-90" />
+            </Button>
           </PopoverTrigger>
           <PopoverContent className="w-[180px] p-2 bg-card border border-border text-foreground rounded-lg shadow-md" align="start">
             <div className="space-y-1">

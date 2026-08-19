@@ -10,7 +10,6 @@ const ChannelFunding = dynamic(() => import('@/systems/payment/components/module
 const PaymentApproval = dynamic(() => import('@/systems/payment/components/modules/PaymentApproval'), { ssr: false });
 const Posting = dynamic(() => import('@/systems/payment/components/modules/Posting'), { ssr: false });
 const MakePayment = dynamic(() => import('@/systems/payment/components/modules/MakePayment'), { ssr: false });
-const UserManagement = dynamic(() => import('@/systems/payment/components/modules/UserManagement'), { ssr: false });
 
 const paymentTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },
@@ -18,8 +17,7 @@ const paymentTabs = [
   { id: "channel-funding", label: "Channel Funding", path: "/channel-funding" },
   { id: "payment-approval", label: "Payment Approval", path: "/payment-approval" },
   { id: "posting", label: "Posting", path: "/posting" },
-  { id: "make-payment", label: "Make Payment", path: "/make-payment" },
-  { id: "user-management", label: "User Management", path: "/user-management" }
+  { id: "make-payment", label: "Make Payment", path: "/make-payment" }
 ];
 
 const renderPaymentComponent = (tabId: string) => {
@@ -30,7 +28,6 @@ const renderPaymentComponent = (tabId: string) => {
     case 'payment-approval': return <PaymentApproval />;
     case 'posting': return <Posting />;
     case 'make-payment': return <MakePayment />;
-    case 'user-management': return <UserManagement />;
     default: return <Dashboard />;
   }
 };

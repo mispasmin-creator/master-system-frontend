@@ -10,8 +10,6 @@ const SentToVendor = dynamic(() => import('@/systems/repair/components/modules/S
 const CheckMachine = dynamic(() => import('@/systems/repair/components/modules/CheckMachine'), { ssr: false });
 const StoreIn = dynamic(() => import('@/systems/repair/components/modules/StoreIn'), { ssr: false });
 const MakePayment = dynamic(() => import('@/systems/repair/components/modules/MakePayment'), { ssr: false });
-const Accounts = dynamic(() => import('@/systems/repair/components/modules/Accounts'), { ssr: false });
-const Users = dynamic(() => import('@/systems/repair/components/modules/Users'), { ssr: false });
 
 const repairTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },
@@ -19,9 +17,7 @@ const repairTabs = [
   { id: "sent-to-vendor", label: "Sent to Vendor", path: "/sent-to-vendor" },
   { id: "check-machine", label: "Check Machine", path: "/check-machine" },
   { id: "store-in", label: "Store In", path: "/store-in" },
-  { id: "make-payment", label: "Make Payment", path: "/make-payment" },
-  { id: "accounts", label: "Accounts", path: "/accounts" },
-  { id: "users", label: "User Management", path: "/users" }
+  { id: "make-payment", label: "Make Payment", path: "/make-payment" }
 ];
 
 const renderRepairComponent = (tabId: string) => {
@@ -32,8 +28,6 @@ const renderRepairComponent = (tabId: string) => {
     case 'check-machine': return <CheckMachine />;
     case 'store-in': return <StoreIn />;
     case 'make-payment': return <MakePayment />;
-    case 'accounts': return <Accounts />;
-    case 'users': return <Users />;
     default: return <Dashboard />;
   }
 };

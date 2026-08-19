@@ -11,7 +11,6 @@ const Bills = dynamic(() => import('@/systems/services/components/modules/Bills'
 const Tally = dynamic(() => import('@/systems/services/components/modules/Tally'), { ssr: false });
 const Utility = dynamic(() => import('@/systems/services/components/modules/Utility'), { ssr: false });
 const Reports = dynamic(() => import('@/systems/services/components/modules/Reports'), { ssr: false });
-const Users = dynamic(() => import('@/systems/services/components/modules/Users'), { ssr: false });
 
 const servicesTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },
@@ -20,8 +19,7 @@ const servicesTabs = [
   { id: "bills", label: "Bills", path: "/bills" },
   { id: "tally", label: "Tally", path: "/tally" },
   { id: "utility", label: "Utility", path: "/utility" },
-  { id: "reports", label: "Reports", path: "/reports" },
-  { id: "users", label: "User Management", path: "/users" }
+  { id: "reports", label: "Reports", path: "/reports" }
 ];
 
 const renderServicesComponent = (tabId: string) => {
@@ -33,7 +31,6 @@ const renderServicesComponent = (tabId: string) => {
     case 'tally': return <Tally />;
     case 'utility': return <Utility />;
     case 'reports': return <Reports />;
-    case 'users': return <Users />;
     default: return <Dashboard />;
   }
 };

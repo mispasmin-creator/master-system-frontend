@@ -6,7 +6,6 @@ export const PAGE_KEY_MAP: Record<string, string> = {
   posting: "Account Audit",
   makepayment: "Posting",
   freight: "Freight",
-  users: "Users",
 };
 
 export function getUserAllowedTabs(user: LoginUser): string[] {
