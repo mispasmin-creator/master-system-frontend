@@ -123,6 +123,8 @@ interface LabItem {
   materialCostActual: number; // This represents Total Cost
   manufacturingCost: number;
   gpActual: number;
+  costingStatus: string;
+  sampleTestStatus?: string;
 }
 
 const PENDING_COLUMNS_META = [
@@ -199,7 +201,6 @@ export default function ManagementApp() {
   const [remarks, setRemarks] = useState("");
   const [remarksError, setRemarksError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [approvalType, setApprovalType] = useState<"OK" | "Make a sample Test">("OK");
   
   // Manual calculation fields (Synced with PI Approval)
   const [manualMaterialCost, setManualMaterialCost] = useState<number>(0);
@@ -307,6 +308,10 @@ export default function ManagementApp() {
         const piApproval = row.piApproval || null;
         const piApprovalStatus = String(piApproval?.status || row["PI Approval Status"] || "").trim();
 
+        const sampleTest = row.sampleTest || null;
+        const sampleTestStatus = String(sampleTest?.status || row["Sample Test Status"] || "").trim();
+        const costingStatus = String(row.status || "").trim();
+
         return {
           id: row.id,
           productionId: order.id || "",
@@ -344,15 +349,17 @@ export default function ManagementApp() {
           materialCostActual: Number(row.variableCost || row["Material Cost Actual"] || 0),
           manufacturingCost: Number(row.manufacturingCost || row["Manufacturing Cost"] || 0),
           firmName,
+          costingStatus,
+          sampleTestStatus,
         };
       });
 
       const filtered = filterDataByFirm(mapped, user, (item) => String(item.firmName || ""));
 
-      // Pending = PI Approved (or status approved) AND no management decision yet
+      // Pending = Sample Test passed AND no management decision yet
       setPendingItems(filtered.filter((i) => {
-        const isPiApproved = i.piApprovalStatus.toLowerCase() === "approved" || i.piApprovalStatus.toLowerCase() === "ok";
-        return isPiApproved && !i.managementApprovalStatus;
+        const isSamplePassed = i.costingStatus.toLowerCase() === "sample passed" || i.sampleTestStatus?.toLowerCase() === "ok";
+        return isSamplePassed && !i.managementApprovalStatus;
       }));
 
       // History = has a management review decision recorded
@@ -374,7 +381,6 @@ export default function ManagementApp() {
     setActionMode(mode);
     setRemarks("");
     setRemarksError("");
-    setApprovalType("OK");
 
     const totalRmCost = item.rmValues.reduce((sum, rm) => sum + rm.cost, 0);
     // Use product_rate (job card selling price) for profit calculation
@@ -400,7 +406,7 @@ export default function ManagementApp() {
     setIsSubmitting(true);
     try {
       const status = decision === "Approved"
-        ? (approvalType === "OK" ? "Final Approved" : "Sample Test Pending")
+        ? "Management Approved"
         : "Rejected by Management";
 
       const reviewBody = {
@@ -423,24 +429,11 @@ export default function ManagementApp() {
         status,
       });
 
-      // If moving to sample test, create or ensure a sample test record exists
-      if (status === "Sample Test Pending") {
-        try {
-          await productionApi.post("sample_test", {
-            costingId: String(selectedItem.id),
-            status: "Pending",
-          });
-        } catch (sampleErr: any) {
-          // If already exists, ignore unique constraint conflict
-          console.log("Sample test record creation info:", sampleErr?.message);
-        }
-      }
-
       toast({
-        title: decision === "Approved" ? `✅ ${status}` : "🔴 Management Rejected",
+        title: decision === "Approved" ? "✅ Management Approved" : "🔴 Management Rejected",
         description:
           decision === "Approved"
-            ? (approvalType === "OK" ? "Entry finalized and moved to Job Cards." : "Entry moved to Sample Test.")
+            ? "Entry approved and moved to Job Cards."
             : "Entry marked as rejected and sent to history.",
       });
 
@@ -938,27 +931,6 @@ export default function ManagementApp() {
                   </Section>
                 )}
               </div>
-
-              {/* ── Workflow Choice (Management Specific) ── */}
-              {actionMode === "review" && (
-                <div className="rounded-xl p-4 border bg-amber-50 border-amber-200 shadow-sm">
-                  <Label className="font-bold text-sm mb-3 block text-amber-800">Approval Workflow Choice</Label>
-                  <RadioGroup 
-                    value={approvalType} 
-                    onValueChange={(v: any) => setApprovalType(v)}
-                    className="flex flex-col sm:flex-row gap-4"
-                  >
-                    <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-amber-100 flex-1">
-                      <RadioGroupItem value="OK" id="ok" />
-                      <Label htmlFor="ok" className="font-semibold cursor-pointer flex-1 py-1 text-sm text-emerald-800">✅ Final Approve (Move to Job Cards)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-amber-100 flex-1">
-                      <RadioGroupItem value="Make a sample Test" id="sample" />
-                      <Label htmlFor="sample" className="font-semibold cursor-pointer flex-1 py-1 text-sm text-amber-800">🧪 Standard Approval (Move to Sample Test)</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-              )}
 
               {/* ── Remarks field for Review (Synced) ── */}
               {actionMode === "review" && (
