@@ -138,7 +138,7 @@ export default function SampleTestPage() {
 
         // Synthesize the workflow status labels
         const status =
-          rawStatus === "OK" ? "Management Approved" :
+          rawStatus === "OK" ? "Sample Passed" :
           rawStatus === "Not OK" ? "Sample Test Failed" :
           "Sample Test Pending";
 
@@ -225,15 +225,15 @@ export default function SampleTestPage() {
         if (createErr) throw createErr;
       }
 
-      // Update ProductionCosting status to allow it to progress to Job Cards or be marked Failed
-      const costingNewStatus = result === "OK" ? "Management Approved" : "Sample Test Failed";
+      // Update ProductionCosting status to allow it to progress to Management Approval or be marked Failed
+      const costingNewStatus = result === "OK" ? "Sample Passed" : "Sample Test Failed";
       await productionApi.patch(COSTING_RESPONSE_TABLE, selectedItem.costingId, {
         status: costingNewStatus,
       });
 
       toast({
-        title: result === "OK" ? "Test Passed" : "Test Failed",
-        description: result === "OK" ? "Item moved to Job Cards." : "Item marked as failed.",
+        title: result === "OK" ? "Sample Test Passed" : "Sample Test Failed",
+        description: result === "OK" ? "Item moved to Management Approval for final sign-off." : "Item marked as failed.",
         variant: result === "OK" ? "default" : "destructive"
       });
 

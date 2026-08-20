@@ -14,6 +14,7 @@ import GroupedProductsDetailsModal from './audit/GroupedProductsDetailsModal';
 import AuditTab from './audit/tabs/AuditTab';
 import RectifyTab from './audit/tabs/RectifyTab';
 import TallyEntryTab from './audit/tabs/TallyEntryTab';
+import RecheckingTab from './audit/tabs/RecheckingTab';
 import ReAuditTab from './audit/tabs/ReAuditTab';
 import BillEntryTab from './audit/tabs/BillEntryTab';
 import HistoryTab from './audit/tabs/HistoryTab';
@@ -26,6 +27,7 @@ const CallTrackerPage = () => {
   const [accountsData, setAccountsData] = useState([]);
   const [auditMismatchData, setAuditMismatchData] = useState([]); 
   const [tallyEntryMismatchData, setTallyEntryMismatchData] = useState([]); 
+  const [recheckingMismatchData, setRecheckingMismatchData] = useState([]); 
   const [billEntryMismatchData, setBillEntryMismatchData] = useState([]); 
   const [rectifyMismatchData, setRectifyMismatchData] = useState([]); 
   const [reAuditMismatchData, setReAuditMismatchData] = useState([]); 
@@ -35,6 +37,7 @@ const CallTrackerPage = () => {
   const [loading, setLoading] = useState(true);
   const [loadingAudit, setLoadingAudit] = useState(true); 
   const [loadingTallyEntry, setLoadingTallyEntry] = useState(true); 
+  const [loadingRechecking, setLoadingRechecking] = useState(true); 
   const [loadingBillEntry, setLoadingBillEntry] = useState(true); 
   const [loadingRectify, setLoadingRectify] = useState(true); 
   const [loadingReAudit, setLoadingReAudit] = useState(true); 
@@ -203,6 +206,12 @@ const CallTrackerPage = () => {
       icon: Clock,
       description: 'Enter data into tally system'
     },
+    RECHECKING: {
+      name: 'Rechecking',
+      color: 'bg-blue-100 text-blue-800 dark:bg-blue-500/10 dark:text-blue-400',
+      icon: ShieldCheck,
+      description: 'Verify tally entry before bill received'
+    },
     REAUDIT: {
       name: 'Re-Audit',
       color: 'bg-orange-100 text-orange-800 dark:bg-orange-500/10 dark:text-orange-400',
@@ -223,7 +232,7 @@ const CallTrackerPage = () => {
     }
   };
 
-  const TAB_ORDER = ['AUDIT', 'RECTIFY', 'REAUDIT', 'TALLY_ENTRY', 'BILL_ENTRY'];
+  const TAB_ORDER = ['AUDIT', 'RECTIFY', 'REAUDIT', 'TALLY_ENTRY', 'RECHECKING', 'BILL_ENTRY'];
 
   const formatDate = (dateString) => {
     if (!dateString || dateString === '') return '-';
@@ -368,6 +377,12 @@ const CallTrackerPage = () => {
           includeDelay: false,
           statusOptions: ['Done', 'Not Done']
         };
+      case 'RECHECKING':
+        return {
+          type: 'rechecking',
+          includeDelay: false,
+          statusOptions: ['Done', 'Not Done']
+        };
       case 'AUDIT':
         return {
           type: 'audit-data',
@@ -464,6 +479,7 @@ const CallTrackerPage = () => {
       REAUDIT: 'reaudit',
       RE_AUDIT: 'reaudit',
       TALLY_ENTRY: 'tally-entry',
+      RECHECKING: 'rechecking',
       BILL_ENTRY: 'bill-entry',
     };
 
@@ -517,6 +533,7 @@ const CallTrackerPage = () => {
       rectifyMismatchData.find((r) => r.id === editingRow) ||
       reAuditMismatchData.find((r) => r.id === editingRow) ||
       tallyEntryMismatchData.find((r) => r.id === editingRow) ||
+      recheckingMismatchData.find((r) => r.id === editingRow) ||
       billEntryMismatchData.find((r) => r.id === editingRow) ||
       allMismatchData.find((r) => r.id === editingRow);
 
@@ -739,6 +756,7 @@ const CallTrackerPage = () => {
     setLoadingRectify(true);
     setLoadingReAudit(true);
     setLoadingTallyEntry(true);
+    setLoadingRechecking(true);
     setLoadingBillEntry(true);
     setLoadingAll(true);
     setLoadingHistory(true);
@@ -754,23 +772,25 @@ const CallTrackerPage = () => {
             .filter((r) => !submittedRows.has(r.id))
         );
 
-      const audit = tagAndFilter(json.data.audit, 'audit');
-      const rectify = tagAndFilter(json.data.rectify, 'rectify');
-      const reaudit = tagAndFilter(json.data.reaudit, 're_audit');
-      const tallyEntry = tagAndFilter(json.data.tallyEntry, 'tally');
-      const billEntry = tagAndFilter(json.data.billEntry, 'bill');
-      const history = filterRowsByUserFirm(json.data.history.map((r) => ({ ...r, id: `history_${r.id}` })));
+      const audit = tagAndFilter(json.data.audit || [], 'audit');
+      const rectify = tagAndFilter(json.data.rectify || [], 'rectify');
+      const reaudit = tagAndFilter(json.data.reaudit || [], 're_audit');
+      const tallyEntry = tagAndFilter(json.data.tallyEntry || [], 'tally');
+      const rechecking = tagAndFilter(json.data.rechecking || [], 'rechecking');
+      const billEntry = tagAndFilter(json.data.billEntry || [], 'bill');
+      const history = filterRowsByUserFirm((json.data.history || []).map((r) => ({ ...r, id: `history_${r.id}` })));
 
       setAuditMismatchData(audit);
       setRectifyMismatchData(rectify);
       setReAuditMismatchData(reaudit);
       setTallyEntryMismatchData(tallyEntry);
+      setRecheckingMismatchData(rechecking);
       setBillEntryMismatchData(billEntry);
       setHistoryData(history);
 
       const seenAll = new Set();
       setAllMismatchData(
-        [...audit, ...rectify, ...reaudit, ...tallyEntry, ...billEntry].filter((item) => {
+        [...audit, ...rectify, ...reaudit, ...tallyEntry, ...rechecking, ...billEntry].filter((item) => {
           if (seenAll.has(item.supabaseId)) return false;
           seenAll.add(item.supabaseId);
           return true;
@@ -783,6 +803,7 @@ const CallTrackerPage = () => {
       setLoadingRectify(false);
       setLoadingReAudit(false);
       setLoadingTallyEntry(false);
+      setLoadingRechecking(false);
       setLoadingBillEntry(false);
       setLoadingAll(false);
       setLoadingHistory(false);
@@ -844,6 +865,15 @@ const CallTrackerPage = () => {
         updated.auditStatus = true;
         updated.rectifyStatus = true;
         updated.reAuditStatus = true;
+      } else if (activeTab === 'RECHECKING') {
+        updated.auditRemarks = true;
+        updated.rectifyRemarks = true;
+        updated.reauditRemarks = true;
+        updated.tallyRemarks = true;
+        updated.auditStatus = true;
+        updated.rectifyStatus = true;
+        updated.reAuditStatus = true;
+        updated.tallyStatus = true;
       } else if (activeTab === 'BILL_ENTRY') {
         updated.auditRemarks = true;
         updated.rectifyRemarks = true;
@@ -885,6 +915,7 @@ const CallTrackerPage = () => {
       ...auditMismatchData,
       ...rectifyMismatchData,
       ...tallyEntryMismatchData,
+      ...recheckingMismatchData,
       ...reAuditMismatchData,
       ...billEntryMismatchData,
       ...accountsData,
@@ -892,13 +923,14 @@ const CallTrackerPage = () => {
     ];
     const firms = [...new Set(allData.map(item => item.firmName).filter(Boolean))];
     return firms.sort();
-  }, [auditMismatchData, rectifyMismatchData, tallyEntryMismatchData, reAuditMismatchData, billEntryMismatchData, accountsData, historyData]);
+  }, [auditMismatchData, rectifyMismatchData, tallyEntryMismatchData, recheckingMismatchData, reAuditMismatchData, billEntryMismatchData, accountsData, historyData]);
 
   const getAllStagesData = () => {
     const combinedData = [
       ...auditMismatchData,
       ...rectifyMismatchData,
       ...tallyEntryMismatchData,
+      ...recheckingMismatchData,
       ...reAuditMismatchData,
       ...billEntryMismatchData
     ];
@@ -918,6 +950,7 @@ const CallTrackerPage = () => {
     if (tab === 'ALL') return getAllStagesData();
     if (tab === 'AUDIT') return auditMismatchData;
     if (tab === 'TALLY_ENTRY') return tallyEntryMismatchData;
+    if (tab === 'RECHECKING') return recheckingMismatchData;
     if (tab === 'BILL_ENTRY') return billEntryMismatchData;
     if (tab === 'RECTIFY') return rectifyMismatchData;
     if (tab === 'REAUDIT') return reAuditMismatchData;
@@ -1034,6 +1067,8 @@ const CallTrackerPage = () => {
         return <RectifyTab {...tabProps} />;
       case 'TALLY_ENTRY':
         return <TallyEntryTab {...tabProps} />;
+      case 'RECHECKING':
+        return <RecheckingTab {...tabProps} />;
       case 'REAUDIT':
         return <ReAuditTab {...tabProps} />;
       case 'BILL_ENTRY':
@@ -1045,7 +1080,7 @@ const CallTrackerPage = () => {
     }
   };
 
-  if (loading || (activeTab === 'ALL' && (loadingAudit || loadingRectify || loadingTallyEntry || loadingReAudit || loadingBillEntry)) || (activeTab === 'AUDIT' && loadingAudit) || (activeTab === 'TALLY_ENTRY' && loadingTallyEntry) || (activeTab === 'BILL_ENTRY' && loadingBillEntry) || (activeTab === 'RECTIFY' && loadingRectify) || (activeTab === 'REAUDIT' && loadingReAudit) || (activeTab === 'HISTORY' && loadingHistory)) {
+  if (loading || (activeTab === 'ALL' && (loadingAudit || loadingRectify || loadingTallyEntry || loadingRechecking || loadingReAudit || loadingBillEntry)) || (activeTab === 'AUDIT' && loadingAudit) || (activeTab === 'TALLY_ENTRY' && loadingTallyEntry) || (activeTab === 'RECHECKING' && loadingRechecking) || (activeTab === 'BILL_ENTRY' && loadingBillEntry) || (activeTab === 'RECTIFY' && loadingRectify) || (activeTab === 'REAUDIT' && loadingReAudit) || (activeTab === 'HISTORY' && loadingHistory)) {
     return (
       <div className="min-h-[400px] bg-linear-to-br from-gray-50 to-gray-100 dark:from-zinc-950 dark:to-zinc-900 flex flex-col items-center justify-center rounded-xl border border-gray-200 dark:border-zinc-800 shadow-sm m-4">
         <RefreshCw className="w-12 h-12 animate-spin text-green-500 dark:text-emerald-400 mx-auto mb-4" />
@@ -1084,6 +1119,7 @@ const CallTrackerPage = () => {
         editingGroupItems={editingGroupItems}
         auditMismatchData={auditMismatchData}
         tallyEntryMismatchData={tallyEntryMismatchData}
+        recheckingMismatchData={recheckingMismatchData}
         billEntryMismatchData={billEntryMismatchData}
         rectifyMismatchData={rectifyMismatchData}
         reAuditMismatchData={reAuditMismatchData}

@@ -389,15 +389,28 @@ export default function PIApprovalPage() {
     }
   };
 
-  const handleSubmitDecision = async (decision: "Approved" | "Rejected") => {
+  const handleSubmitDecision = async (decision: "Rejected" | "Finalize" | "SampleTest") => {
     if (!selectedItem) return;
-    const finalRemarks = remarks.trim() || (decision === "Approved" ? "Approved by PI" : "Rejected by PI");
+    const defaultRemark =
+      decision === "Rejected"
+        ? "Rejected by PI"
+        : decision === "Finalize"
+        ? "Final Approved by PI"
+        : "Sent to Sample Test by PI";
+    const finalRemarks = remarks.trim() || defaultRemark;
     setIsSubmitting(true);
     try {
+      const costingStatus =
+        decision === "Finalize"
+          ? "Final Approved"
+          : decision === "SampleTest"
+          ? "Sample Test Pending"
+          : "Rejected";
+
       const costingUpdate: Record<string, any> = {
-        status: decision,
+        status: costingStatus,
       };
-      if (decision === "Approved") {
+      if (decision !== "Rejected") {
         costingUpdate.gpPercent = typeof manualGP === 'number' ? Number(manualGP.toFixed(2)) : null;
         costingUpdate.manufacturingCost = typeof manualMfgCost === 'number' ? Number(manualMfgCost.toFixed(2)) : null;
       }
@@ -406,7 +419,7 @@ export default function PIApprovalPage() {
 
       const piApprovalPayload = {
         costingId: selectedItem.id,
-        status: decision,
+        status: decision === "Finalize" ? "Final Approved" : decision === "SampleTest" ? "Approved" : "Rejected",
         remarks: finalRemarks,
         approvedAt: new Date().toISOString(),
       };
@@ -419,13 +432,33 @@ export default function PIApprovalPage() {
         if (postErr) throw postErr;
       }
 
+      // If sending to sample test, create or ensure a sample test record exists
+      if (decision === "SampleTest") {
+        try {
+          await productionApi.post("sample_test", {
+            costingId: String(selectedItem.id),
+            status: "Pending",
+          });
+        } catch (sampleErr: any) {
+          console.log("Sample test record creation info:", sampleErr?.message);
+        }
+      }
+
       if (decision === "Rejected") {
         toast({
           title: "🔴 Rejected",
           description: `Composition for order “${selectedItem.orderNo}” marked as rejected.`,
         });
+      } else if (decision === "Finalize") {
+        toast({
+          title: "✅ Final Approved",
+          description: "Item finalized and moved directly to Job Cards.",
+        });
       } else {
-        toast({ title: "✅ Approved", description: "Item approved and moved to Management Approval." });
+        toast({
+          title: "🧪 Sent to Sample Test",
+          description: "Item approved and moved to Sample Test.",
+        });
       }
 
       setActionMode(null);
@@ -926,6 +959,7 @@ export default function PIApprovalPage() {
               )}
 
 
+
               {/* ── Remarks field for Review ── */}
               {actionMode === "review" && (
                 <div className="rounded-xl p-4 border bg-indigo-50 border-indigo-100">
@@ -948,7 +982,7 @@ export default function PIApprovalPage() {
             </div>
           )}
 
-          <SheetFooter className="pt-4 border-t gap-2 mt-auto">
+          <SheetFooter className="pt-4 border-t gap-2 mt-auto flex-wrap sm:flex-nowrap">
             <Button variant="outline" onClick={() => { setActionMode(null); setSelectedItem(null); }} disabled={isSubmitting}>
               Cancel
             </Button>
@@ -959,16 +993,24 @@ export default function PIApprovalPage() {
                   onClick={() => handleSubmitDecision("Rejected")}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <XCircle className="h-4 w-4 mr-1.5" />}
                   Reject
                 </Button>
                 <Button
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={() => handleSubmitDecision("Approved")}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={() => handleSubmitDecision("SampleTest")}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-                  Approve
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <TestTube2 className="h-4 w-4 mr-1.5" />}
+                  Send to Sample Test
+                </Button>
+                <Button
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => handleSubmitDecision("Finalize")}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />}
+                  Finalize (Move to Job Cards)
                 </Button>
               </>
             )}

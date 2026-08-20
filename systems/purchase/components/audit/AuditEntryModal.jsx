@@ -10,6 +10,7 @@ const AuditEntryModal = ({
   editingGroupItems,
   auditMismatchData,
   tallyEntryMismatchData,
+  recheckingMismatchData = [],
   billEntryMismatchData,
   rectifyMismatchData,
   reAuditMismatchData,
@@ -38,6 +39,9 @@ const AuditEntryModal = ({
     row = auditMismatchData.find(r => r.id === editingRow);
     if (!row) {
       row = tallyEntryMismatchData.find(r => r.id === editingRow);
+    }
+    if (!row) {
+      row = recheckingMismatchData.find(r => r.id === editingRow);
     }
     if (!row) {
       row = billEntryMismatchData.find(r => r.id === editingRow);
