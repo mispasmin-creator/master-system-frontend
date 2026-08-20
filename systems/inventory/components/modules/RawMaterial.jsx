@@ -15,11 +15,12 @@ export default function RawMaterial() {
     itemName: '',
     unit: 'MT',
     opStock: '',
-    productRate: '',
+    opStockDate: '',
+    optimumQty: '',
+    maxQty: '',
     annualConsumption: '',
     leadTimeDays: '',
     safetyFactor: '1.0',
-    sNo: '',
   });
 
   useEffect(() => {
@@ -47,11 +48,12 @@ export default function RawMaterial() {
       itemName: '',
       unit: 'MT',
       opStock: '',
-      productRate: '',
+      opStockDate: '',
+      optimumQty: '',
+      maxQty: '',
       annualConsumption: '',
       leadTimeDays: '',
       safetyFactor: '1.0',
-      sNo: '',
     });
     setModalOpen(true);
   };
@@ -63,11 +65,12 @@ export default function RawMaterial() {
       itemName: item.item_name,
       unit: item.unit || 'MT',
       opStock: item.op_stock || '',
-      productRate: item.product_rate || '',
+      opStockDate: item.op_stock_date ? String(item.op_stock_date).split('T')[0] : '',
+      optimumQty: item.optimum_qty || '',
+      maxQty: item.max_qty || '',
       annualConsumption: item.annual_consumption || '',
       leadTimeDays: item.lead_time_days || '',
       safetyFactor: item.safety_factor || '1.0',
-      sNo: item.s_no || '',
     });
     setModalOpen(true);
   };
@@ -147,17 +150,26 @@ export default function RawMaterial() {
 
       {/* Data Table */}
       <div className="overflow-x-auto border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-xs whitespace-nowrap">
           <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 font-semibold text-zinc-500 uppercase tracking-wider">
             <tr>
               <th className="p-3">S.No</th>
               <th className="p-3">Item Name</th>
               <th className="p-3">Unit</th>
-              <th className="p-3 text-right">Op Stock</th>
-              <th className="p-3 text-right">Actual Level</th>
-              <th className="p-3 text-right">Optimum Stock</th>
+              <th className="p-3 text-right">Annual Con</th>
+              <th className="p-3 text-right">Daily Con</th>
+              <th className="p-3 text-right">S.F</th>
+              <th className="p-3 text-right">Lead Time</th>
               <th className="p-3 text-right">Max Stock</th>
+              <th className="p-3 text-right">Optimum Stock</th>
+              <th className="p-3 text-right">Op Stock</th>
+              <th className="p-3 text-right">Stock Adjustment</th>
+              <th className="p-3 text-right">Purchase System</th>
+              <th className="p-3 text-right">Production Consumption</th>
+              <th className="p-3 text-right">Raw Material Sales</th>
+              <th className="p-3 text-right font-bold text-zinc-900 dark:text-white">Actual Level</th>
               <th className="p-3 text-right">Rate (₹)</th>
+              <th className="p-3 text-right">Optimum Stock Total (₹)</th>
               <th className="p-3 text-right">Stock Total (₹)</th>
               <th className="p-3 text-center">Status</th>
               <th className="p-3 text-center">Actions</th>
@@ -166,59 +178,76 @@ export default function RawMaterial() {
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
             {loading ? (
               <tr>
-                <td colSpan={11} className="p-8 text-center text-zinc-400">
+                <td colSpan={20} className="p-8 text-center text-zinc-400">
                   Loading items...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={11} className="p-8 text-center text-zinc-400">
+                <td colSpan={20} className="p-8 text-center text-zinc-400">
                   No raw material records found.
                 </td>
               </tr>
             ) : (
-              items.map((item) => (
-                <tr key={item.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
-                  <td className="p-3 font-medium text-zinc-400">{item.s_no || '-'}</td>
-                  <td className="p-3 font-semibold text-zinc-900 dark:text-white">{item.item_name}</td>
-                  <td className="p-3 text-zinc-500">{item.unit || 'MT'}</td>
-                  <td className="p-3 text-right text-zinc-600 dark:text-zinc-300">{Number(item.op_stock || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right font-bold text-zinc-900 dark:text-white">{Number(item.actual_level || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right text-zinc-500">{Number(item.optimum_stock || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right text-zinc-500">{Number(item.max_stock || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right text-zinc-600 dark:text-zinc-300">₹{Number(item.product_rate || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                    ₹{Number(item.stock_total || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                  </td>
-                  <td className="p-3 text-center">
-                    <span
-                      className={`px-2 py-1 rounded-full text-[10px] font-bold ${
-                        item.colour === 'Red'
-                          ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400'
-                          : item.colour === 'Yellow'
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400'
-                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
-                      }`}
-                    >
-                      {item.colour || 'Green'}
-                    </span>
-                  </td>
-                  <td className="p-3 text-center space-x-2">
-                    <button
-                      onClick={() => handleOpenEdit(item)}
-                      className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(item.id)}
-                      className="p-1 text-zinc-400 hover:text-red-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))
+              items.map((item, idx) => {
+                const netPurchase = Number(item.purchase_system || 0) - Number(item.purchase_return || 0);
+                const colourStyles = {
+                  'No Stock': 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400',
+                  'Low Stock': 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-400',
+                  'Medium Stock': 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400',
+                  'Normal Stock': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400',
+                  'Excess Stock': 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400',
+                };
+                return (
+                  <tr key={item.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                    <td className="p-3 text-zinc-400">{idx + 1}</td>
+                    <td className="p-3 font-semibold text-zinc-900 dark:text-white">{item.item_name}</td>
+                    <td className="p-3 text-zinc-500">{item.unit || 'MT'}</td>
+                    <td className="p-3 text-right text-zinc-500">{Number(item.annual_consumption || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-zinc-500">{Number(item.daily_consumption || 0).toFixed(3)}</td>
+                    <td className="p-3 text-right text-zinc-500">{Number(item.safety_factor || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-zinc-500">{Number(item.lead_time_days || 0)} days</td>
+                    <td className="p-3 text-right text-zinc-500">{Number(item.max_stock || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-zinc-500">{Number(item.optimum_stock || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-zinc-600 dark:text-zinc-300">{Number(item.op_stock || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-zinc-500">{Number(item.stock_adjustment || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold">{netPurchase.toFixed(2)}</td>
+                    <td className="p-3 text-right text-rose-600 dark:text-rose-400">{Number(item.production_consumption || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-rose-600 dark:text-rose-400">{Number(item.raw_material_sales || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right font-bold text-zinc-900 dark:text-white">{Number(item.actual_level || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-zinc-600 dark:text-zinc-300">₹{Number(item.product_rate || 0).toFixed(2)}</td>
+                    <td className="p-3 text-right text-zinc-500">
+                      ₹{Number(item.optimum_stock_total || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
+                      ₹{Number(item.stock_total || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-3 text-center">
+                      <span
+                        className={`px-2 py-1 rounded-full text-[10px] font-bold ${
+                          colourStyles[item.colour] || 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                        }`}
+                      >
+                        {item.colour || 'Normal Stock'}
+                      </span>
+                    </td>
+                    <td className="p-3 text-center space-x-2">
+                      <button
+                        onClick={() => handleOpenEdit(item)}
+                        className="p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="p-1 text-zinc-400 hover:text-red-600"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -273,12 +302,11 @@ export default function RawMaterial() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-zinc-600 dark:text-zinc-400 mb-1">Product Rate (₹)</label>
+                  <label className="block font-medium text-zinc-600 dark:text-zinc-400 mb-1">Opening Stock Date</label>
                   <input
-                    type="number"
-                    step="any"
-                    value={formData.productRate}
-                    onChange={(e) => setFormData({ ...formData, productRate: e.target.value })}
+                    type="date"
+                    value={formData.opStockDate}
+                    onChange={(e) => setFormData({ ...formData, opStockDate: e.target.value })}
                     className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border rounded-xl"
                   />
                 </div>
@@ -289,6 +317,29 @@ export default function RawMaterial() {
                     step="any"
                     value={formData.annualConsumption}
                     onChange={(e) => setFormData({ ...formData, annualConsumption: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-zinc-600 dark:text-zinc-400 mb-1">Optimum Stock</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.optimumQty}
+                    onChange={(e) => setFormData({ ...formData, optimumQty: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block font-medium text-zinc-600 dark:text-zinc-400 mb-1">Max Stock</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.maxQty}
+                    onChange={(e) => setFormData({ ...formData, maxQty: e.target.value })}
                     className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border rounded-xl"
                   />
                 </div>

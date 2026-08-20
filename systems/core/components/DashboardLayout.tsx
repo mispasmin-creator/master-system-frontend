@@ -703,13 +703,13 @@ export default function DashboardLayout({
               if (basePath !== '/dashboard') {
                 router.push('/dashboard');
               } else {
-                navigate('/master');
+                navigate('/overview');
               }
               setMobileNavOpen(false);
             }}
             title="Dashboard"
             className={`w-full flex items-center gap-3 h-11 px-3 rounded-2xl text-sm font-semibold transition-all ${collapsed ? 'md:justify-center md:px-0' : ''} ${
-              basePath === '/dashboard'
+              basePath === '/dashboard' && location.pathname !== '/master'
                 ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25'
                 : 'text-zinc-500 dark:text-zinc-400 hover:bg-surface dark:hover:bg-zinc-800/60 hover:text-zinc-900 dark:hover:text-zinc-100'
             }`}

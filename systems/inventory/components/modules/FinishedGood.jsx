@@ -14,8 +14,7 @@ export default function FinishedGood() {
     firmName: 'Purab',
     productName: '',
     opStock: '',
-    stockAdjustment: '',
-    sNo: '',
+    opStockDate: '',
   });
 
   useEffect(() => {
@@ -42,8 +41,7 @@ export default function FinishedGood() {
       firmName: activeFirm,
       productName: '',
       opStock: '',
-      stockAdjustment: '',
-      sNo: '',
+      opStockDate: '',
     });
     setModalOpen(true);
   };
@@ -54,8 +52,7 @@ export default function FinishedGood() {
       firmName: item.firm_name,
       productName: item.product_name,
       opStock: item.op_stock || '',
-      stockAdjustment: item.stock_adjustment || '',
-      sNo: item.s_no || '',
+      opStockDate: item.op_stock_date ? String(item.op_stock_date).split('T')[0] : '',
     });
     setModalOpen(true);
   };
@@ -135,17 +132,20 @@ export default function FinishedGood() {
 
       {/* Data Table */}
       <div className="overflow-x-auto border border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900">
-        <table className="w-full text-left text-xs">
+        <table className="w-full text-left text-xs whitespace-nowrap">
           <thead className="bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-800 font-semibold text-zinc-500 uppercase tracking-wider">
             <tr>
               <th className="p-3">S.No</th>
               <th className="p-3">Product Name</th>
               <th className="p-3 text-right">Op Stock</th>
-              <th className="p-3 text-right">Adjustment</th>
+              <th className="p-3 text-right">Stock Adjustment</th>
+              <th className="p-3 text-right">Sales Order Pending</th>
+              <th className="p-3 text-right">Purchase Received</th>
+              <th className="p-3 text-right">Purchase Return</th>
               <th className="p-3 text-right">Production</th>
-              <th className="p-3 text-right">Material Recd</th>
-              <th className="p-3 text-right">Sales Dispatch</th>
-              <th className="p-3 text-right">Pending Orders</th>
+              <th className="p-3 text-right">Sales</th>
+              <th className="p-3 text-right">Sales Return</th>
+              <th className="p-3 text-right">Consumption</th>
               <th className="p-3 text-right font-bold text-zinc-900 dark:text-white">Current Level</th>
               <th className="p-3 text-center">Actions</th>
             </tr>
@@ -153,28 +153,33 @@ export default function FinishedGood() {
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
             {loading ? (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-zinc-400">
+                <td colSpan={13} className="p-8 text-center text-zinc-400">
                   Loading finished goods...
                 </td>
               </tr>
             ) : items.length === 0 ? (
               <tr>
-                <td colSpan={10} className="p-8 text-center text-zinc-400">
+                <td colSpan={13} className="p-8 text-center text-zinc-400">
                   No finished goods records found.
                 </td>
               </tr>
             ) : (
-              items.map((item) => (
+              items.map((item, idx) => {
+                const isShort = Number(item.current_level || 0) < Number(item.sales_order_pending || 0);
+                return (
                 <tr key={item.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
-                  <td className="p-3 font-medium text-zinc-400">{item.s_no || '-'}</td>
+                  <td className="p-3 text-zinc-400">{idx + 1}</td>
                   <td className="p-3 font-semibold text-zinc-900 dark:text-white">{item.product_name}</td>
                   <td className="p-3 text-right text-zinc-600 dark:text-zinc-300">{Number(item.op_stock || 0).toFixed(2)}</td>
                   <td className="p-3 text-right text-zinc-500">{Number(item.stock_adjustment || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold">{Number(item.production || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right text-zinc-500">{Number(item.purchase_material_received || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right text-blue-600 dark:text-blue-400 font-semibold">{Number(item.sales || 0).toFixed(2)}</td>
                   <td className="p-3 text-right text-amber-600 dark:text-amber-400">{Number(item.sales_order_pending || 0).toFixed(2)}</td>
-                  <td className="p-3 text-right font-extrabold text-zinc-900 dark:text-white">{Number(item.current_level || 0).toFixed(2)}</td>
+                  <td className="p-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold">{Number(item.purchase_material_received || 0).toFixed(2)}</td>
+                  <td className="p-3 text-right text-rose-600 dark:text-rose-400">{Number(item.purchase_return || 0).toFixed(2)}</td>
+                  <td className="p-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold">{Number(item.production || 0).toFixed(2)}</td>
+                  <td className="p-3 text-right text-rose-600 dark:text-rose-400">{Number(item.sales || 0).toFixed(2)}</td>
+                  <td className="p-3 text-right text-emerald-600 dark:text-emerald-400">{Number(item.sales_return || 0).toFixed(2)}</td>
+                  <td className="p-3 text-right text-rose-600 dark:text-rose-400">{Number(item.consumption || 0).toFixed(2)}</td>
+                  <td className={`p-3 text-right font-extrabold ${isShort ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{Number(item.current_level || 0).toFixed(2)}</td>
                   <td className="p-3 text-center space-x-2">
                     <button
                       onClick={() => handleOpenEdit(item)}
@@ -190,7 +195,8 @@ export default function FinishedGood() {
                     </button>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -233,12 +239,11 @@ export default function FinishedGood() {
                   />
                 </div>
                 <div>
-                  <label className="block font-medium text-zinc-600 dark:text-zinc-400 mb-1">Stock Adjustment</label>
+                  <label className="block font-medium text-zinc-600 dark:text-zinc-400 mb-1">Opening Stock Date</label>
                   <input
-                    type="number"
-                    step="any"
-                    value={formData.stockAdjustment}
-                    onChange={(e) => setFormData({ ...formData, stockAdjustment: e.target.value })}
+                    type="date"
+                    value={formData.opStockDate}
+                    onChange={(e) => setFormData({ ...formData, opStockDate: e.target.value })}
                     className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border rounded-xl"
                   />
                 </div>

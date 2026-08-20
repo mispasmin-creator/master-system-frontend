@@ -1,17 +1,20 @@
 'use client';
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import DashboardLayout from '@/systems/core/components/DashboardLayout';
-// import Overview from '@/systems/core/components/Overview';
-import MasterPage from '@/systems/core/components/MasterPage';
+
+const Overview = dynamic(() => import('@/systems/core/components/Overview'), { ssr: false });
+const MasterPage = dynamic(() => import('@/systems/core/components/MasterPage'), { ssr: false });
 
 function RouterApp() {
   return (
     <Routes>
       <Route element={<DashboardLayout basePath="/dashboard" />}>
-        {/* <Route path="/overview" element={<Overview />} /> */}
+        <Route path="/" element={<Overview />} />
+        <Route path="/overview" element={<Overview />} />
         <Route path="/master" element={<MasterPage />} />
-        <Route path="*" element={<Navigate to="/master" replace />} />
+        <Route path="*" element={<Navigate to="/overview" replace />} />
       </Route>
     </Routes>
   );
