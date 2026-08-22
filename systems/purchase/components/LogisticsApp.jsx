@@ -181,9 +181,9 @@ export default function LogisticsApproval() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 flex flex-col bg-slate-50">
-      <Card className="shadow-md border border-gray-200 flex-1 flex flex-col bg-white">
-        <CardHeader className="p-4 border-b border-gray-200">
+    <div className="p-4 sm:p-6 lg:p-8 flex flex-col">
+      <Card className="flex-1 flex flex-col">
+        <CardHeader className="p-4">
           <CardTitle className="text-lg font-bold text-gray-800 flex items-center gap-3">
             <CheckCircle2 className="h-6 w-6 text-[#2fa36b]" />
             Logistics App.
@@ -348,7 +348,7 @@ export default function LogisticsApproval() {
                   <Truck className="h-5 w-5 text-brand" />
                   Approve Logistics for {selectedIndent.poNumber}
                 </SheetTitle>
-                <div className="grid grid-cols-2 gap-4 mt-4 text-sm bg-slate-50 dark:bg-zinc-900/50 border border-gray-100 dark:border-zinc-800/80 p-4 rounded-xl">
+                <div className="grid grid-cols-2 gap-4 mt-4 text-sm dark:bg-zinc-900/50 border border-gray-100 dark:border-zinc-800/80 p-4 rounded-xl">
                   <div>
                     <Label className="text-gray-500 dark:text-zinc-400">Vendor</Label>
                     <p className="font-medium text-gray-900 dark:text-white mt-1">{selectedIndent.vendorName}</p>

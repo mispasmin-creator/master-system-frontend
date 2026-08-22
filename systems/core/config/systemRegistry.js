@@ -362,6 +362,8 @@ export function getSystemByPath(basePath) {
  * @param {string|null} [userRole] - The user's role if present
  * @returns {{
  *   isAdmin: boolean,
+ *   isSuperAdmin: boolean,
+ *   canEditRevert: boolean,
  *   isViewOnly: boolean,
  *   allowedPages: string[],
  *   pageFirmsMap: Record<string, { firms: string[], readOnly: boolean }>,
@@ -375,10 +377,18 @@ export function parseUserPermissions(rawAccess, userRole = "") {
   const pageFirmsMap = {};
   const allowedPages = [];
 
-  const roleStr = String(userRole || "").trim().toLowerCase();
-  if (roleStr === "admin" || roleStr === "super admin") {
+  // Canonical 3-tier role: 'super_admin' | 'admin' | 'user'. isAdmin means
+  // "sees every page/firm" (true for both admin and super_admin — unchanged
+  // from before). isSuperAdmin/canEditRevert is the new axis: only the
+  // Super Admin tier may edit an already-submitted record or revert/delete
+  // one, anywhere in the app — Admin sees everything but is otherwise
+  // read/forward-only, same as User.
+  const roleStr = String(userRole || "").trim().toLowerCase().replace(/[\s-]/g, "_");
+  const isSuperAdmin = roleStr === "super_admin" || roleStr === "superadmin";
+  if (isSuperAdmin || roleStr === "admin") {
     isAdmin = true;
   }
+  let canEditRevert = isSuperAdmin;
 
   if (rawAccess != null) {
     if (typeof rawAccess === "string") {
@@ -386,6 +396,7 @@ export function parseUserPermissions(rawAccess, userRole = "") {
       const lower = trimmed.toLowerCase();
       if (lower === "all" || lower === "super admin" || lower === "admin") {
         isAdmin = true;
+        if (lower === "super admin") canEditRevert = true;
       } else if (lower === "viewonly") {
         isViewOnly = true;
       } else if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
@@ -480,6 +491,8 @@ export function parseUserPermissions(rawAccess, userRole = "") {
 
   return {
     isAdmin,
+    isSuperAdmin,
+    canEditRevert,
     isViewOnly,
     allowedPages,
     pageFirmsMap,

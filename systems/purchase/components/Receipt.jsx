@@ -378,6 +378,9 @@ export default function ReceiptCheck() {
     totalQuantity: "all",
     orderNumber: "all",
   });
+  // Processed Lifts (History) tab is filtered by the actual "Date Of Receiving" —
+  // e.g. From: 23/6/2023 should match every receipt on/after that date.
+  const [dateRangeFilter, setDateRangeFilter] = useState({ from: "", to: "" });
   const [activeTab, setActiveTab] = useState("awaitingReceipt");
   const [visibleAwaitingReceiptColumns, setVisibleAwaitingReceiptColumns] =
     useState({});
@@ -415,6 +418,7 @@ export default function ReceiptCheck() {
       totalQuantity: "all",
       orderNumber: "all",
     });
+    setDateRangeFilter({ from: "", to: "" });
   };
 
   useEffect(() => {
@@ -635,6 +639,28 @@ export default function ReceiptCheck() {
             (lift.indentNo === filters.orderNumber ||
               lift.billNo === filters.orderNumber);
 
+        // Actual Receipt Date (Date Of Receiving) range filter — e.g. From
+        // 23/6/2023 should match every receipt on/after that date.
+        if (matches && (dateRangeFilter.from || dateRangeFilter.to)) {
+          const receivingDate = lift.dateOfReceiving_fromSheet
+            ? new Date(lift.dateOfReceiving_fromSheet)
+            : null;
+          if (!receivingDate || isNaN(receivingDate.getTime())) {
+            matches = false;
+          } else {
+            if (dateRangeFilter.from) {
+              const fromDate = new Date(dateRangeFilter.from);
+              fromDate.setHours(0, 0, 0, 0);
+              matches = matches && receivingDate.getTime() >= fromDate.getTime();
+            }
+            if (dateRangeFilter.to) {
+              const toDate = new Date(dateRangeFilter.to);
+              toDate.setHours(23, 59, 59, 999);
+              matches = matches && receivingDate.getTime() <= toDate.getTime();
+            }
+          }
+        }
+
         const searchLower = searchQuery.trim().toLowerCase();
         if (searchLower) {
           matches =
@@ -675,7 +701,7 @@ export default function ReceiptCheck() {
         };
         return parseDate(b) - parseDate(a);
       });
-  }, [allLiftsData, filters, searchQuery]);
+  }, [allLiftsData, filters, searchQuery, dateRangeFilter]);
 
   const handleInputChange = (e) => {
     const { name, value, type, files } = e.target;
@@ -1012,7 +1038,7 @@ export default function ReceiptCheck() {
     const isLoading = loadingData && data.length === 0;
     const hasError = errorData && data.length === 0 && activeTab === tabKey;
     return (
-      <Card className="flex-col flex-1 border shadow-sm border-border">
+      <Card className="flex-col flex-1">
         <CardHeader className="px-4 py-3 bg-muted/30">
           <div className="flex items-center justify-between">
             <div>
@@ -1241,9 +1267,9 @@ export default function ReceiptCheck() {
   };
 
   return (
-    <div className="p-4 space-y-4 md:p-6 bg-slate-50 dark:bg-zinc-950">
-      <Card className="border-none shadow-md">
-        <CardHeader className="p-4 border-b border-gray-200 dark:border-zinc-800">
+    <div className="p-4 space-y-4 md:p-6">
+      <Card className="">
+        <CardHeader className="p-4">
           <CardTitle className="flex items-center gap-2 text-lg text-gray-700 dark:text-zinc-300">
             <PackageOpen className="h-5 w-5 text-[#2fa36b]" /> Step 6: Receipt
             Of Material / Physical Quality Check
@@ -1398,6 +1424,36 @@ export default function ReceiptCheck() {
                   </SelectContent>
                 </Select>
               </div>
+              {activeTab === "processedReceipts" && (
+                <div className="grid grid-cols-2 gap-4 mt-3 sm:max-w-md">
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 dark:text-zinc-400">
+                      Actual Receipt Date — From
+                    </Label>
+                    <Input
+                      type="date"
+                      value={dateRangeFilter.from}
+                      onChange={(e) =>
+                        setDateRangeFilter((prev) => ({ ...prev, from: e.target.value }))
+                      }
+                      className="h-8 mt-1 text-xs bg-white dark:bg-zinc-900 border-gray-300 dark:border-zinc-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-gray-500 dark:text-zinc-400">
+                      Actual Receipt Date — To
+                    </Label>
+                    <Input
+                      type="date"
+                      value={dateRangeFilter.to}
+                      onChange={(e) =>
+                        setDateRangeFilter((prev) => ({ ...prev, to: e.target.value }))
+                      }
+                      className="h-8 mt-1 text-xs bg-white dark:bg-zinc-900 border-gray-300 dark:border-zinc-700 dark:text-white"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <TabsContent
               value="awaitingReceipt"

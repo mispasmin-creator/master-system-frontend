@@ -55,12 +55,13 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 
-import { API_URL, getToken } from "@/lib/auth";
+import { API_URL, getToken, getStoredUser } from "@/lib/auth";
 import {
   SYSTEM_REGISTRY,
   ALL_FIRMS,
   getVisiblePages,
   getPageKeys,
+  parseUserPermissions,
 } from "@/systems/core/config/systemRegistry";
 
 // List of all visible purchase pages/permissions based on systemRegistry
@@ -163,6 +164,15 @@ const getPagePermissionsWithFirms = (rawPages) => {
 
 
 export default function ManageUsers() {
+  // Route-level gate: User Management is Super Admin only. Computed up top
+  // (not just before the final return) so the fetchUsers() effect below can
+  // also skip firing for non-super-admins — otherwise it still runs (hooks
+  // always run regardless of what's rendered) and 403s against the
+  // Super-Admin-gated /api/users/manage, surfacing a spurious error toast
+  // behind the "Access Denied" screen.
+  const currentUser = getStoredUser();
+  const currentPerms = parseUserPermissions(currentUser?.page_access, currentUser?.role);
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -189,11 +199,19 @@ export default function ManageUsers() {
     permissions: [],
     pageFirms: {},
     isViewOnly: false,
+    // Super Admin is a distinct 3rd tier, not an alias for Full Admin: only
+    // Super Admin may edit/revert already-submitted records anywhere in the
+    // app (Admin sees everything but is otherwise read/forward-only, same
+    // as a limited User). Exactly one Super Admin may exist — enforced by
+    // the backend (POST/PUT /api/users/manage), surfaced here as a normal
+    // save error if violated.
+    isSuperAdmin: false,
   });
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    if (currentPerms.isSuperAdmin) fetchUsers();
+    else setLoading(false);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -224,6 +242,7 @@ export default function ManageUsers() {
       permissions: [],
       pageFirms: {},
       isViewOnly: false,
+      isSuperAdmin: false,
     });
     setIsDialogOpen(true);
   };
@@ -327,6 +346,12 @@ export default function ManageUsers() {
       userPermissions = ["admin", ...userPermissions];
     }
 
+    // The real 3rd-tier signal is the DB role column (set explicitly by
+    // this same form's handleSubmit) — not a Pages-content heuristic like
+    // the rest of this function uses for legacy data, since a Super Admin's
+    // Pages payload looks identical to a Full Admin's (both grant every page).
+    const isSuperAdminRole = user.role === "super_admin";
+
     setFormData({
       username: user["User Name"] || "",
       password: "",
@@ -336,6 +361,7 @@ export default function ManageUsers() {
       permissions: userPermissions,
       pageFirms,
       isViewOnly,
+      isSuperAdmin: isSuperAdminRole,
     });
 
     setIsDialogOpen(true);
@@ -394,6 +420,7 @@ export default function ManageUsers() {
         nextState = {
           ...prev,
           isViewOnly: true,
+          isSuperAdmin: false, // View Only and Super Admin are mutually exclusive
           permissions: generatedPermissions,
           pageFirms: generatedPageFirms,
           firmName: [...ALL_FIRMS],
@@ -409,6 +436,29 @@ export default function ManageUsers() {
       }
       console.log("ManageUsers: Form state after Toggle View Only:", nextState);
       return nextState;
+    });
+  };
+
+  // Super Admin implies Full Admin's page grant (every page, every firm) but
+  // is tracked as its own explicit flag so handleSubmit can send a real
+  // `role: 'super_admin'` — turning it on/off doesn't touch isViewOnly
+  // (mutually exclusive by the UI disabling Super Admin while View Only is
+  // checked, and vice versa).
+  const handleToggleSuperAdmin = () => {
+    setFormData((prev) => {
+      const next = !prev.isSuperAdmin;
+      if (next) {
+        const { generatedPageFirms, generatedPermissions } = buildAllSystemPermissions(false);
+        return {
+          ...prev,
+          isViewOnly: false,
+          isSuperAdmin: true,
+          permissions: ["admin", ...generatedPermissions],
+          pageFirms: generatedPageFirms,
+          firmName: [...ALL_FIRMS],
+        };
+      }
+      return { ...prev, isSuperAdmin: false };
     });
   };
 
@@ -429,6 +479,9 @@ export default function ManageUsers() {
         } else {
           nextState = {
             ...prev,
+            // Full Admin is a prerequisite for Super Admin — turning it off
+            // demotes away from Super Admin too.
+            isSuperAdmin: false,
             permissions: [],
             pageFirms: {},
             firmName: [],
@@ -734,6 +787,14 @@ export default function ManageUsers() {
         "Firm Name": firmsValue,
         Pages: pagesValue,
         Name: formData.name || null,
+        // Explicit role — a Super Admin's Pages payload looks identical to a
+        // Full Admin's (both grant every page), so the role must be sent
+        // explicitly rather than inferred from Pages content.
+        role: formData.isSuperAdmin
+          ? "super_admin"
+          : formData.permissions.includes("admin")
+          ? "admin"
+          : "user",
       };
 
       // Only send a password when one was actually typed — the backend hashes
@@ -772,7 +833,13 @@ export default function ManageUsers() {
       setIsDialogOpen(false);
       fetchUsers();
     } catch (error) {
-      console.error("Error saving user:", error);
+      // Deliberately not console.error()'d — this is an expected, already-
+      // handled validation error (e.g. the single-Super-Admin rule), and
+      // console.error() triggers Next.js's dev-mode full-screen error
+      // overlay even inside a caught try/catch, which hides the toast
+      // below it. console.warn keeps it visible in devtools without
+      // triggering the overlay.
+      console.warn("Error saving user:", error.message);
       toast.error(error.message || "Failed to save user");
     } finally {
       setIsSubmitting(false);
@@ -794,8 +861,11 @@ export default function ManageUsers() {
       toast.success("User deleted successfully");
       fetchUsers();
     } catch (error) {
-      console.error("Error deleting user:", error);
-      toast.error("Failed to delete user");
+      // See handleSubmit's catch block for why this is console.warn, not
+      // console.error — and the real backend message (e.g. "Cannot remove
+      // the only Super Admin...") is now surfaced instead of a generic string.
+      console.warn("Error deleting user:", error.message);
+      toast.error(error.message || "Failed to delete user");
     }
   };
 
@@ -808,9 +878,32 @@ export default function ManageUsers() {
     return userName.includes(query) || name.includes(query) || firmsText.includes(query);
   });
 
+  // Route-level gate: User Management is Super Admin only (currentPerms
+  // computed at the top of the component — see the comment there). Read
+  // auth state directly (not via a system-specific useAuth()) so this
+  // component is safe to mount under any system's page (each has its own
+  // AuthProvider instance/context identity, so a cross-system useContext()
+  // call could otherwise throw or silently miss). This closes the exact
+  // hole an earlier audit found: any logged-in user could reach this page
+  // directly by URL — the backend now also enforces this (403), but the UI
+  // should never even offer the form.
+  if (!currentPerms.isSuperAdmin) {
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="py-16 text-center">
+          <Shield className="h-10 w-10 mx-auto text-zinc-300 mb-3" />
+          <p className="font-semibold text-zinc-700">Super Admin access required</p>
+          <p className="text-sm text-zinc-400 mt-1">
+            User Management is restricted to the Super Admin account.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <Card className="border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-4 w-4 text-[#2fa36b]" />
@@ -845,7 +938,7 @@ export default function ManageUsers() {
           </div>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-50 dark:bg-zinc-800">
+              <TableHeader className="dark:bg-zinc-800">
                 <TableRow>
                   <TableHead className="w-[200px] font-bold">
                     Name
@@ -928,7 +1021,12 @@ export default function ManageUsers() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1.5">
-                            {isViewOnly ? (
+                            {user.role === "super_admin" ? (
+                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-none font-bold">
+                                <ShieldCheck className="h-3 w-3 mr-1" />
+                                Super Admin (Full Access + Edit/Revert)
+                              </Badge>
+                            ) : isViewOnly ? (
                               <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none font-bold">
                                 <Eye className="h-3 w-3 mr-1" />
                                 View Only (All Pages, No Edits)
@@ -996,7 +1094,7 @@ export default function ManageUsers() {
       <Sheet open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <SheetContent className="sm:max-w-3xl w-full p-0 overflow-hidden rounded-xl sm:rounded-2xl border-none shadow-2xl max-h-[90vh] flex flex-col">
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
-            <SheetHeader className="bg-slate-50 p-6 border-b border-gray-100 shrink-0">
+            <SheetHeader className="p-6 border-b border-gray-100 shrink-0">
               <SheetTitle className="text-xl font-bold flex items-center gap-2">
                 {editingUser ? (
                   <Edit2 className="h-5 w-5 text-[#2fa36b]" />
@@ -1134,7 +1232,7 @@ export default function ManageUsers() {
                     </Badge>
                   </Label>
                   
-                  <div className="border border-gray-100 rounded-xl p-3 bg-slate-50/30 space-y-2">
+                  <div className="border border-gray-100 rounded-xl p-3 /30 space-y-2">
                     {!(formData.isViewOnly || formData.permissions.includes("admin")) ? (
                       <div className="p-2 text-xs text-slate-500 bg-slate-100/50 rounded-lg border border-dashed border-slate-200">
                         <p className="font-semibold text-slate-600">Dynamic Firm Assignment</p>
@@ -1216,7 +1314,7 @@ export default function ManageUsers() {
                   </Badge>
                 </Label>
 
-                <div className="border border-gray-100 rounded-xl p-4 bg-slate-50/30">
+                <div className="border border-gray-100 rounded-xl p-4 /30">
                   {/* View Only Access */}
                   <div className="flex items-center space-x-3 p-2 bg-blue-50 rounded-lg border border-blue-100 mb-2 group cursor-pointer">
                     <Checkbox
@@ -1231,6 +1329,27 @@ export default function ManageUsers() {
                       </Label>
                       <p className="text-[10px] text-blue-700 font-medium">
                         Can see all pages but cannot make any changes
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-2 bg-amber-50 rounded-lg border border-amber-200 mb-2 group cursor-pointer">
+                    <Checkbox
+                      id="superadmin"
+                      checked={formData.isSuperAdmin}
+                      onCheckedChange={handleToggleSuperAdmin}
+                      disabled={formData.isViewOnly}
+                      className="data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
+                    />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor="superadmin"
+                        className="text-sm font-bold text-amber-900 cursor-pointer flex items-center"
+                      >
+                        <ShieldCheck className="h-3 w-3 mr-1.5" /> Super Admin
+                      </Label>
+                      <p className="text-[10px] text-amber-800 font-medium">
+                        Only role that can edit or revert already-submitted records, anywhere. Exactly one Super Admin may exist at a time.
                       </p>
                     </div>
                   </div>
@@ -1251,7 +1370,7 @@ export default function ManageUsers() {
                         <Shield className="h-3 w-3 mr-1.5" /> Full Admin Access
                       </Label>
                       <p className="text-[10px] text-purple-700 font-medium">
-                        Overwrites all specific module selections
+                        Overwrites all specific module selections. Sees everything but cannot edit/revert history.
                       </p>
                     </div>
                   </div>
@@ -1270,7 +1389,7 @@ export default function ManageUsers() {
                   <div className="h-[280px] overflow-y-auto overflow-x-auto border border-gray-100 rounded-lg bg-white relative custom-scrollbar">
                     {formData.isViewOnly || formData.permissions.includes("admin") ? (
                       <div className="p-3 space-y-2">
-                        <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700">
+                        <div className="flex items-center justify-between px-3 py-2 border border-slate-200 rounded-lg text-xs text-slate-700">
                           <span className="font-semibold">
                             {formData.isViewOnly
                               ? "View Only Mode: Read-only access to all systems across all 9 firms"
@@ -1296,7 +1415,7 @@ export default function ManageUsers() {
                                 <button
                                   type="button"
                                   onClick={() => toggleSystemExpand(sysKey)}
-                                  className="w-full flex items-center justify-between p-2.5 hover:bg-slate-50 transition-colors text-left"
+                                  className="w-full flex items-center justify-between p-2.5 hover: transition-colors text-left"
                                 >
                                   <div className="flex items-center gap-2">
                                     {isExpanded ? (
@@ -1343,7 +1462,7 @@ export default function ManageUsers() {
                                 </button>
 
                                 {isExpanded && (
-                                  <div className="px-3 pb-3 pt-1 border-t border-gray-100 bg-slate-50/60">
+                                  <div className="px-3 pb-3 pt-1 border-t border-gray-100 /60">
                                     <div className="text-[10px] text-slate-400 mb-2 flex items-center justify-between">
                                       <span>Granted Pages (Implied access - all 9 firms)</span>
                                       <div className="flex items-center gap-3">
@@ -1428,11 +1547,11 @@ export default function ManageUsers() {
                       <table className="w-full text-xs border-separate border-spacing-0 relative" style={{ minWidth: "500px" }}>
                         <thead>
                           <tr>
-                            <th className="font-bold text-gray-700 bg-slate-50 py-2.5 px-3 text-left align-middle sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] w-[30%]">
+                            <th className="font-bold text-gray-700 py-2.5 px-3 text-left align-middle sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] w-[30%]">
                               Page Name
                             </th>
                             {["Pmmpl", "Purab", "Rkl"].map((firm) => (
-                              <th key={firm} className="text-center font-bold text-gray-700 bg-slate-50 py-2.5 px-2 align-middle sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] w-[14%]">
+                              <th key={firm} className="text-center font-bold text-gray-700 py-2.5 px-2 align-middle sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] w-[14%]">
                                 <div className="flex flex-col items-center gap-1">
                                   <span>{firm}</span>
                                   <Checkbox
@@ -1443,10 +1562,10 @@ export default function ManageUsers() {
                                 </div>
                               </th>
                             ))}
-                            <th className="text-center font-bold text-gray-700 bg-slate-50 py-2.5 px-2 align-middle sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] w-[18%]">
+                            <th className="text-center font-bold text-gray-700 py-2.5 px-2 align-middle sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] w-[18%]">
                               Access Level
                             </th>
-                            <th className="text-center font-bold text-gray-700 bg-slate-50 py-2.5 px-2 align-middle sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] w-[10%]">
+                            <th className="text-center font-bold text-gray-700 py-2.5 px-2 align-middle sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0] w-[10%]">
                               Row Action
                             </th>
                           </tr>
@@ -1459,7 +1578,7 @@ export default function ManageUsers() {
                             const isPageReadOnly = pageObj && !Array.isArray(pageObj) ? !!pageObj.readOnly : false;
                             const hasAccess = currentFirms.length > 0;
                             return (
-                              <tr key={page} className="hover:bg-slate-50/50 transition-colors">
+                              <tr key={page} className="hover:/50 transition-colors">
                                 <td className="font-medium text-gray-700 py-2 px-3 align-middle border-b border-gray-100">{page}</td>
                                 {["Pmmpl", "Purab", "Rkl"].map((firm) => (
                                   <td key={firm} className="text-center py-2 px-2 align-middle border-b border-gray-100">
@@ -1513,7 +1632,7 @@ export default function ManageUsers() {
               </div>
             </div>
 
-            <SheetFooter className="bg-slate-50 p-4 sm:p-6 border-t border-gray-100 flex flex-row items-center justify-between gap-4 shrink-0">
+            <SheetFooter className="p-4 sm:p-6 border-t border-gray-100 flex flex-row items-center justify-between gap-4 shrink-0">
               <Button
                 type="button"
                 variant="ghost"

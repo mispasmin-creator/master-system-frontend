@@ -220,7 +220,6 @@ export default function DashboardLayout({
   const [checking, setChecking] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
 
   const [sfExpanded, setSfExpanded] = useState(false);
@@ -660,7 +659,7 @@ export default function DashboardLayout({
   const accessibleProductionTabs = productionTabs.filter(tab => !tab.hidden);
 
   return (
-    <div className="fixed inset-0 overflow-hidden w-full flex bg-[#eef3ef] dark:bg-zinc-950 transition-colors duration-500 font-sans">
+    <div className="fixed inset-0 overflow-hidden w-full flex bg-[#eef3ef] dark:bg-background transition-colors duration-500 font-sans">
       {/* Mobile backdrop */}
       {mobileNavOpen && (
         <div
@@ -670,7 +669,7 @@ export default function DashboardLayout({
       )}
 
       <aside
-        className={`fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-40 flex flex-col shrink-0 w-72 bg-white dark:bg-zinc-900 shadow-[1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-none md:border-r md:border-zinc-100 dark:md:border-zinc-800/70 transition-transform md:transition-[width] duration-300 ${
+        className={`fixed md:sticky md:top-0 md:h-screen inset-y-0 left-0 z-40 flex flex-col shrink-0 w-72 bg-white dark:bg-card shadow-[1px_0_0_0_rgba(0,0,0,0.04)] dark:shadow-none md:border-r md:border-zinc-100 dark:md:border-border transition-transform md:transition-[width] duration-300 ${
           collapsed ? 'md:w-[84px]' : 'md:w-72'
         } ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
       >
@@ -1314,7 +1313,7 @@ export default function DashboardLayout({
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setMobileNavOpen(true)}
-                  className="md:hidden flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 shrink-0"
+                  className="md:hidden flex items-center justify-center w-9 h-9 rounded-full bg-zinc-100 dark:bg-secondary text-zinc-500 dark:text-zinc-400 shrink-0"
                   title="Open menu"
                 >
                   <LogInIcon className="w-4 h-4 rotate-180" />
@@ -1325,21 +1324,10 @@ export default function DashboardLayout({
               </div>
 
               <div className="flex items-center gap-3 sm:gap-5">
-                <div className="relative hidden sm:block">
-                  <SearchIcon className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search vendor, material, firm…"
-                    className="w-[220px] h-[42px] pl-10 pr-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full text-xs font-medium outline-none shadow-sm focus:ring-1 focus:ring-[#2fa36b] dark:focus:ring-[#5ec792] transition-all placeholder:text-zinc-400 text-zinc-900 dark:text-white"
-                  />
-                </div>
-
                 {/* Theme Toggle Button */}
                 <button
                   onClick={toggleTheme}
-                  className="w-9 h-9 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-secondary text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-muted transition-colors"
                   title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
                 >
                   {theme === 'light' ? <MoonIcon className="w-4 h-4" /> : <SunIcon className="w-4 h-4" />}
@@ -1348,12 +1336,12 @@ export default function DashboardLayout({
                 <div className="relative shrink-0">
                   <button
                     onClick={() => setAvatarMenuOpen((o) => !o)}
-                    className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-[#2fa36b] dark:bg-[#5ec792] text-white dark:text-zinc-900 text-sm font-bold"
+                    className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-[#2fa36b] dark:bg-primary text-white dark:text-primary-foreground text-sm font-bold"
                   >
                     {initial}
                   </button>
                   {avatarMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-52 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl z-50">
+                    <div className="absolute right-0 mt-2 w-52 py-1.5 rounded-xl bg-white dark:bg-card border border-zinc-200 dark:border-border shadow-xl z-50">
                       <div className="px-3.5 py-2 border-b border-zinc-100 dark:border-zinc-800">
                         <p className="text-sm font-semibold text-zinc-900 dark:text-white truncate">{user.username}</p>
                         <p className="text-xs text-zinc-400 capitalize">{user.role}</p>
@@ -1373,7 +1361,7 @@ export default function DashboardLayout({
 
             {/* Dynamic Content area */}
             <div className={location.pathname !== '/overview' ? 'hide-page-titles' : ''}>
-              {children || <Outlet context={{ user, searchQuery, poRows, poLoading, theme, toggleTheme, goToPurchase, pendingApprovals }} />}
+              {children || <Outlet context={{ user, searchQuery: '', poRows, poLoading, theme, toggleTheme, goToPurchase, pendingApprovals }} />}
             </div>
 
             <style>{`

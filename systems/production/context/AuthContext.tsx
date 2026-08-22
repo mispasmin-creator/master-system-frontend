@@ -48,7 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(mappedUser);
       setAllowedSteps(steps);
       setIsReadOnly(parsed.isViewOnly);
-      setIsSuperAdmin(parsed.isAdmin);
+      // isSuperAdmin now reflects the real 3-tier role (was previously an
+      // alias for isAdmin, i.e. plain Admins incorrectly got edit/revert
+      // rights too).
+      setIsSuperAdmin(parsed.isSuperAdmin);
       setPermissionParser(() => parsed);
     }
     setIsLoading(false);

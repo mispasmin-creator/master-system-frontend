@@ -509,8 +509,8 @@ export default function PurchaseReturnPage() {
                 </TabsList>
 
                 <TabsContent value="finalized">
-                    <Card className="shadow-sm border border-border overflow-hidden flex flex-col">
-                        <CardHeader className="pb-3 border-b border-gray-100 bg-gray-50/30">
+                    <Card className="overflow-hidden flex flex-col">
+                        <CardHeader className="pb-3 bg-gray-50/30">
                             <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
             <FileText className="w-4 h-4 text-[#2fa36b]" />
             Purchase Return
@@ -615,8 +615,8 @@ export default function PurchaseReturnPage() {
                 </TabsContent>
 
                 <TabsContent value="pending">
-                    <Card className="shadow-sm border border-border overflow-hidden flex flex-col">
-                        <CardHeader className="pb-3 border-b border-orange-100 bg-orange-50/20">
+                    <Card className="overflow-hidden flex flex-col">
+                        <CardHeader className="pb-3 bg-orange-50/20">
                             <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
                                 <RotateCcw className="w-4 h-4 text-orange-500" />
                                 Pending Mismatches Needs Return

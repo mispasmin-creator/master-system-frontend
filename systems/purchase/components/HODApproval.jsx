@@ -748,8 +748,8 @@ export default function StockApproval() {
         onSaved={() => { setSuperAdminEditIndent(null); setRefreshData((p) => !p); }}
       />
     )}
-    <Card className="w-full max-w-full 2xl:max-w-screen-2xl mx-auto relative bg-white shadow-md rounded-lg border border-gray-200">
-      <CardHeader className="p-4 border-b border-gray-200">
+    <Card className="w-full max-w-full 2xl:max-w-screen-2xl mx-auto relative rounded-lg">
+      <CardHeader className="p-4">
         <CardTitle className="flex items-center gap-2 text-gray-800 text-lg">
             <Shield className="h-5 w-5 text-[#2fa36b]" />
             HOD Approval

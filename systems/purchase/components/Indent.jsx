@@ -369,8 +369,8 @@ export default function IndentForm() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-slate-50">
-        <Card className="w-full max-w-lg shadow-lg">
+      <div className="flex items-center justify-center h-screen">
+        <Card className="w-full max-w-lg">
           <CardContent className="flex flex-col items-center justify-center p-12">
             <Loader2 className="w-12 h-12 text-primary animate-spin" />
             <p className="mt-4 ml-3 text-gray-700">Loading form data...</p>
@@ -381,9 +381,9 @@ export default function IndentForm() {
   }
 
   return (
-    <div className="w-full p-4 bg-slate-50 sm:p-6 lg:p-6">
-      <Card className="w-full bg-white border border-gray-200 rounded-lg shadow-md">
-        <CardHeader className="p-6 border-b border-gray-200">
+    <div className="w-full p-4 sm:p-6 lg:p-6">
+      <Card className="w-full rounded-lg">
+        <CardHeader className="p-6">
           <CardTitle className="flex items-center gap-2 text-gray-700">
             <FileText className="w-6 h-6 text-primary" />
             Indent

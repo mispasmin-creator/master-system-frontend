@@ -280,9 +280,9 @@ export default function IndentTrackingReport() {
     }
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 space-y-6 bg-slate-50 min-h-screen">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-6 min-h-screen">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card className="bg-white border-none shadow-sm overflow-hidden relative">
+                <Card className="overflow-hidden relative">
                     <div className="absolute top-0 right-0 p-3 opacity-10">
                         <BarChart3 size={60} />
                     </div>
@@ -291,7 +291,7 @@ export default function IndentTrackingReport() {
                         <CardTitle className="text-3xl font-bold text-gray-800">{stats.total}</CardTitle>
                     </CardHeader>
                 </Card>
-                <Card className="bg-white border-none shadow-sm overflow-hidden relative">
+                <Card className="overflow-hidden relative">
                     <div className="absolute top-0 right-0 p-3 opacity-10 text-amber-500">
                         <Clock size={60} />
                     </div>
@@ -300,7 +300,7 @@ export default function IndentTrackingReport() {
                         <CardTitle className="text-3xl font-bold text-gray-800">{stats.inProgress}</CardTitle>
                     </CardHeader>
                 </Card>
-                <Card className="bg-white border-none shadow-sm overflow-hidden relative">
+                <Card className="overflow-hidden relative">
                     <div className="absolute top-0 right-0 p-3 opacity-10 text-green-500">
                         <CheckCircle2 size={60} />
                     </div>
@@ -309,7 +309,7 @@ export default function IndentTrackingReport() {
                         <CardTitle className="text-3xl font-bold text-gray-800">{stats.completed}</CardTitle>
                     </CardHeader>
                 </Card>
-                <Card className="bg-white border-none shadow-sm overflow-hidden relative border-l-4 border-l-[#2fa36b]">
+                <Card className="overflow-hidden relative">
                     <CardHeader className="pb-2">
                         <CardDescription className="text-xs font-semibold uppercase tracking-wider text-[#2fa36b]">Today's Progress</CardDescription>
                         <div className="flex items-end gap-2">
@@ -340,7 +340,7 @@ export default function IndentTrackingReport() {
                 </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm bg-white">
+            <Card className="">
                 <CardContent className="p-4">
                     <div className="flex flex-col md:flex-row gap-4">
                         <div className="relative flex-1">
@@ -364,7 +364,7 @@ export default function IndentTrackingReport() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex items-center gap-2 border rounded-md px-2 bg-slate-50">
+                            <div className="flex items-center gap-2 border rounded-md px-2">
                                 <Calendar size={16} className="text-gray-400" />
                                 <Input
                                     type="date"
@@ -390,14 +390,14 @@ export default function IndentTrackingReport() {
                 </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm bg-white overflow-hidden">
+            <Card className="overflow-hidden">
                 <CardHeader className="pb-0 px-6 pt-6">
                     <div className="flex justify-between items-center">
                         <div>
                             <CardTitle className="text-xl font-bold text-gray-800">Indent Progression Report</CardTitle>
                             <CardDescription>Real-time status tracking of all purchase indents.</CardDescription>
                         </div>
-                        <Badge variant="outline" className="text-xs bg-slate-50">
+                        <Badge variant="outline" className="text-xs">
                             Showing {filteredData.length} records
                         </Badge>
                     </div>
@@ -405,7 +405,7 @@ export default function IndentTrackingReport() {
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <Table>
-                            <TableHeader className="bg-slate-50/50">
+                            <TableHeader className="/50">
                                 <TableRow>
                                     <TableHead className="text-xs uppercase font-bold text-gray-500">Indent / PO</TableHead>
                                     <TableHead className="text-xs uppercase font-bold text-gray-500">Material & Vendor</TableHead>
@@ -419,7 +419,7 @@ export default function IndentTrackingReport() {
                             <TableBody>
                                 {filteredData.map((item) => (
                                     <React.Fragment key={item.id}>
-                                        <TableRow className="group hover:bg-slate-50/80 transition-colors">
+                                        <TableRow className="group hover:/80 transition-colors">
                                             <TableCell className="font-mono font-bold text-blue-600">
                                                 {item.indentId || "N/A"}
                                             </TableCell>
@@ -492,9 +492,9 @@ function TrackingDetails({ indent }) {
 
             {open && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-                    <Card className="w-full max-w-2xl bg-white shadow-2xl relative overflow-hidden">
+                    <Card className="w-full max-w-2xl relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1.5 bg-[#2fa36b]" />
-                        <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
+                        <CardHeader className="flex flex-row items-center justify-between pb-4">
                             <div>
                                 <CardTitle className="text-2xl font-bold flex items-center gap-3">
                                     <BarChart3 className="text-[#2fa36b]" />
@@ -543,7 +543,7 @@ function TrackingDetails({ indent }) {
                                 })}
                             </div>
                         </CardContent>
-                        <div className="p-4 bg-slate-50 border-t flex justify-between items-center text-xs text-gray-500 font-medium">
+                        <div className="p-4 border-t flex justify-between items-center text-xs text-gray-500 font-medium">
                             <div className="flex items-center gap-2">
                                 <span className="font-bold text-gray-700">Material:</span> {indent.material}
                             </div>

@@ -14,6 +14,43 @@ const CATEGORY_META = {
   TradingMaterial: { label: 'Trading Material', endpoint: 'trading-material' },
 };
 
+// Rows pushed here by another module (Purchase receipts, Production runs/
+// consumption, Order deliveries) carry a remark encoded by applyMovement() as
+// "<sourceModule>:<sourceTable>#<sourceId> (<movementType>)" — e.g.
+// "purchase:PurchaseReceipt#1 (RECEIPT)" — instead of free text. Manual
+// entries (added from this page) just have whatever the user typed, or
+// nothing. This turns the encoded ones into a small "which system" badge so
+// Purchase-sourced rows read as Purchase and Production-sourced rows read as
+// Production, instead of showing the raw remark string either way.
+const SOURCE_MODULE_META = {
+  purchase: { label: 'Purchase', className: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400' },
+  production: { label: 'Production', className: 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-400' },
+  order: { label: 'Order', className: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400' },
+  manual: { label: 'Manual', className: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+};
+
+const MOVEMENT_TYPE_LABEL = {
+  RECEIPT: 'Receipt',
+  CONSUMPTION: 'Consumption',
+  PRODUCTION: 'Production Run',
+  SALES: 'Sales',
+  SALES_RETURN: 'Sales Return',
+  PURCHASE_RETURN: 'Purchase Return',
+  ADJUSTMENT_ADD: 'Manual Add',
+  ADJUSTMENT_REDUCE: 'Manual Reduce',
+  RETURN: 'Return',
+};
+
+function parseSource(remark) {
+  if (!remark) return null;
+  const m = remark.match(/^(\w+):(\w+)#(\S+)\s+\((\w+)\)$/);
+  if (!m) return null;
+  const [, sourceModule, , , movementType] = m;
+  const meta = SOURCE_MODULE_META[sourceModule];
+  if (!meta) return null;
+  return { ...meta, typeLabel: MOVEMENT_TYPE_LABEL[movementType] || movementType };
+}
+
 const UNIT_OPTIONS = ['MT', 'KGS', 'LITER', 'PCS', 'NOS', 'SET'];
 const FIRM_OPTIONS = ['Purab', 'Pmmpl', 'Rkl'];
 
@@ -451,7 +488,22 @@ export default function StockAdjustment() {
                     <td className="p-3 text-right font-bold text-zinc-900 dark:text-white">
                       {Number(adj.qty || 0).toFixed(2)}
                     </td>
-                    <td className="p-3 text-zinc-500 italic">{adj.remark || '-'}</td>
+                    <td className="p-3">
+                      {(() => {
+                        const source = parseSource(adj.remark);
+                        if (!source) {
+                          return <span className="text-zinc-500 italic">{adj.remark || '-'}</span>;
+                        }
+                        return (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${source.className}`}>
+                              {source.label}
+                            </span>
+                            <span className="text-zinc-400">{source.typeLabel}</span>
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="p-3 text-center">
                       <span
                         className={`px-2 py-1 rounded-full text-[10px] font-bold ${

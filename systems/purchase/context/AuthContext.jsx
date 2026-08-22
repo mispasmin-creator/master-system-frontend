@@ -26,13 +26,17 @@ export function AuthProvider({ children }) {
         firmName: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map(f => f.trim()).filter(Boolean),
         globalFirms: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map(f => f.trim()).filter(Boolean),
         isReadOnly: parsed.isViewOnly,
-        isSuperAdmin: parsed.isAdmin
+        // isSuperAdmin now reflects the real 3-tier role (was previously an
+        // alias for isAdmin, i.e. plain Admins incorrectly got edit/revert
+        // rights too) — every "SA Edit"/"Revert" button gated on isSuperAdmin
+        // across this system now correctly means Super Admin only.
+        isSuperAdmin: parsed.isSuperAdmin
       };
 
       setUser(mappedUser);
       setAllowedSteps(parsed.isAdmin ? ["admin"] : parsed.allowedPages.map(p => p.toLowerCase()));
       setIsReadOnly(parsed.isViewOnly);
-      setIsSuperAdmin(parsed.isAdmin);
+      setIsSuperAdmin(parsed.isSuperAdmin);
       setPermissionParser(() => parsed);
     }
     setIsLoading(false);

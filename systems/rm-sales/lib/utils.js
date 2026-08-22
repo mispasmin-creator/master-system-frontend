@@ -19,7 +19,9 @@ export const parseMultiValue = (value) => {
 };
 
 export const hasPageAccess = (value, requiredAccess) => {
-  if (!value) return true;
+  // Deny by default when there's no role value at all (e.g. logged out) —
+  // this used to return true, granting access to nothing/no-one.
+  if (!value) return false;
   const selectedAccess = parseMultiValue(value);
   return (
     selectedAccess.some(a => ['admin', 'superadmin', 'user'].includes(a.toLowerCase())) ||

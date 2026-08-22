@@ -491,8 +491,8 @@ export default function TallyEntry() {
     };
     const { icon: Icon, title, desc } = cardInfo[type];
     return (
-      <Card className="shadow-none border flex-1 flex flex-col">
-        <CardHeader className="py-3 px-4 border-b">
+      <Card className="flex-1 flex flex-col">
+        <CardHeader className="py-3 px-4">
           <div className="flex justify-between items-center">
             <div>
               <CardTitle className="flex items-center text-base">
@@ -581,9 +581,9 @@ export default function TallyEntry() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 flex flex-col bg-slate-50 dark:bg-zinc-950">
-      <Card className="shadow-md border border-gray-200 dark:border-zinc-800 flex-1 flex flex-col bg-white dark:bg-zinc-900">
-        <CardHeader className="p-4 border-b border-gray-200 dark:border-zinc-800">
+    <div className="p-4 sm:p-6 lg:p-8 flex flex-col">
+      <Card className="flex-1 flex flex-col">
+        <CardHeader className="p-4">
           <CardTitle className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-3">
             <Calculator className="h-6 w-6 text-[#2fa36b]" />
             Step 4: Purchase Order Entry In Tally

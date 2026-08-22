@@ -231,9 +231,9 @@ export default function POHistory() {
   };
 
   return (
-    <Card className="w-full max-w-7xl mx-auto bg-white shadow-lg border-0">
+    <Card className="w-full max-w-7xl mx-auto">
       {renderEditModal()}
-      <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white">
+      <CardHeader className="bg-gradient-to-r from-slate-50 to-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
@@ -302,20 +302,20 @@ export default function POHistory() {
           <div className="overflow-auto border border-gray-200 rounded-xl max-h-[calc(100vh-350px)] relative custom-scrollbar shadow-sm">
             <table className="w-full text-sm border-collapse">
               <thead className="sticky top-0 z-30">
-                <tr className="bg-slate-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm">PO ID</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm">Creation Date</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm">Firm Name</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm">Vendor Name</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm">Items</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm">Amount</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm">Status</th>
-                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-right bg-slate-50/95 backdrop-blur-sm shadow-sm">Actions</th>
+                <tr className="border-b border-gray-200">
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left /95 backdrop-blur-sm shadow-sm">PO ID</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left /95 backdrop-blur-sm shadow-sm">Creation Date</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left /95 backdrop-blur-sm shadow-sm">Firm Name</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left /95 backdrop-blur-sm shadow-sm">Vendor Name</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left /95 backdrop-blur-sm shadow-sm">Items</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left /95 backdrop-blur-sm shadow-sm">Amount</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left /95 backdrop-blur-sm shadow-sm">Status</th>
+                  <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-right /95 backdrop-blur-sm shadow-sm">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
                 {filteredPOs.map((po) => (
-                  <tr key={po.id} className="hover:bg-slate-50 transition-colors border-b border-gray-100">
+                  <tr key={po.id} className="hover: transition-colors border-b border-gray-100">
                     <td className="px-4 py-3 font-medium text-blue-600">{po.poId}</td>
                     <td className="px-4 py-3 text-gray-600">{formatDate(po.date)}</td>
                     <td className="px-4 py-3 text-gray-700 font-medium">{po.firmName || "N/A"}</td>

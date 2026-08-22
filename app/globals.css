@@ -102,37 +102,39 @@
 }
 
 .dark {
-  --brand: #5ec792;
-  --brand-dark: #4db381;
-  --brand-deep: #a7e3c4;
-  --brand-soft: #1e3b2d;
-  --brand-faint: #16281f;
-  --surface: #0c120e;
+  /* Brand Green Retained & Optimized for Dark Mode */
+  --brand: #10b981;
+  --brand-dark: #059669;
+  --brand-deep: #34d399;
+  --brand-soft: rgba(16, 185, 129, 0.15);
+  --brand-faint: rgba(16, 185, 129, 0.05);
+  --surface: #0b0f19;
 
-  --background: #0c120e;
-  --foreground: #e7efe9;
-  --card: #131b16;
-  --card-foreground: #e7efe9;
-  --popover: #131b16;
-  --popover-foreground: #e7efe9;
+  /* Premium Midnight Obsidian / Deep Slate Theme */
+  --background: #0b0f19;
+  --foreground: #f8fafc;
+  --card: #151c2c;
+  --card-foreground: #f8fafc;
+  --popover: #151c2c;
+  --popover-foreground: #f8fafc;
   --primary: var(--brand);
-  --primary-foreground: #0c120e;
-  --secondary: #1a241e;
-  --secondary-foreground: #e7efe9;
-  --muted: #1a241e;
-  --muted-foreground: #93a49a;
-  --accent: var(--brand-faint);
-  --accent-foreground: var(--brand-deep);
-  --destructive: #b91c1c;
-  --destructive-foreground: #fef2f2;
-  --border: #223028;
-  --input: #223028;
+  --primary-foreground: #ffffff;
+  --secondary: #1e293b;
+  --secondary-foreground: #f8fafc;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: var(--brand-soft);
+  --accent-foreground: var(--brand);
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #233045;
+  --input: #233045;
   --ring: var(--brand);
   --chart-1: var(--brand);
-  --chart-2: #38bdf8;
-  --chart-3: #fbbf24;
-  --chart-4: #a78bfa;
-  --chart-5: #f472b6;
+  --chart-2: #3b82f6;
+  --chart-3: #f59e0b;
+  --chart-4: #8b5cf6;
+  --chart-5: #ec4899;
 }
 
 @layer base {

@@ -444,8 +444,8 @@ const handleFinalTallyMarkDone = async (entryId, checked) => {
         <Toast message={toast.message} description={toast.description} type={toast.type} onClose={closeToast} />
       )}
 
-      <Card className="shadow-md border-none">
-        <CardHeader className="p-4 border-b border-gray-200">
+      <Card className="">
+        <CardHeader className="p-4">
           <CardTitle className="flex items-center gap-2 text-gray-700 text-lg">
             <FileText className="h-5 w-5 text-[#2fa36b]" />
             Step 8: Final Tally Entry

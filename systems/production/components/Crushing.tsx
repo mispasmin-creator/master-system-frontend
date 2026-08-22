@@ -632,6 +632,7 @@ export default function Step5List() {
             // Insert new crushing record
             const { error: insertError } = await productionApi.post('crushing_actual', {
                     crushingItemId,
+                    firmName: formData.firmName || user?.firm || '',
                     dateOfProduction: formData.dateOfProduction,
                     inputQty: Number(formData.inputQty),
                     machineHours: Number(formData.machineHours) || 0,
