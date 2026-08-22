@@ -75,8 +75,10 @@ import { useAuth, FIRM_MAP } from "@/systems/production/context/AuthContext";
 
 // Type for Production items
 interface ProductionItem {
-  id: number;
+  id: number | string;
   productionId?: number | string;
+  receiptId?: number;
+  orderNumberOfProduction?: string;
   timestamp: string;
   deliveryOrderNo: string;
   firmName: string;
@@ -100,6 +102,30 @@ interface ProductionItem {
   cancelReason: string;
   product_rate: string;
 }
+
+export const formatProdSerial = (val?: any, receiptIdOrDo?: any): string => {
+  if (!val && !receiptIdOrDo) return "—";
+  const str = val ? String(val).trim() : "";
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+  let fallbackNum: number | string | null = null;
+  if (receiptIdOrDo != null) {
+    if (typeof receiptIdOrDo === "number") {
+      fallbackNum = receiptIdOrDo;
+    } else {
+      const matchDo = String(receiptIdOrDo).match(/(\d+)$/);
+      if (matchDo) fallbackNum = matchDo[1];
+    }
+  }
+
+  if (!str || isUuid) {
+    return fallbackNum != null ? String(fallbackNum).padStart(5, "0") : "—";
+  }
+  if (/^\d+$/.test(str)) return str.padStart(5, "0");
+  const match = str.match(/(\d+)$/);
+  if (match) return match[1].padStart(5, "0");
+  return fallbackNum != null ? String(fallbackNum).padStart(5, "0") : str;
+};
 
 // Column Definitions for Job Cards Table
 const JOBCARD_COLUMNS_META = [
@@ -297,6 +323,8 @@ export default function OrdersPage() {
       const productionRows: ProductionItem[] = filteredProduction.map((row: any) => ({
         id: row.id,
         productionId: row.id,
+        receiptId: row.receiptId,
+        orderNumberOfProduction: row.receipt?.orderNumberOfProduction,
         timestamp: row.createdAt || "",
         deliveryOrderNo: row.deliveryOrderNo || "",
         firmName: row.firmName || "",
@@ -628,8 +656,13 @@ export default function OrdersPage() {
     if (searchQuery.trim() !== "") {
       const q = searchQuery.toLowerCase().trim();
       baseData = baseData.filter((item) => {
+        const serialFormatted = formatProdSerial(
+          item.orderNumberOfProduction || item.productionId,
+          item.receiptId || item.deliveryOrderNo
+        );
         return [
           item.productionId,
+          serialFormatted,
           item.deliveryOrderNo,
           item.firmName,
           item.partyName,
@@ -997,6 +1030,13 @@ export default function OrdersPage() {
                             ) : (
                               "-"
                             )
+                          ) : col.dataKey === "productionId" ? (
+                            <span className="font-mono text-xs font-semibold text-olive-800 dark:text-olive-300 bg-olive-50 dark:bg-olive-950/40 px-2 py-0.5 rounded border border-olive-200 dark:border-olive-800">
+                              {formatProdSerial(
+                                item.orderNumberOfProduction || item.productionId,
+                                item.receiptId || item.deliveryOrderNo
+                              )}
+                            </span>
                           ) : col.dataKey === "timestamp" ||
                             col.dataKey === "expectedDeliveryDate" ? (
                             <div className="flex items-center gap-2">

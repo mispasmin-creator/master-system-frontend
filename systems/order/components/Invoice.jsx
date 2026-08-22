@@ -13,7 +13,7 @@ import { Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Invoice() {
-  const { user } = useAuth();
+  const { user, isReadOnly, isSuperAdmin } = useAuth();
   const [pending, setPending] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +24,6 @@ export default function Invoice() {
   const [invoiceCopy, setInvoiceCopy] = useState("");
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const isAdmin = user?.role === "admin" || user?.page_access === "all" || user?.page_access === "super admin";
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -44,20 +43,29 @@ export default function Invoice() {
   const handleFile = async (e) => {
     const file = e.target.files?.[0]; if (!file) return;
     setUploading(true);
-    try { const url = await uploadFileToStorage(file, "order-invoice"); setInvoiceCopy(url); toast.success("Invoice uploaded"); }
-    catch { toast.error("Upload failed"); } finally { setUploading(false); }
+    try {
+      const res = await uploadFileToStorage(file, "order-invoice");
+      const url = typeof res === "object" && res?.url ? res.url : (typeof res === "string" ? res : "");
+      setInvoiceCopy(url);
+      toast.success("Invoice uploaded");
+    } catch {
+      toast.error("Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (selected.length === 0) { toast.error("Select at least one dispatch"); return; }
-    if (!invoiceNo || !invoiceDate || !invoiceCopy) { toast.error("Invoice No., date and file are required"); return; }
+    const copyUrl = typeof invoiceCopy === "object" && invoiceCopy?.url ? invoiceCopy.url : String(invoiceCopy || "");
+    if (!invoiceNo || !invoiceDate || !copyUrl) { toast.error("Invoice No., date and file are required"); return; }
     setSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/order/invoice/submit`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ dispatchIds: selected, invoiceNo, invoiceDate, invoiceCopy }),
+        body: JSON.stringify({ dispatchIds: selected, invoiceNo, invoiceDate, invoiceCopy: copyUrl }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.message || "Failed");
@@ -78,7 +86,7 @@ export default function Invoice() {
         ))}
       </div>
 
-      {tab === "pending" && selected.length > 0 && isAdmin && (
+      {tab === "pending" && selected.length > 0 && !isReadOnly && (
         <Card>
           <CardHeader><CardTitle className="text-base">Invoice Details — {selected.length} dispatch(es)</CardTitle></CardHeader>
           <CardContent>
@@ -115,8 +123,21 @@ export default function Invoice() {
               <TableRow><TableCell colSpan={7} className="text-center py-10 text-zinc-400">No records</TableCell></TableRow>
             ) : (tab === "pending" ? pending : history).map(r => (
               <TableRow key={r.id} className={`text-sm cursor-pointer ${selected.includes(r.id) ? "bg-emerald-50 dark:bg-emerald-900/20" : ""}`}
-                onClick={() => tab === "pending" && isAdmin && toggle(r.id)}>
-                {tab === "pending" && <TableCell><input type="checkbox" readOnly checked={selected.includes(r.id)} className="accent-emerald-600" /></TableCell>}
+                onClick={() => tab === "pending" && !isReadOnly && toggle(r.id)}>
+                {tab === "pending" && (
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(r.id)}
+                      disabled={isReadOnly}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        if (!isReadOnly) toggle(r.id);
+                      }}
+                      className="accent-emerald-600 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                  </TableCell>
+                )}
                 <TableCell className="font-mono text-xs">{r.dSrNumber}</TableCell>
                 <TableCell className="font-mono text-xs">{r.doNumber}</TableCell>
                 <TableCell>{r.partyName}</TableCell>

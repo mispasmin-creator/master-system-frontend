@@ -82,11 +82,20 @@ export default function Offers() {
     }
   };
 
+  const getOfferOutstanding = (offer) => {
+    if (!offer) return 0;
+    if (offer.outstanding !== undefined && offer.outstanding !== null) {
+      return offer.outstanding;
+    }
+    return Math.max(0, (offer.amount || 0) - (offer.amountPaid || 0));
+  };
+
   const handleConvertOpen = (offer) => {
     setSelectedOffer(offer);
+    const currentOutstanding = getOfferOutstanding(offer);
     setConvertForm({
       checker: '',
-      amount: offer.amount || '',
+      amount: currentOutstanding || '',
       tdsAmount: '0',
       remark: `Converted from Offer ${offer.offerNo}`
     });
@@ -96,6 +105,20 @@ export default function Offers() {
   const handleConvertSubmit = async (e) => {
     e.preventDefault();
     if (!selectedOffer) return;
+
+    const convertAmt = parseFloat(convertForm.amount) || 0;
+    const currentOutstanding = getOfferOutstanding(selectedOffer);
+
+    if (convertAmt <= 0) {
+      alert('Please enter a valid conversion amount greater than 0.');
+      return;
+    }
+
+    if (convertAmt > currentOutstanding) {
+      alert(`Amount (₹${convertAmt}) exceeds outstanding balance of ₹${currentOutstanding}.`);
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await servicesApi.post(`/offers/${selectedOffer.id}/convert`, convertForm);
@@ -103,7 +126,9 @@ export default function Offers() {
         setIsConvertOpen(false);
         setSelectedOffer(null);
         fetchOffers();
-        alert(`Successfully converted Offer ${selectedOffer.offerNo} to Service Job ${res.data.serviceNo}!`);
+        alert(`Successfully converted ₹${convertAmt} from Offer ${selectedOffer.offerNo} to Service Job ${res.data.serviceNo}!`);
+      } else {
+        alert(res.error || 'Failed to convert offer.');
       }
     } catch (err) {
       alert(`Error converting offer: ${err.message}`);
@@ -194,6 +219,8 @@ export default function Offers() {
               <th className="p-3">Description</th>
               <th className="p-3">Location</th>
               <th className="p-3">Amount</th>
+              <th className="p-3">Amount To Be Paid</th>
+              <th className="p-3">Outstanding Amount</th>
               <th className="p-3">Offer Copy</th>
               <th className="p-3">Status</th>
               <th className="p-3">Action</th>
@@ -202,47 +229,56 @@ export default function Offers() {
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-800 dark:text-zinc-200">
             {loading ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-zinc-500">Loading offers...</td>
+                <td colSpan={11} className="p-8 text-center text-zinc-500">Loading offers...</td>
               </tr>
             ) : filteredOffers.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-zinc-500">No offers found.</td>
+                <td colSpan={11} className="p-8 text-center text-zinc-500">No offers found.</td>
               </tr>
             ) : (
-              filteredOffers.map((o) => (
-                <tr key={o.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
-                  <td className="p-3 font-semibold text-zinc-900 dark:text-white">{o.offerNo}</td>
-                  <td className="p-3">{o.firmName}</td>
-                  <td className="p-3 font-medium">{o.vendor}</td>
-                  <td className="p-3 max-w-xs truncate" title={o.description}>{o.description || '-'}</td>
-                  <td className="p-3">{o.location || '-'}</td>
-                  <td className="p-3 font-semibold">{formatCurrency(o.amount)}</td>
-                  <td className="p-3">
-                    {o.offerCopy ? (
-                      <a href={o.offerCopy} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline font-medium">View File</a>
-                    ) : (
-                      <span className="text-zinc-400">None</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      o.status === 'Converted' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                    }`}>
-                      {o.status}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    {o.status !== 'Converted' && (
-                      <button
-                        onClick={() => handleConvertOpen(o)}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-semibold transition-colors"
-                      >
-                        Convert to Service
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))
+              filteredOffers.map((o) => {
+                const outstandingAmt = getOfferOutstanding(o);
+                const isConvertible = o.status !== 'Converted' && outstandingAmt > 0;
+
+                return (
+                  <tr key={o.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                    <td className="p-3 font-semibold text-zinc-900 dark:text-white">{o.offerNo}</td>
+                    <td className="p-3">{o.firmName}</td>
+                    <td className="p-3 font-medium">{o.vendor}</td>
+                    <td className="p-3 max-w-xs truncate" title={o.description}>{o.description || '-'}</td>
+                    <td className="p-3">{o.location || '-'}</td>
+                    <td className="p-3 font-semibold">{formatCurrency(o.amount)}</td>
+                    <td className="p-3 font-semibold">{formatCurrency(o.amountPaid || 0)}</td>
+                    <td className="p-3 font-semibold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(outstandingAmt)}
+                    </td>
+                    <td className="p-3">
+                      {o.offerCopy ? (
+                        <a href={o.offerCopy} target="_blank" rel="noreferrer" className="text-emerald-600 hover:underline font-medium">View File</a>
+                      ) : (
+                        <span className="text-zinc-400">None</span>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        o.status === 'Converted' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {o.status}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      {isConvertible && (
+                        <button
+                          onClick={() => handleConvertOpen(o)}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-semibold transition-colors cursor-pointer"
+                        >
+                          Convert to Service
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -347,7 +383,12 @@ export default function Offers() {
       {isConvertOpen && selectedOffer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="w-full max-w-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 space-y-4 shadow-xl">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Convert Offer {selectedOffer.offerNo} to Service Job</h3>
+            <div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Convert Offer {selectedOffer.offerNo}</h3>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Outstanding Balance: <span className="font-bold text-amber-600 dark:text-amber-400">{formatCurrency(getOfferOutstanding(selectedOffer))}</span>
+              </p>
+            </div>
             <form onSubmit={handleConvertSubmit} className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Checker Name</label>
@@ -367,10 +408,12 @@ export default function Offers() {
                   <input
                     type="number"
                     required
+                    max={getOfferOutstanding(selectedOffer)}
                     value={convertForm.amount}
                     onChange={(e) => setConvertForm({ ...convertForm, amount: e.target.value })}
                     className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
                   />
+                  <p className="text-[10px] text-zinc-400 mt-0.5">Max: {formatCurrency(getOfferOutstanding(selectedOffer))}</p>
                 </div>
                 <div>
                   <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">TDS Amount (₹)</label>

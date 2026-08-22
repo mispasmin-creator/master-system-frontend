@@ -22,6 +22,7 @@ export function AuthProvider({ children }) {
       // Map properties to fit Purchase FMS requirements
       const mappedUser = {
         username: rawUser.username,
+        role: rawUser.role || "",
         firmName: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map(f => f.trim()).filter(Boolean),
         globalFirms: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map(f => f.trim()).filter(Boolean),
         isReadOnly: parsed.isViewOnly,

@@ -73,12 +73,12 @@ const DEBIT_NOTE_COLUMNS_META = [
   { header: "Bill No", dataKey: "billNo", toggleable: true },
   { header: "Bill Image", dataKey: "billImage", toggleable: true },
   { header: "Credit Note", dataKey: "creditNoteUrl", toggleable: true },
+  { header: "Advance Details", dataKey: "advanceDetails", toggleable: true },
   { header: "Transporter Name", dataKey: "transporterName", toggleable: true },
   { header: "Vehicle No", dataKey: "vehicleNo", toggleable: true },
   { header: "Status", dataKey: "status", toggleable: true },
   { header: "Qty Diff Status", dataKey: "qtyDifferenceStatus", toggleable: true },
   { header: "Debit Amount", dataKey: "debitAmount", toggleable: true },
-  { header: "Debit Image", dataKey: "debitNoteUrl", toggleable: true },
   { header: "Remarks", dataKey: "remarks", toggleable: true },
 ];
 
@@ -237,7 +237,9 @@ export default function DebitNote() {
         timestamp: formatTimestamp(row.timestamp),
         _rawTimestamp: row.timestamp,
         firmName: normalizeFirmName(row.firmName) || "",
-        remarks: "",
+        remarks: row.remarks || "",
+        advanceAmount: row.advanceAmount || row.toBePaidAmount || "",
+        advanceDetails: row.advanceDetails || (row.advanceAmount ? `₹${row.advanceAmount}` : ""),
         debitAmount: "",
         debitNoteUrl: "",
         isFromReAudit: row.actionType === "Make Debit Note (Re-Audit)",
@@ -249,6 +251,9 @@ export default function DebitNote() {
         timestamp: formatTimestamp(row.timestamp),
         _rawTimestamp: row.timestamp,
         firmName: normalizeFirmName(row.firmName) || "",
+        remarks: row.remarks || "",
+        advanceAmount: row.advanceAmount || row.debitAmount || "",
+        advanceDetails: row.advanceDetails || (row.advanceAmount ? `₹${row.advanceAmount}` : ""),
       }));
 
       const allMergedData = [...pendingRows, ...historyRows];
@@ -418,10 +423,8 @@ export default function DebitNote() {
       return;
     }
 
-    const hasImage = debitImageFile || editingItem.debitNoteUrl;
-
-    if (!remarks.trim() || !debitAmount || !hasImage) {
-      toast.error("Please provide remarks, a Debit Amount, and a Debit Image.");
+    if (!remarks.trim() || !debitAmount) {
+      toast.error("Please provide remarks and a Debit Amount.");
       return;
     }
 
@@ -445,6 +448,9 @@ export default function DebitNote() {
           debitNoteUrl: publicUrl,
           remarks: remarks.trim(),
           purchaseReturnNo: editingItem.purchaseReturnNo || null,
+          createdBy: user?.username || "Admin",
+          liftId: editingItem.liftId || null,
+          firmName: editingItem.firmName || null,
         }),
       });
       const json = await res.json();
@@ -565,6 +571,17 @@ export default function DebitNote() {
           </svg>
           View
         </a>
+      ) : (
+        <span className="text-gray-400 dark:text-zinc-500 text-xs">-</span>
+      );
+    }
+
+    if (column.dataKey === "advanceDetails" || column.dataKey === "advanceAmount") {
+      const adv = item.advanceDetails || (item.advanceAmount ? `₹${item.advanceAmount}` : "");
+      return adv ? (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800">
+          {adv}
+        </span>
       ) : (
         <span className="text-gray-400 dark:text-zinc-500 text-xs">-</span>
       );
@@ -711,6 +728,14 @@ export default function DebitNote() {
                   <Label className="text-sm font-medium">Product</Label>
                   <div className="p-2 bg-gray-50 rounded border text-sm">{editingItem.productName}</div>
                 </div>
+                {editingItem.advanceDetails && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label className="text-sm font-medium text-amber-800 dark:text-amber-300">Advance Details</Label>
+                    <div className="p-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded text-sm font-semibold text-amber-900 dark:text-amber-200">
+                      {editingItem.advanceDetails}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -733,7 +758,7 @@ export default function DebitNote() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">Debit Image <span className="text-red-500">*</span></Label>
+                  <Label className="text-sm font-medium">Debit Image (Optional)</Label>
                   <Input
                     type="file"
                     accept="image/*,application/pdf,.pdf"

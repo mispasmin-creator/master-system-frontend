@@ -493,6 +493,18 @@ export default function ThreeParty() {
     });
   };
 
+  const CHEMICAL_FIELDS = ["alumina", "iron", "sio2", "cao", "ap", "bd", "fineness"];
+
+  const isChemicalAnalysisComplete = useMemo(() => {
+    const filledVendors = vendorForms.filter((v) => v.name && v.name.trim() !== "");
+    if (filledVendors.length === 0) return false;
+    return filledVendors.every((v) =>
+      CHEMICAL_FIELDS.every(
+        (field) => v[field] !== undefined && v[field] !== null && String(v[field]).trim() !== ""
+      )
+    );
+  }, [vendorForms]);
+
   // Calculate lowest rate among vendors
   const lowestRate = useMemo(() => {
     const validRates = vendorForms
@@ -516,9 +528,20 @@ export default function ThreeParty() {
     if (!selectedIndent) return;
 
     // Validate at least one vendor selected
-    const hasVendor = vendorForms.some((v) => v.name);
-    if (!hasVendor) {
+    const filledVendors = vendorForms.filter((v) => v.name && v.name.trim() !== "");
+    if (filledVendors.length === 0) {
       toast.error("Please select at least one vendor");
+      return;
+    }
+
+    // Validate all mandatory chemical analysis fields for each filled vendor
+    const missingChemical = filledVendors.some((v) =>
+      CHEMICAL_FIELDS.some(
+        (field) => v[field] === undefined || v[field] === null || String(v[field]).trim() === ""
+      )
+    );
+    if (missingChemical) {
+      toast.error("All chemical analysis fields (Al₂O₃, Fe₂O₃, SiO₂, CaO, AP, BD, Fineness) are mandatory for every selected vendor.");
       return;
     }
 
@@ -1521,20 +1544,22 @@ export default function ThreeParty() {
                           />
                         </div>
                         <div>
-                          <Label className="block mb-2 text-xs font-medium text-gray-600">
-                            Chemical Analysis (%)
-                          </Label>
-                          <p className="mb-2 text-[10px] text-gray-400">
-                            Optional
-                          </p>
+                          <div className="flex items-center justify-between mb-1">
+                            <Label className="block text-xs font-medium text-gray-700 dark:text-gray-200">
+                              Chemical Analysis (%) <span className="text-red-500">*</span>
+                            </Label>
+                            <span className="text-[10px] text-red-600 dark:text-red-400 font-semibold uppercase tracking-wider">
+                              Mandatory
+                            </span>
+                          </div>
                           <div className="grid grid-cols-3 gap-2">
                             {[
-                              ["alumina", "Al₂O₃"],
-                              ["iron", "Fe₂O₃"],
-                              ["sio2", "SiO₂"],
-                              ["cao", "CaO"],
-                              ["ap", "AP"],
-                              ["bd", "BD"],
+                              ["alumina", "Al₂O₃ *"],
+                              ["iron", "Fe₂O₃ *"],
+                              ["sio2", "SiO₂ *"],
+                              ["cao", "CaO *"],
+                              ["ap", "AP *"],
+                              ["bd", "BD *"],
                             ].map(([field, label]) => (
                               <div key={field}>
                                 <Label className="block mb-1 text-[9px] text-gray-500">
@@ -1542,11 +1567,14 @@ export default function ThreeParty() {
                                 </Label>
                                 <Input
                                   type="text"
+                                  required
                                   value={currentVendor[field]}
                                   onChange={(e) =>
                                     updateVendorForm(idx, field, e.target.value)
                                   }
-                                  className="h-7 text-[10px] border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+                                  className={`h-7 text-[10px] border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 ${
+                                    currentVendor.name && !String(currentVendor[field] || "").trim() ? "border-red-300 dark:border-red-800 focus:border-red-500" : ""
+                                  }`}
                                   placeholder="0.00"
                                 />
                               </div>
@@ -1554,10 +1582,11 @@ export default function ThreeParty() {
                           </div>
                           <div className="mt-2">
                             <Label className="block mb-1 text-[9px] text-gray-500">
-                              Fineness
+                              Fineness <span className="text-red-500">*</span>
                             </Label>
                             <Input
                               type="text"
+                              required
                               value={currentVendor.fineness}
                               onChange={(e) =>
                                 updateVendorForm(
@@ -1566,7 +1595,9 @@ export default function ThreeParty() {
                                   e.target.value,
                                 )
                               }
-                              className="h-7 text-[10px] border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+                              className={`h-7 text-[10px] border-gray-200 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 ${
+                                currentVendor.name && !String(currentVendor.fineness || "").trim() ? "border-red-300 dark:border-red-800 focus:border-red-500" : ""
+                              }`}
                               placeholder="Details"
                             />
                           </div>
@@ -1578,24 +1609,33 @@ export default function ThreeParty() {
               </div>
 
               {/* Sticky Footer */}
-              <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 px-6 flex justify-end gap-3 rounded-b-2xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-                <Button
-                  variant="outline"
-                  onClick={() => setOpenDialog(false)}
-                  className="px-6"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={onSubmit}
-                  disabled={isSubmitting || !vendorForms.some((v) => v.name)}
-                  className="px-6 bg-[#2fa36b] hover:bg-[#268a59] text-white"
-                >
-                  {isSubmitting ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  Submit to Factory Approval
-                </Button>
+              <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 px-6 flex items-center justify-between gap-3 rounded-b-2xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                <div>
+                  {!isChemicalAnalysisComplete && vendorForms.some((v) => v.name) && (
+                    <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> All chemical analysis fields are mandatory for approval
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setOpenDialog(false)}
+                    className="px-6"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={onSubmit}
+                    disabled={isSubmitting || !vendorForms.some((v) => v.name) || !isChemicalAnalysisComplete}
+                    className="px-6 bg-[#2fa36b] hover:bg-[#268a59] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    Submit to Factory Approval
+                  </Button>
+                </div>
               </div>
             </div>
           )}

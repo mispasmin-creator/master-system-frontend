@@ -24,7 +24,10 @@ import {
   ExternalLink,
   ChevronsUpDown,
   History,
-  FileClock
+  FileClock,
+  Search,
+  FileText,
+  Eye,
 } from "lucide-react";
 import { MixerHorizontalIcon } from "@radix-ui/react-icons";
 import { AuthContext } from "../context/AuthContext";
@@ -35,6 +38,19 @@ import { canViewFirm } from "../utils/firmFilter";
 const cleanIndentId = (indentId) => {
   if (!indentId) return "";
   return String(indentId).replace(/[^a-zA-Z0-9-]/g, "");
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return "-";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return dateString;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 };
 
 const SearchableSelect = ({
@@ -196,6 +212,37 @@ export default function OriginalBillsFiledPage() {
     columns.reduce((acc, col) => ({ ...acc, [col.dataKey]: col.alwaysVisible || col.toggleable }), {})
   );
 
+  // PO History read-only reference state (sourced from /purchase/generate-po/po-history)
+  const [poHistoryList, setPoHistoryList] = useState([]);
+  const [loadingPoHistory, setLoadingPoHistory] = useState(true);
+  const [poSearchQuery, setPoSearchQuery] = useState("");
+  const [poDateFilter, setPoDateFilter] = useState("");
+
+  const fetchPOHistory = useCallback(async () => {
+    setLoadingPoHistory(true);
+    try {
+      const res = await fetch(`${API_URL}/purchase/generate-po/po-history`);
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Failed to load PO history");
+      }
+
+      let result = json.data || [];
+      if (user?.firmName) {
+        result = result.filter((po) => canViewFirm(user.firmName, po.firmName));
+      }
+      setPoHistoryList(result);
+    } catch (err) {
+      console.error("Error fetching PO history in AdvancePayment:", err);
+    } finally {
+      setLoadingPoHistory(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchPOHistory();
+  }, [fetchPOHistory, refreshTrigger]);
+
   const fetchSheetData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -271,6 +318,26 @@ export default function OriginalBillsFiledPage() {
     // Sort logic removed to simply show all history
     return applyFilters(history);
   }, [sheetData, applyFilters]);
+
+  // Read-only PO History filter computation
+  const filteredPOHistory = useMemo(() => {
+    return poHistoryList.filter((po) => {
+      const searchMatch =
+        (po.poId || "").toLowerCase().includes(poSearchQuery.toLowerCase()) ||
+        (po.vendorName || "").toLowerCase().includes(poSearchQuery.toLowerCase()) ||
+        (po.firmName || "").toLowerCase().includes(poSearchQuery.toLowerCase()) ||
+        (po.items || []).join(", ").toLowerCase().includes(poSearchQuery.toLowerCase());
+
+      const dateMatch =
+        !poDateFilter || (po.date && po.date.startsWith(poDateFilter));
+
+      const vendorMatch =
+        filters.vendorName === "all" ||
+        (po.vendorName && po.vendorName.trim().toLowerCase() === filters.vendorName.trim().toLowerCase());
+
+      return searchMatch && dateMatch && vendorMatch;
+    });
+  }, [poHistoryList, poSearchQuery, poDateFilter, filters.vendorName]);
 
   const getUniqueValues = (field) => {
     const values = sheetData.map((entry) => entry[field]).filter((value) => value && value.trim() !== "");
@@ -555,7 +622,7 @@ export default function OriginalBillsFiledPage() {
         </CardHeader>
         <CardContent className="p-4 flex-1 flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <TabsList className="grid w-[400px] grid-cols-2 mb-4">
+            <TabsList className="grid w-[600px] grid-cols-3 mb-4">
               <TabsTrigger value="pending" className="flex items-center gap-2">
                 <FileClock className="h-4 w-4" />
                 Pending Payments
@@ -565,6 +632,11 @@ export default function OriginalBillsFiledPage() {
                 <History className="h-4 w-4" />
                 Payment History
                 <Badge variant="outline" className="ml-1 text-xs">{historyEntries.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="poHistory" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                PO History
+                <Badge variant="outline" className="ml-1 text-xs">{filteredPOHistory.length}</Badge>
               </TabsTrigger>
             </TabsList>
 
@@ -703,6 +775,126 @@ export default function OriginalBillsFiledPage() {
                     </div>
                   ) : (
                     renderTable(historyEntries, true)
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="poHistory" className="flex-1 flex flex-col mt-0 h-full">
+              <Card className="shadow-none border flex-1 flex flex-col h-full bg-white dark:bg-zinc-900">
+                <CardHeader className="py-3 px-4 border-b">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                      <CardTitle className="flex items-center text-base">
+                        PO & Payment History ({filteredPOHistory.length})
+                      </CardTitle>
+                      <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                        Read-only reference of prior purchase orders and payment statuses
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <div className="relative flex-1 sm:w-64">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 w-3.5 h-3.5" />
+                        <Input
+                          placeholder="Search PO ID, vendor, material..."
+                          className="pl-8 h-8 text-xs bg-white dark:bg-zinc-900"
+                          value={poSearchQuery}
+                          onChange={(e) => setPoSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      <Input
+                        type="date"
+                        className="w-36 h-8 text-xs bg-white dark:bg-zinc-900"
+                        value={poDateFilter}
+                        onChange={(e) => setPoDateFilter(e.target.value)}
+                      />
+                      {(poSearchQuery || poDateFilter) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => {
+                            setPoSearchQuery("");
+                            setPoDateFilter("");
+                          }}
+                        >
+                          Reset
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0 flex-1 overflow-hidden h-full">
+                  {loadingPoHistory ? (
+                    <div className="flex h-40 items-center justify-center gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-[#2fa36b]" /> Loading PO History...
+                    </div>
+                  ) : filteredPOHistory.length === 0 ? (
+                    <div className="text-center py-16 border-dashed rounded-xl">
+                      <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 font-medium">No purchase order records found</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-auto border-0 max-h-[calc(100vh-420px)] relative custom-scrollbar">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-muted/80 backdrop-blur-sm z-10">
+                          <TableRow>
+                            <TableHead className="text-xs font-bold">PO ID</TableHead>
+                            <TableHead className="text-xs font-bold">Creation Date</TableHead>
+                            <TableHead className="text-xs font-bold">Firm Name</TableHead>
+                            <TableHead className="text-xs font-bold">Vendor Name</TableHead>
+                            <TableHead className="text-xs font-bold">Items</TableHead>
+                            <TableHead className="text-xs font-bold">PO Amount</TableHead>
+                            <TableHead className="text-xs font-bold">Status</TableHead>
+                            <TableHead className="text-xs font-bold text-right">PO Copy</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredPOHistory.map((po) => (
+                            <TableRow key={po.id} className="hover:bg-muted/50 text-xs">
+                              <TableCell className="py-2.5 px-3 font-medium text-blue-600">{po.poId}</TableCell>
+                              <TableCell className="py-2.5 px-3 text-gray-600">{formatDate(po.date)}</TableCell>
+                              <TableCell className="py-2.5 px-3 text-gray-700">{po.firmName || "-"}</TableCell>
+                              <TableCell className="py-2.5 px-3 font-semibold text-gray-800">{po.vendorName}</TableCell>
+                              <TableCell className="py-2.5 px-3">
+                                <div className="flex flex-wrap gap-1">
+                                  {po.items.map((item, idx) => (
+                                    <Badge key={idx} variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 border-blue-100">
+                                      {item}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-2.5 px-3 font-bold">₹{Number(po.totalAmount).toLocaleString("en-IN")}</TableCell>
+                              <TableCell className="py-2.5 px-3">
+                                <Badge
+                                  className={`text-[10px] ${
+                                    po.status === "Logistics Arranged"
+                                      ? "bg-green-100 text-green-700 border-green-200"
+                                      : po.status === "Entered in Tally"
+                                      ? "bg-blue-100 text-blue-700 border-blue-200"
+                                      : "bg-amber-100 text-amber-700 border-amber-200"
+                                  }`}
+                                >
+                                  {po.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-2.5 px-3 text-right">
+                                {po.pdfUrl ? (
+                                  <Button variant="outline" size="sm" className="h-7 text-xs bg-white text-blue-600 border-blue-200 hover:bg-blue-50" asChild>
+                                    <a href={po.pdfUrl} target="_blank" rel="noopener noreferrer">
+                                      <Eye className="h-3.5 w-3.5 mr-1" /> View PDF
+                                    </a>
+                                  </Button>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">No PDF</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>

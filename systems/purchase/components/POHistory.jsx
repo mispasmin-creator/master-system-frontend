@@ -55,7 +55,10 @@ export default function POHistory() {
   const fetchPOHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/purchase/generate-po/po-history`);
+      const token = getToken();
+      const res = await fetch(`${API_URL}/purchase/generate-po/po-history`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const json = await res.json();
       if (!res.ok || !json.success) {
         throw new Error(json.message || "Failed to load PO history");
@@ -81,16 +84,24 @@ export default function POHistory() {
   }, [fetchPOHistory]);
 
   const filteredPOs = useMemo(() => {
+    const q = (searchQuery || "").trim().toLowerCase();
     return poList.filter((po) => {
+      if (!po) return false;
+      const poId = String(po.poId || "");
+      const vendor = String(po.vendorName || "");
+      const firm = String(po.firmName || "");
+      const itemsList = Array.isArray(po.items) ? po.items : (po.items ? [po.items] : []);
+      const itemsStr = itemsList.join(", ");
+
       const searchMatch =
-        po.poId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        po.vendorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (po.firmName &&
-          po.firmName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        po.items.join(", ").toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        poId.toLowerCase().includes(q) ||
+        vendor.toLowerCase().includes(q) ||
+        firm.toLowerCase().includes(q) ||
+        itemsStr.toLowerCase().includes(q);
 
       const dateMatch =
-        !dateFilter || (po.date && po.date.startsWith(dateFilter));
+        !dateFilter || (po.date && String(po.date).startsWith(dateFilter));
 
       return searchMatch && dateMatch;
     });
@@ -308,10 +319,10 @@ export default function POHistory() {
                     <td className="px-4 py-3 font-medium text-blue-600">{po.poId}</td>
                     <td className="px-4 py-3 text-gray-600">{formatDate(po.date)}</td>
                     <td className="px-4 py-3 text-gray-700 font-medium">{po.firmName || "N/A"}</td>
-                    <td className="px-4 py-3 font-semibold text-gray-800">{po.vendorName}</td>
+                    <td className="px-4 py-3 font-semibold text-gray-800">{po.vendorName || "N/A"}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
-                        {po.items.map((item, idx) => (
+                        {(Array.isArray(po.items) ? po.items : (po.items ? [po.items] : [])).map((item, idx) => (
                           <Badge
                             key={idx}
                             variant="secondary"
@@ -323,7 +334,7 @@ export default function POHistory() {
                       </div>
                     </td>
                     <td className="px-4 py-3 font-bold">
-                      ₹{Number(po.totalAmount).toLocaleString("en-IN")}
+                      ₹{Number(po.totalAmount || 0).toLocaleString("en-IN")}
                     </td>
                     <td className="px-4 py-3">
                       <Badge

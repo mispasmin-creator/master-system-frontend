@@ -4,10 +4,14 @@ import { servicesApi } from '../../lib/api';
 export default function Services() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('active'); // active | completed
+  const [activeTab, setActiveTab] = useState('pending'); // pending | completed
   const [search, setSearch] = useState('');
   const [firmFilter, setFirmFilter] = useState('All');
   const [stageFilter, setStageFilter] = useState('All');
+
+  // Checkbox & Submit state per row
+  const [checkedRows, setCheckedRows] = useState({});
+  const [submittingRowId, setSubmittingRowId] = useState(null);
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -24,9 +28,7 @@ export default function Services() {
     amount: '',
     tdsAmount: '0',
     checker: '',
-    remark: '',
-    planned1: '',
-    actual1: ''
+    remark: ''
   });
 
   const fetchJobs = async () => {
@@ -46,6 +48,40 @@ export default function Services() {
   useEffect(() => {
     fetchJobs();
   }, [firmFilter, stageFilter, search]);
+
+  const handleCheckboxToggle = (jobId, checked) => {
+    setCheckedRows((prev) => ({
+      ...prev,
+      [jobId]: checked
+    }));
+  };
+
+  const handleSubmitDone = async (job) => {
+    setSubmittingRowId(job.id);
+    try {
+      const res = await servicesApi.put(`/jobs/${job.id}`, {
+        paymentFormDone: true,
+        actual1: job.actual1 ? job.actual1 : new Date().toISOString()
+      });
+
+      if (res?.success) {
+        // Clear checked row state and refresh list
+        setCheckedRows((prev) => {
+          const next = { ...prev };
+          delete next[job.id];
+          return next;
+        });
+        await fetchJobs();
+      } else {
+        throw new Error(res?.error || 'Failed to submit service completion');
+      }
+    } catch (err) {
+      console.error('Failed to submit done status:', err);
+      alert(`Failed to submit: ${err.message}`);
+    } finally {
+      setSubmittingRowId(null);
+    }
+  };
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
@@ -103,33 +139,15 @@ export default function Services() {
     }
   };
 
-  const handleTogglePaymentFormDone = async (jobId, checked) => {
-    setJobs((prevJobs) =>
-      prevJobs.map((j) => (j.id === jobId ? { ...j, paymentFormDone: checked } : j))
-    );
-    try {
-      const res = await servicesApi.put(`/jobs/${jobId}`, { paymentFormDone: checked });
-      if (!res?.success) {
-        throw new Error(res?.error || 'Failed to update status');
-      }
-    } catch (err) {
-      console.error('Failed to update paymentFormDone:', err);
-      alert(`Failed to update status: ${err.message}`);
-      setJobs((prevJobs) =>
-        prevJobs.map((j) => (j.id === jobId ? { ...j, paymentFormDone: !checked } : j))
-      );
-    }
-  };
+  const isJobCompleted = (j) => Boolean(j.paymentFormDone || j.status === 'Completed');
 
-  const filteredJobs = jobs.filter((j) => {
-    if (activeTab === 'active') return j.status !== 'Completed';
-    return j.status === 'Completed';
-  });
+  const pendingJobs = jobs.filter((j) => !isJobCompleted(j));
+  const completedJobs = jobs.filter((j) => isJobCompleted(j));
+
+  const filteredJobs = activeTab === 'pending' ? pendingJobs : completedJobs;
 
   const formatCurrency = (amt) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amt || 0);
-
-  const formatDate = (dt) => (dt ? new Date(dt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-');
 
   return (
     <div className="space-y-6">
@@ -154,14 +172,14 @@ export default function Services() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-xl w-fit">
           <button
-            onClick={() => setActiveTab('active')}
+            onClick={() => setActiveTab('pending')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === 'active'
+              activeTab === 'pending'
                 ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
             }`}
           >
-            Active Services ({jobs.filter((j) => j.status !== 'Completed').length})
+            Payment Pending ({pendingJobs.length})
           </button>
           <button
             onClick={() => setActiveTab('completed')}
@@ -171,7 +189,7 @@ export default function Services() {
                 : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
             }`}
           >
-            Completed ({jobs.filter((j) => j.status === 'Completed').length})
+            Completed ({completedJobs.length})
           </button>
         </div>
 
@@ -215,16 +233,16 @@ export default function Services() {
         <table className="w-full text-left text-xs">
           <thead className="bg-zinc-50 dark:bg-zinc-800/60 text-zinc-500 font-semibold border-b border-zinc-200 dark:border-zinc-800">
             <tr>
-              <th className="p-3 w-12 text-center">Done</th>
-              <th className="p-3">Service No</th>
-              <th className="p-3">Firm</th>
-              <th className="p-3">Vendor</th>
-              <th className="p-3">Description</th>
-              <th className="p-3">Amount</th>
+              <th className="p-3 w-28 text-center">DONE</th>
+              <th className="p-3">Offer No.</th>
+              <th className="p-3">Service No.</th>
+              <th className="p-3">Firm Name</th>
               <th className="p-3">Checker</th>
-              <th className="p-3">Work Stage 1 (P / A / Delay)</th>
-              <th className="p-3">Derived Status</th>
-              <th className="p-3">Action</th>
+              <th className="p-3">Total Amount</th>
+              <th className="p-3">TDS</th>
+              <th className="p-3">Actual Amount</th>
+              <th className="p-3">Vendor</th>
+              <th className="p-3 text-center">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-800 dark:text-zinc-200">
@@ -237,45 +255,72 @@ export default function Services() {
                 <td colSpan={10} className="p-8 text-center text-zinc-500">No service jobs found.</td>
               </tr>
             ) : (
-              filteredJobs.map((j) => (
-                <tr key={j.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
-                  <td className="p-3 text-center">
-                    <input
-                      type="checkbox"
-                      checked={!!j.paymentFormDone}
-                      onChange={(e) => handleTogglePaymentFormDone(j.id, e.target.checked)}
-                      className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                    />
-                  </td>
-                  <td className="p-3 font-semibold text-zinc-900 dark:text-white">{j.serviceNo}</td>
-                  <td className="p-3">{j.firmName}</td>
-                  <td className="p-3 font-medium">{j.vendor}</td>
-                  <td className="p-3 max-w-xs truncate" title={j.description}>{j.description || '-'}</td>
-                  <td className="p-3 font-semibold">{formatCurrency(j.amount)}</td>
-                  <td className="p-3">{j.checker || '-'}</td>
-                  <td className="p-3">
-                    <span className="text-[11px] text-zinc-500">
-                      P: {formatDate(j.planned1)} | A: {formatDate(j.actual1)}
-                      {j.delay1 > 0 && <span className="ml-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 font-bold">{j.delay1}d delay</span>}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                      {j.status}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <a
-                      href="https://docs.google.com/forms/d/e/1FAIpQLScn8tHEUldlOM_8DKpHUfHHiRImDVjkpkhhfduaZUIxpxlJrA/viewform"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-semibold transition-colors inline-block"
-                    >
-                      Payment Form
-                    </a>
-                  </td>
-                </tr>
-              ))
+              filteredJobs.map((j) => {
+                const isCompleted = isJobCompleted(j);
+                const isChecked = Boolean(checkedRows[j.id]);
+                const isSubmittingThis = submittingRowId === j.id;
+                const totalAmount = j.amount || 0;
+                const tdsAmount = j.tdsAmount || 0;
+                const actualAmount = totalAmount - tdsAmount;
+                const offerNumber = j.offer?.offerNo || j.offerNo || '-';
+
+                return (
+                  <tr key={j.id} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 transition-colors">
+                    <td className="p-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5 min-w-[90px]">
+                        <input
+                          type="checkbox"
+                          checked={isCompleted || isChecked}
+                          disabled={isCompleted || isSubmittingThis}
+                          onChange={(e) => handleCheckboxToggle(j.id, e.target.checked)}
+                          className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:cursor-default"
+                        />
+                        {!isCompleted && isChecked && (
+                          <button
+                            type="button"
+                            disabled={isSubmittingThis}
+                            onClick={() => handleSubmitDone(j)}
+                            className="px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-sm transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          >
+                            {isSubmittingThis ? '...' : 'Submit'}
+                          </button>
+                        )}
+                        {isCompleted && (
+                          <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">Done</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3 font-semibold text-zinc-700 dark:text-zinc-300">{offerNumber}</td>
+                    <td className="p-3 font-semibold text-zinc-900 dark:text-white">{j.serviceNo}</td>
+                    <td className="p-3">{j.firmName}</td>
+                    <td className="p-3">{j.checker || '-'}</td>
+                    <td className="p-3 font-semibold">{formatCurrency(totalAmount)}</td>
+                    <td className="p-3 text-zinc-500">{formatCurrency(tdsAmount)}</td>
+                    <td className="p-3 font-semibold text-emerald-600 dark:text-emerald-400">{formatCurrency(actualAmount)}</td>
+                    <td className="p-3 font-medium">{j.vendor}</td>
+                    <td className="p-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <a
+                          href="https://docs.google.com/forms/d/e/1FAIpQLScn8tHEUldlOM_8DKpHUfHHiRImDVjkpkhhfduaZUIxpxlJrA/viewform"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 font-semibold transition-colors inline-block"
+                        >
+                          Payment Form
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleEditOpen(j)}
+                          className="px-2 py-1 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 text-[11px] font-medium"
+                          title="Edit Service Details"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -368,26 +413,7 @@ export default function Services() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Planned Date 1 (Work Start)</label>
-                  <input
-                    type="date"
-                    value={jobForm.planned1}
-                    onChange={(e) => setJobForm({ ...jobForm, planned1: e.target.value })}
-                    className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Actual Date 1 (Work Started)</label>
-                  <input
-                    type="date"
-                    value={jobForm.actual1}
-                    onChange={(e) => setJobForm({ ...jobForm, actual1: e.target.value })}
-                    className="w-full h-9 px-3 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                  />
-                </div>
-              </div>
+
 
               <div>
                 <label className="block font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Remarks</label>

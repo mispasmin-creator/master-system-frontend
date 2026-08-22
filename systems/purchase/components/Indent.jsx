@@ -35,9 +35,12 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { canViewFirm } from "../utils/firmFilter";
 import { API_URL, getToken } from "@/lib/auth";
+import { inventoryApi } from "@/systems/inventory/lib/api";
 
 export default function IndentForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingStock, setIsFetchingStock] = useState(false);
+  const [isFetchingDO, setIsFetchingDO] = useState(false);
   const [formData, setFormData] = useState({
     generatedBy: "",
     vendorName: "",
@@ -136,6 +139,89 @@ export default function IndentForm() {
     }
   }, [formData.firmName, dropdownOptions.firmNameMapping, formData.generatedBy]);
 
+  // Live-fetch Current Factory Stock from Inventory module whenever item or firm changes
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveStock = async () => {
+      if (!formData.rawMaterialName) {
+        setFormData((prev) => ({ ...prev, currentStock: "" }));
+        return;
+      }
+      setIsFetchingStock(true);
+      try {
+        const params = {};
+        if (formData.firmName && formData.firmName !== "all" && formData.firmName !== "All") {
+          params.firm = formData.firmName;
+        }
+        params.search = formData.rawMaterialName.trim();
+        const res = await inventoryApi.get("raw-material", params);
+        if (!isMounted) return;
+        const items = res?.data || [];
+        const normalizedSelected = formData.rawMaterialName.trim().toLowerCase();
+        const match = items.find(
+          (item) => item.item_name && item.item_name.trim().toLowerCase() === normalizedSelected
+        ) || items[0];
+
+        if (match && match.actual_level !== undefined && match.actual_level !== null) {
+          setFormData((prev) => ({ ...prev, currentStock: String(match.actual_level) }));
+          setErrors((prev) => ({ ...prev, currentStock: null }));
+        } else {
+          setFormData((prev) => ({ ...prev, currentStock: "0" }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch live stock from Inventory module:", err);
+      } finally {
+        if (isMounted) setIsFetchingStock(false);
+      }
+    };
+
+    fetchLiveStock();
+    return () => {
+      isMounted = false;
+    };
+  }, [formData.rawMaterialName, formData.firmName]);
+
+  // Auto-fetch Delivery Order No. from Sales Order if one exists for this context
+  useEffect(() => {
+    let isMounted = true;
+    const fetchSalesOrderDO = async () => {
+      if (!shouldShowDeliveryOrder || !formData.rawMaterialName) return;
+      setIsFetchingDO(true);
+      try {
+        const res = await fetch(`${API_URL}/order/receipt`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!res.ok || !isMounted) return;
+        const json = await res.json();
+        const receipts = json.data || [];
+        const normMat = formData.rawMaterialName.trim().toLowerCase();
+        const normFirm = formData.firmName ? formData.firmName.trim().toLowerCase() : "";
+
+        // Match active sales order by firm and product/material
+        const matchingOrder = receipts.find((r) => {
+          if (r.orderCancelledAt) return false;
+          const matMatch = r.productName && r.productName.trim().toLowerCase() === normMat;
+          const firmMatch = !normFirm || (r.firmName && r.firmName.trim().toLowerCase() === normFirm);
+          return matMatch && firmMatch && r.doNumber;
+        });
+
+        if (matchingOrder && matchingOrder.doNumber) {
+          setFormData((prev) => ({ ...prev, deliveryOrderNo: matchingOrder.doNumber }));
+          setErrors((prev) => ({ ...prev, deliveryOrderNo: null }));
+        }
+      } catch (err) {
+        console.error("Failed to check sales orders for DO Number:", err);
+      } finally {
+        if (isMounted) setIsFetchingDO(false);
+      }
+    };
+
+    fetchSalesOrderDO();
+    return () => {
+      isMounted = false;
+    };
+  }, [shouldShowDeliveryOrder, formData.rawMaterialName, formData.firmName]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -184,9 +270,9 @@ export default function IndentForm() {
     }
 
     // Stricter check for Current Stock
-    if (!formData.currentStock) {
+    if (formData.currentStock === "" || formData.currentStock === null || formData.currentStock === undefined) {
       newErrors.currentStock = "Current stock is required.";
-    } else if (!/^-?\d*\.?\d+$/.test(formData.currentStock)) {
+    } else if (!/^-?\d*\.?\d+$/.test(String(formData.currentStock))) {
       newErrors.currentStock =
         "Please enter only valid numeric value for Current Stock.";
     }
@@ -507,19 +593,18 @@ export default function IndentForm() {
               </div>
 
               <div>
-                <Label htmlFor="currentStock">
-                  Current Stock As Per Factory{" "}
-                  <span className="text-red-500">*</span>
+                <Label htmlFor="currentStock" className="flex items-center justify-between">
+                  <span>Current Stock <span className="text-xs text-gray-500 font-normal">(Live from Inventory)</span></span>
+                  {isFetchingStock && <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />}
                 </Label>
                 <Input
                   id="currentStock"
                   type="text"
-                  inputMode="decimal"
                   name="currentStock"
-                  placeholder="Enter current stock"
+                  readOnly
+                  placeholder={isFetchingStock ? "Fetching live stock..." : "0"}
                   value={formData.currentStock}
-                  onChange={handleChange}
-                  className={`mt-1 ${errors.currentStock ? "border-red-500" : ""}`}
+                  className={`mt-1 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-200 cursor-not-allowed font-medium ${errors.currentStock ? "border-red-500" : ""}`}
                 />
                 {errors.currentStock && (
                   <p className="mt-1 text-xs text-red-500">
@@ -604,18 +689,28 @@ export default function IndentForm() {
 
               {shouldShowDeliveryOrder && (
                 <div className="lg:col-span-2">
-                  <Label htmlFor="deliveryOrderNo">
-                    Delivery Order No. <span className="text-red-500">*</span>
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="deliveryOrderNo">
+                      Delivery Order No. <span className="text-red-500">*</span>
+                    </Label>
+                    {isFetchingDO && (
+                      <span className="flex items-center text-xs text-gray-500 gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Checking Sales Orders...
+                      </span>
+                    )}
+                  </div>
                   <Input
                     id="deliveryOrderNo"
                     type="text"
                     name="deliveryOrderNo"
-                    placeholder="Enter delivery order number"
+                    placeholder="Enter or auto-populated DO number"
                     value={formData.deliveryOrderNo}
                     onChange={handleChange}
-                    className="mt-1"
+                    className={`mt-1 ${errors.deliveryOrderNo ? "border-red-500" : ""}`}
                   />
+                  {errors.deliveryOrderNo && (
+                    <p className="mt-1 text-xs text-red-500">{errors.deliveryOrderNo}</p>
+                  )}
                 </div>
               )}
             </div>

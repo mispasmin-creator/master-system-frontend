@@ -290,65 +290,97 @@ export default function CreatePO() {
   useEffect(() => {
     if (!currentGroup) return;
     const first = currentGroup.indents[0] || {};
+    const isTransferType = (first.typeOfIndent || "").toLowerCase().includes("transfer");
+
+    // Auto-select location based on firm for transfer-type PO or regular PO
+    const firmLocation =
+      selectedFirm?.address ||
+      selectedFirm?.billing_address ||
+      first.dest ||
+      first.firmName ||
+      "";
+
+    const indentsList = currentGroup.indents.map((indent) => ({
+      id: indent.id,
+      supabaseId: indent.supabaseId,
+      indentNumber: String(indent.id || ""),
+      productName: indent.rawMaterialName || "",
+      typeOfIndent: indent.typeOfIndent || "",
+      specifications: [
+        indent.alumina ? `Alumina ${indent.alumina}%` : "",
+        indent.iron ? `Iron ${indent.iron}%` : "",
+        indent.sio2 ? `SiO2 ${indent.sio2}%` : "",
+        indent.cao ? `CaO ${indent.cao}%` : "",
+        indent.ap ? `AP ${indent.ap}%` : "",
+        indent.bd ? `BD ${indent.bd}%` : "",
+        indent.fineness ? `Fineness ${indent.fineness}` : "",
+        indent.packaging ? `Packaging ${indent.packaging}` : "",
+      ]
+        .filter(Boolean)
+        .join(", "),
+      quantity: indent.approvedQty,
+      unit: indent.uom || "MT",
+      rate: indent.approvedRate,
+      gstPercent: 18,
+      discountPercent: 0,
+      specs: {
+        alumina: indent.alumina || "",
+        iron: indent.iron || "",
+        sio2: indent.sio2 || "",
+        cao: indent.cao || "",
+        ap: indent.ap || "",
+        bd: indent.bd || "",
+        fineness: indent.fineness || "",
+      },
+      packaging: indent.packaging || "",
+    }));
+
+    // Auto-calculate advance amount if advance percentage exists
+    const subtotalCalc = indentsList.reduce(
+      (acc, it) => acc + (Number(it.quantity) || 0) * (Number(it.rate) || 0),
+      0,
+    );
+    const advancePercent = Number(first.advancePercentage) || 0;
+    const advanceAmountCalc =
+      advancePercent > 0
+        ? String(Math.round((subtotalCalc * 1.18 * advancePercent) / 100))
+        : "";
+
     setFormData((prev) => ({
       ...prev,
       poNumber: mode === "revise" ? first.poNumber || "" : prev.poNumber,
-      poDate: mode === "revise" ? first.poDate || prev.poDate : prev.poDate,
+      poDate:
+        mode === "revise"
+          ? first.poDate || prev.poDate
+          : first.poDate || prev.poDate,
       deliveryDate:
         mode === "revise"
           ? first.deliveryDate || prev.deliveryDate
-          : prev.deliveryDate,
+          : first.deliveryDate || prev.deliveryDate,
       supplierName: currentGroup.vendorName,
       supplierAddress: first.supplierAddress || prev.supplierAddress,
       gstin: first.supplierGstin || prev.gstin,
       companyEmail: first.supplierEmail || prev.companyEmail,
       quotationNumber: first.quotationNumber || prev.quotationNumber,
       quotationDate: first.quotationDate || prev.quotationDate,
-      notes: prev.notes || first.notes || "",
-      destination: first.dest || first.firmName || prev.destination,
+      paymentTerms: first.paymentTerms || prev.paymentTerms || "1 DAY",
+      notes: first.notes || prev.notes || "",
+      destination: isTransferType
+        ? selectedFirm?.address || selectedFirm?.billing_address || firmLocation
+        : first.dest || firmLocation || prev.destination,
       advanceToBePaid:
-        normalize(first.advanceToBePaid) === "yes"
+        first.advanceToBePaid ||
+        (advancePercent > 0 || normalize(first.advanceToBePaid) === "yes"
           ? "yes"
-          : prev.advanceToBePaid,
-      toBePaidAmount: first.toBePaidAmount || prev.toBePaidAmount,
-      whenToBePaid: first.whenToBePaid || prev.whenToBePaid,
-      transportType: first.transportType || prev.transportType,
-
-      indents: currentGroup.indents.map((indent) => ({
-        id: indent.id,
-        supabaseId: indent.supabaseId,
-        indentNumber: String(indent.id || ""),
-        productName: indent.rawMaterialName || "",
-        specifications: [
-          indent.alumina ? `Alumina ${indent.alumina}%` : "",
-          indent.iron ? `Iron ${indent.iron}%` : "",
-          indent.sio2 ? `SiO2 ${indent.sio2}%` : "",
-          indent.cao ? `CaO ${indent.cao}%` : "",
-          indent.ap ? `AP ${indent.ap}%` : "",
-          indent.bd ? `BD ${indent.bd}%` : "",
-          indent.fineness ? `Fineness ${indent.fineness}` : "",
-          indent.packaging ? `Packaging ${indent.packaging}` : "",
-        ]
-          .filter(Boolean)
-          .join(", "),
-        quantity: indent.approvedQty,
-        unit: indent.uom || "MT",
-        rate: indent.approvedRate,
-        gstPercent: 18,
-        discountPercent: 0,
-        specs: {
-          alumina: indent.alumina || "",
-          iron: indent.iron || "",
-          sio2: indent.sio2 || "",
-          cao: indent.cao || "",
-          ap: indent.ap || "",
-          bd: indent.bd || "",
-          fineness: indent.fineness || "",
-        },
-        packaging: indent.packaging || "",
-      })),
+          : prev.advanceToBePaid),
+      toBePaidAmount:
+        first.toBePaidAmount || advanceAmountCalc || prev.toBePaidAmount,
+      whenToBePaid:
+        first.whenToBePaid || first.deliveryDate || prev.whenToBePaid,
+      transportType: first.transportType || prev.transportType || "FOR",
+      indents: indentsList,
     }));
-  }, [currentGroup, rows]);
+  }, [currentGroup, rows, selectedFirm, mode]);
 
   const subtotal = useMemo(
     () => sumBy(formData.indents, taxable),

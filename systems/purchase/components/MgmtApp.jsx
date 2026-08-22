@@ -153,6 +153,8 @@ export default function ManagementApprovals() {
         expectedRequirementDate: row.expectedRequirementDate || "",
         currentStock: row.currentStockAsPerFactory || "0",
         indentQty: row.quantity || "",
+        approvedQty: row.approvedQty ?? row.hodApproval?.approvedQty ?? row.quantity ?? "",
+        uom: row.uom || "MT",
         vendors: row.vendors,
       }));
 
@@ -169,6 +171,8 @@ export default function ManagementApprovals() {
           approvedRate: row.managementApproval?.approvedRate || "0",
           approvedTag: row.approvedTag || "",
           indentQty: row.quantity || "",
+          approvedQty: row.approvedQty ?? row.hodApproval?.approvedQty ?? row.quantity ?? "",
+          uom: row.uom || "MT",
           canRevert: row.canRevert ?? false,
         }))
         .sort((a, b) => new Date(b.actual8) - new Date(a.actual8));
@@ -490,6 +494,7 @@ export default function ManagementApprovals() {
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Firm</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Product</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Indent Qty</th>
+                      <th className="px-4 py-3 text-xs font-bold text-emerald-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Approved Qty</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Required On</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Current Stock</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Rate</th>
@@ -517,7 +522,8 @@ export default function ManagementApprovals() {
                         </td>
                         <td className="px-4 py-3">{item.firmName}</td>
                         <td className="px-4 py-3">{item.product}</td>
-                        <td className="px-4 py-3 font-semibold text-gray-900">{item.indentQty || "-"}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900">{item.indentQty || "-"} {item.indentQty ? <span className="text-xs font-normal text-gray-500">{item.uom}</span> : ""}</td>
+                        <td className="px-4 py-3 font-bold text-emerald-700">{item.approvedQty || item.indentQty || "-"} {item.approvedQty ? <span className="text-xs font-normal text-emerald-600">{item.uom}</span> : ""}</td>
                         <td className="px-4 py-3 text-xs font-medium text-blue-600">
                           {formatDate(item.expectedRequirementDate)}
                         </td>
@@ -585,6 +591,7 @@ export default function ManagementApprovals() {
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Firm</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Product</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Indent Qty</th>
+                      <th className="px-4 py-3 text-xs font-bold text-emerald-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Approved Qty</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Approved Vendor</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Tag</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-700 uppercase text-left bg-gray-50/95 backdrop-blur-sm shadow-sm">Rate</th>
@@ -598,7 +605,8 @@ export default function ManagementApprovals() {
                         <td className="px-4 py-3">{item.indentId}</td>
                         <td className="px-4 py-3">{item.firmName}</td>
                         <td className="px-4 py-3">{item.product}</td>
-                        <td className="px-4 py-3 font-semibold text-gray-900">{item.indentQty || "-"}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900">{item.indentQty || "-"} {item.indentQty ? <span className="text-xs font-normal text-gray-500">{item.uom}</span> : ""}</td>
+                        <td className="px-4 py-3 font-bold text-emerald-700">{item.approvedQty || item.indentQty || "-"} {item.approvedQty ? <span className="text-xs font-normal text-emerald-600">{item.uom}</span> : ""}</td>
                         <td className="px-4 py-3">{item.approvedVendorName}</td>
                         <td className="px-4 py-3">
                           {item.approvedTag ? (
@@ -646,7 +654,7 @@ export default function ManagementApprovals() {
           }
         }}
       >
-        <SheetContent className="sm:max-w-[1100px]">
+        <SheetContent className="sm:max-w-[1100px] overflow-y-auto">
           {selectedIndent && (
             <>
               <SheetHeader>
@@ -661,14 +669,44 @@ export default function ManagementApprovals() {
                   <span className="mx-2 text-gray-300">|</span>
                   <span className="font-medium text-gray-700">Product:</span>
                   <span className="font-bold text-gray-900 ml-1">{selectedIndent.product}</span>
-                  <span className="mx-2 text-gray-300">|</span>
-                  <span className="font-medium text-gray-700">Indent Qty:</span>
-                  <span className="font-bold text-gray-900 ml-1">{selectedIndent.indentQty || "-"}</span>
-                  <span className="mx-2 text-gray-300">|</span>
-                  <span className="font-medium text-gray-700">Stock:</span>
-                  <span className="font-bold text-gray-900 ml-1">{selectedIndent.currentStock}</span>
                 </SheetDescription>
               </SheetHeader>
+
+              {/* Prominent Side-by-Side Quantity & Indent Context Comparison */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Indent Quantity
+                  </span>
+                  <p className="text-lg font-bold text-gray-900 mt-1">
+                    {selectedIndent.indentQty || "-"} <span className="text-xs font-normal text-gray-500">{selectedIndent.uom}</span>
+                  </p>
+                </div>
+                <div className="bg-emerald-50/80 p-3 rounded-lg border border-emerald-300 shadow-sm">
+                  <span className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">
+                    Approved Quantity
+                  </span>
+                  <p className="text-lg font-bold text-emerald-700 mt-1">
+                    {selectedIndent.approvedQty || selectedIndent.indentQty || "-"} <span className="text-xs font-normal text-emerald-600">{selectedIndent.uom}</span>
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Current Stock
+                  </span>
+                  <p className="text-lg font-bold text-gray-900 mt-1">
+                    {selectedIndent.currentStock || "0"} <span className="text-xs font-normal text-gray-500">{selectedIndent.uom}</span>
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block">
+                    Required On
+                  </span>
+                  <p className="text-sm font-semibold text-blue-600 mt-1.5">
+                    {formatDate(selectedIndent.expectedRequirementDate)}
+                  </p>
+                </div>
+              </div>
 
               <div className="grid gap-4 py-2 lg:grid-cols-3">
                 {selectedIndent.vendors.map((vendor) => {

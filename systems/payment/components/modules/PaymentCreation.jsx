@@ -14,37 +14,41 @@ const formatCurrency = (amount) => {
   }).format(amount);
 };
 
+// Status options for the creation modal
+const STATUS_OPTIONS = ['Draft', 'Submitted', 'Pending', 'Approved for Funding', 'Rejected'];
+
 export default function PaymentCreation() {
   const [payments, setPayments] = useState([]);
   const [masterData, setMasterData] = useState({ fms: [], firms: [], vendors: [] });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [firmFilter, setFirmFilter] = useState('All');
-  
-  // Form State
+
+  // --- Create Payment Modal State ---
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [apPaymentNumber, setApPaymentNumber] = useState('');
+
+  // Modal form fields (in display order)
+  const [uniqueNumber, setUniqueNumber] = useState('');
+  const [modalStatus, setModalStatus] = useState('Submitted');
   const [fmsName, setFmsName] = useState('Repair FMS');
   const [firmName, setFirmName] = useState('PMMPL');
   const [payTo, setPayTo] = useState('');
   const [amount, setAmount] = useState('');
-  const [department, setDepartment] = useState('IT');
-  const [priority, setPriority] = useState('Medium');
-  const [plannedDate, setPlannedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [requiredDate, setRequiredDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attachmentUrl, setAttachmentUrl] = useState('');
-  const [supportingDocuments, setSupportingDocuments] = useState('Invoice');
   const [remarks, setRemarks] = useState('');
+  const [attachmentUrl, setAttachmentUrl] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
-  // Selected Payment Action Modal State
+  // --- Action Modal State (for existing payments) ---
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [actionRemarks, setActionRemarks] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
-
 
   const loadAll = async () => {
     try {
@@ -77,7 +81,39 @@ export default function PaymentCreation() {
     loadAll();
   }, []);
 
-  const handleCreate = async (initialStatus) => {
+  // Pre-fetch a payment number when the modal opens
+  const openCreateModal = async () => {
+    setFormError('');
+    setFormSuccess('');
+    setUniqueNumber('');
+    setModalStatus('Submitted');
+    setPayTo('');
+    setAmount('');
+    setRemarks('');
+    setAttachmentUrl('');
+    setApPaymentNumber('Generating…');
+    setCreateModalOpen(true);
+
+    try {
+      // Fetch a preview number by calling master; actual number is assigned on submit by backend
+      const masterRes = await paymentApi.get('master');
+      if (masterRes.success && masterRes.data) {
+        setMasterData(masterRes.data);
+        if (masterRes.data.fms?.[0]?.fmsName) setFmsName(masterRes.data.fms[0].fmsName);
+        if (masterRes.data.firms?.[0]) setFirmName(masterRes.data.firms[0]);
+        // Show next sequential number as a preview if available
+        if (masterRes.data.nextPaymentNumber) {
+          setApPaymentNumber(masterRes.data.nextPaymentNumber);
+        } else {
+          setApPaymentNumber('Auto-Generated on Submit');
+        }
+      }
+    } catch {
+      setApPaymentNumber('Auto-Generated on Submit');
+    }
+  };
+
+  const handleCreate = async () => {
     setFormError('');
     setFormSuccess('');
 
@@ -93,23 +129,21 @@ export default function PaymentCreation() {
         firmName,
         payTo: payTo.trim(),
         amount: parseFloat(amount),
-        department,
-        priority,
-        plannedDate,
-        requiredDate,
-        attachmentUrl,
-        supportingDocuments,
+        uniqueNumber: uniqueNumber.trim() || undefined,
+        status: modalStatus,
         remarks,
-        status: initialStatus
+        attachmentUrl,
+        // Fields not in modal — backend will use its defaults:
+        // department -> 'IT', priority -> 'Medium',
+        // plannedDate/requiredDate -> null, supportingDocuments -> 'Invoice'
       });
 
       if (res.success) {
-        setFormSuccess(`Payment Request '${res.data.paymentNumber}' saved cleanly!`);
-        setPayTo('');
-        setAmount('');
-        setRemarks('');
-        setAttachmentUrl('');
-        loadAll();
+        setFormSuccess(`Payment Request '${res.data.paymentNumber}' created successfully!`);
+        setTimeout(() => {
+          setCreateModalOpen(false);
+          loadAll();
+        }, 1200);
       } else {
         setFormError(res.error || 'Failed to create payment request.');
       }
@@ -209,185 +243,22 @@ export default function PaymentCreation() {
         <p className="text-xs text-zinc-500 mt-1">Initiate payment requisitions, assign FMS categories, attach invoices, and track maker submissions.</p>
       </div>
 
-      {/* Creation Form */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-4">
-        <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-          <FileText className="h-4 w-4 text-emerald-500" />
-          New Payment Requisition
-        </h2>
-
-        {formError && (
-          <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 text-rose-600 rounded-xl text-xs flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{formError}</span>
-          </div>
-        )}
-
-        {formSuccess && (
-          <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-semibold">
-            {formSuccess}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Firm Name</label>
-            <select
-              value={firmName}
-              onChange={(e) => setFirmName(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-            >
-              {(masterData.firms || ["PMMPL", "PMM Logisol", "PMM Retail", "PMM Infra", "PMM Ventures"]).map((f, i) => (
-                <option key={i} value={f}>{f}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">FMS Name / Category</label>
-            <select
-              value={fmsName}
-              onChange={(e) => setFmsName(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-            >
-              {(masterData.fms || []).map((f, i) => (
-                <option key={i} value={f.fmsName}>{f.fmsName}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Pay To / Vendor Name</label>
-            <input
-              type="text"
-              value={payTo}
-              onChange={(e) => setPayTo(e.target.value)}
-              placeholder="e.g. Acme Corp / Transporter"
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Amount (₹)</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-mono font-bold"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Department</label>
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-            >
-              {["IT", "Logistics", "Finance", "Production", "HR", "Purchase", "Store", "Sales", "Management"].map((d, i) => (
-                <option key={i} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Priority</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-            >
-              {["Low", "Medium", "High", "Urgent"].map((p, i) => (
-                <option key={i} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Planned Date</label>
-            <input
-              type="date"
-              value={plannedDate}
-              onChange={(e) => setPlannedDate(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Required Date</label>
-            <input
-              type="date"
-              value={requiredDate}
-              onChange={(e) => setRequiredDate(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-          </div>
-
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Supporting Document Type</label>
-            <select
-              value={supportingDocuments}
-              onChange={(e) => setSupportingDocuments(e.target.value)}
-              className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none"
-            >
-              {["Invoice", "PO Copy", "Approval Slip", "Bilty", "GRN", "Agreement"].map((d, i) => (
-                <option key={i} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Upload Attachment / Bill</label>
-            <input
-              type="file"
-              onChange={handleFileUpload}
-              className="w-full text-xs text-zinc-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 dark:file:bg-emerald-950/40 dark:file:text-emerald-400 hover:file:bg-emerald-100"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Remarks / Note</label>
-          <textarea
-            value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
-            rows={2}
-            placeholder="Provide context, PO reference, or payment purpose..."
-            className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-        </div>
-
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <button
-            onClick={() => handleCreate('Draft')}
-            disabled={isSubmitting}
-            className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold rounded-xl text-xs transition-colors"
-          >
-            Save as Draft
-          </button>
-          <button
-            onClick={() => handleCreate('Submitted')}
-            disabled={isSubmitting}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>Submit Requisition</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Submitted Payments Ledger Table */}
+      {/* Payment Requisition Ledger */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm space-y-4">
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Payment Requisition Ledger</h2>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Create Payment Button */}
+            <button
+              onClick={openCreateModal}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>Create Payment</span>
+            </button>
+
             <select
               value={firmFilter}
               onChange={(e) => setFirmFilter(e.target.value)}
@@ -472,7 +343,199 @@ export default function PaymentCreation() {
         </div>
       </div>
 
-      {/* Action Dialog Modal */}
+      {/* ── CREATE NEW PAYMENT MODAL ── */}
+      {createModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh]">
+
+            {/* Modal Header */}
+            <div className="flex justify-between items-center border-b border-zinc-100 dark:border-zinc-800 px-6 pt-5 pb-4 shrink-0">
+              <div>
+                <h3 className="font-extrabold text-base text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-emerald-500" />
+                  Create New Payment Request
+                </h3>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Fill in the details below to initiate a payment requisition.</p>
+              </div>
+              <button
+                onClick={() => !isSubmitting && setCreateModalOpen(false)}
+                disabled={isSubmitting}
+                className="p-1 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body — scrollable */}
+            <div className="overflow-y-auto px-6 py-5 space-y-4">
+
+              {formError && (
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 text-rose-600 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
+              {formSuccess && (
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-emerald-600 rounded-xl text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{formSuccess}</span>
+                </div>
+              )}
+
+              {/* 1. AP-Payment Number (auto, read-only) */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">
+                  AP-Payment Number <span className="text-zinc-400 font-normal">(Auto-Generated)</span>
+                </label>
+                <input
+                  type="text"
+                  value={apPaymentNumber}
+                  readOnly
+                  className="w-full bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-2 text-xs text-zinc-500 dark:text-zinc-400 font-mono cursor-not-allowed outline-none"
+                />
+              </div>
+
+              {/* 2. Unique Number */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">
+                  Unique Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={uniqueNumber}
+                  onChange={(e) => setUniqueNumber(e.target.value)}
+                  placeholder="e.g. INV-2024-001"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* 3. Status */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Status</label>
+                <select
+                  value={modalStatus}
+                  onChange={(e) => setModalStatus(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  {STATUS_OPTIONS.map((s, i) => (
+                    <option key={i} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Firm Name */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Firm Name</label>
+                <select
+                  value={firmName}
+                  onChange={(e) => setFirmName(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  {(masterData.firms?.length ? masterData.firms : ["PMMPL", "PMM Logisol", "PMM Retail", "PMM Infra", "PMM Ventures"]).map((f, i) => (
+                    <option key={i} value={f}>{f}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 5. FMS Name */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">FMS Name / Category</label>
+                <select
+                  value={fmsName}
+                  onChange={(e) => setFmsName(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                >
+                  {(masterData.fms || []).map((f, i) => (
+                    <option key={i} value={f.fmsName}>{f.fmsName}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 6. Pay To / Vendor Name */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">
+                  Pay To / Vendor Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={payTo}
+                  onChange={(e) => setPayTo(e.target.value)}
+                  placeholder="e.g. Acme Corp / Transporter"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* 7. Amount To Be Paid */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">
+                  Amount To Be Paid (₹) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  min="0"
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-emerald-500 font-mono font-bold"
+                />
+              </div>
+
+              {/* 8. Remarks / Business Justification */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Remarks / Business Justification</label>
+                <textarea
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  rows={3}
+                  placeholder="Provide context, PO reference, or payment purpose..."
+                  className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* 9. Any Attachments */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">Any Attachments / Upload Attachment</label>
+                <input
+                  type="file"
+                  onChange={handleFileUpload}
+                  className="w-full text-xs text-zinc-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 dark:file:bg-emerald-950/40 dark:file:text-emerald-400 hover:file:bg-emerald-100"
+                />
+                {attachmentUrl && (
+                  <a href={attachmentUrl} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline font-medium">
+                    View uploaded file <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => setCreateModalOpen(false)}
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-semibold rounded-xl text-xs transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={isSubmitting}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <PlusCircle className="h-4 w-4" />
+                <span>{isSubmitting ? 'Submitting…' : 'Submit Request'}</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── ACTION MODAL (existing payments) ── */}
       {modalOpen && selectedPayment && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl max-w-xl w-full p-6 space-y-4 shadow-2xl">

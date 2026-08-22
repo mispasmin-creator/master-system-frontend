@@ -114,6 +114,7 @@ const AWAITING_RECEIPT_COLUMNS_META = [
   { header: "Party Name", dataKey: "vendorName", toggleable: true },
   { header: "Product Name", dataKey: "rawMaterialName", toggleable: true },
   { header: "Billing Quantity", dataKey: "liftingQty", toggleable: true },
+  { header: "Quantity Difference", dataKey: "qtyDifference", toggleable: true },
   { header: "Total Bag Qty", dataKey: "totalBagsQty_fromSheet", toggleable: true },
   { header: "Rate", dataKey: "rate", toggleable: true },
   {
@@ -163,6 +164,7 @@ const PROCESSED_RECEIPTS_COLUMNS_META = [
   { header: "PO Qty", dataKey: "qty", toggleable: true },
   { header: "ACTUAL Qty", dataKey: "actualQuantity_fromSheet", toggleable: true },
   { header: "Billing Quantity", dataKey: "liftingQty", toggleable: true },
+  { header: "Quantity Difference", dataKey: "qtyDifference", toggleable: true },
   { header: "Rate", dataKey: "rate", toggleable: true },
   {
     header: "Per MT Transportation Rate",
@@ -465,27 +467,37 @@ export default function ReceiptCheck() {
           actualQuantity_fromSheet: '', physicalCondition_fromSheet: '', moisture_fromSheet: '',
           physicalImageUrl_fromSheet: '', weightSlipImageUrl_fromSheet: '', weightSlipQty_fromSheet: '',
           totalBagsQty_fromSheet: l.totalBagsQty || '', hasDownstreamCompletion: false, _quantitiesMatch: true, perMTTransportationRate: '-',
+          qtyDifference: '-',
         }));
-        const historyMapped = (json.data.history || []).map((l) => ({
-          _dbId: l.id, id: l.liftNo || String(l.id), liftNo: l.liftNo || '',
-          indentNo: l.indentNo || '', originalIndentNo: l.indentNo || '', firmName: l.firmName || '',
-          vendorName: l.vendorName || '', rawMaterialName: l.rawMaterialName || '', qty: l.qty || '',
-          liftingQty: l.liftingQty || '', billNo: l.billNo || '',
-          dateOfBill: l.dateOfBill ? formatTimestamp(l.dateOfBill) : '', areaLifting: l.areaLifting || '',
-          type: l.type || '', billCopy: l.billImage || '', driverNo: l.driverNo || '',
-          truckNo: l.truckNo || '', transporterName: l.transporterName || '', transporterRate: l.transporterRate || '',
-          typeOfRate: l.typeOfTransportingRate || '', rate: l.rate || '', biltyNo: l.biltyNo || '',
-          biltyImage: l.biltyImage || '', orderCancelQty: l.orderCancelQty || '0',
-          unloadApprovalRequired: l.unloadApprovalRequired || '', unloadApprovalStatus: l.unloadApprovalStatus || 'Approved',
-          plannedDate_formatted: formatTimestamp(l.plannedDate), filterColPlanned1: l.plannedDate || null,
-          filterColActual1: l.dateOfReceiving || 'done', filterColPlanned2: l.dateOfReceiving || null, filterColActual2: null,
-          dateOfReceiving_fromSheet: l.dateOfReceiving || '', dateOfReceiving_formatted: formatTimestamp(l.dateOfReceiving),
-          totalBillQuantity_fromSheet: l.totalBillQuantity || '', actualQuantity_fromSheet: l.actualQuantity || '',
-          physicalCondition_fromSheet: l.physicalCondition || '', moisture_fromSheet: l.moisture || '',
-          physicalImageUrl_fromSheet: l.physicalImageOfProduct || '', weightSlipImageUrl_fromSheet: l.imageOfWeightSlip || '',
-          weightSlipQty_fromSheet: '', totalBagsQty_fromSheet: l.totalBagsQty || '',
-          hasDownstreamCompletion: false, _quantitiesMatch: checkQuantitiesMatch(l.totalBillQuantity, l.actualQuantity), perMTTransportationRate: '-',
-        }));
+        const historyMapped = (json.data.history || []).map((l) => {
+          const orderedVal = parseFloat(l.liftingQty != null && l.liftingQty !== '' ? l.liftingQty : l.qty) || 0;
+          const actualVal = parseFloat(l.actualQuantity) || 0;
+          const diffNumber = Number((orderedVal - actualVal).toFixed(3));
+          const diffStr = l.actualQuantity != null && l.actualQuantity !== '' && !isNaN(diffNumber)
+            ? (diffNumber === 0 ? "0.00" : diffNumber.toFixed(2))
+            : '-';
+          return {
+            _dbId: l.id, id: l.liftNo || String(l.id), liftNo: l.liftNo || '',
+            indentNo: l.indentNo || '', originalIndentNo: l.indentNo || '', firmName: l.firmName || '',
+            vendorName: l.vendorName || '', rawMaterialName: l.rawMaterialName || '', qty: l.qty || '',
+            liftingQty: l.liftingQty || '', billNo: l.billNo || '',
+            dateOfBill: l.dateOfBill ? formatTimestamp(l.dateOfBill) : '', areaLifting: l.areaLifting || '',
+            type: l.type || '', billCopy: l.billImage || '', driverNo: l.driverNo || '',
+            truckNo: l.truckNo || '', transporterName: l.transporterName || '', transporterRate: l.transporterRate || '',
+            typeOfRate: l.typeOfTransportingRate || '', rate: l.rate || '', biltyNo: l.biltyNo || '',
+            biltyImage: l.biltyImage || '', orderCancelQty: l.orderCancelQty || '0',
+            unloadApprovalRequired: l.unloadApprovalRequired || '', unloadApprovalStatus: l.unloadApprovalStatus || 'Approved',
+            plannedDate_formatted: formatTimestamp(l.plannedDate), filterColPlanned1: l.plannedDate || null,
+            filterColActual1: l.dateOfReceiving || 'done', filterColPlanned2: l.dateOfReceiving || null, filterColActual2: null,
+            dateOfReceiving_fromSheet: l.dateOfReceiving || '', dateOfReceiving_formatted: formatTimestamp(l.dateOfReceiving),
+            totalBillQuantity_fromSheet: l.totalBillQuantity || '', actualQuantity_fromSheet: l.actualQuantity || '',
+            physicalCondition_fromSheet: l.physicalCondition || '', moisture_fromSheet: l.moisture || '',
+            physicalImageUrl_fromSheet: l.physicalImageOfProduct || '', weightSlipImageUrl_fromSheet: l.imageOfWeightSlip || '',
+            weightSlipQty_fromSheet: '', totalBagsQty_fromSheet: l.totalBagsQty || '',
+            hasDownstreamCompletion: false, _quantitiesMatch: checkQuantitiesMatch(l.totalBillQuantity, l.actualQuantity), perMTTransportationRate: '-',
+            qtyDifference: diffStr,
+          };
+        });
         let processedData = [...pendingMapped, ...historyMapped];
         if (user?.firmName) {
           processedData = processedData.filter((lift) => lift && canViewFirm(user.firmName, lift.firmName));
@@ -684,7 +696,7 @@ export default function ReceiptCheck() {
             parseFloat(
               name === "actualQuantity" ? sanitizedValue : prev.actualQuantity,
             ) || 0;
-          updated.qtyDifference = (actualQty - billQty).toFixed(2);
+          updated.qtyDifference = (billQty - actualQty).toFixed(2);
           if (name === "actualQuantity") updated.actualQuantity = sanitizedValue.toString();
         }
         return updated;
@@ -716,7 +728,7 @@ export default function ReceiptCheck() {
         new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }),
       totalBillQuantity: initialTotal.toString(),
       actualQuantity: "",
-      qtyDifference: (-initialTotal).toFixed(2),
+      qtyDifference: initialTotal.toFixed(2),
       totalBagsQty: lift.totalBagsQty_fromSheet || "",
 
       physicalCondition: lift.physicalCondition_fromSheet || "Good",
@@ -927,6 +939,28 @@ export default function ReceiptCheck() {
 
   const renderCell = (item, column) => {
     const value = item[column.dataKey];
+    if (column.dataKey === "qtyDifference" || column.dataKey === "quantityDifference") {
+      if (value === "-" || value === "" || value == null) {
+        return <span className="text-xs text-gray-400 dark:text-zinc-500">-</span>;
+      }
+      const numVal = parseFloat(value);
+      if (isNaN(numVal)) return <span className="text-xs">{value}</span>;
+      if (numVal < 0) {
+        return (
+          <span className="text-xs font-bold text-rose-600 dark:text-rose-400" title="Over-received">
+            {numVal.toFixed(2)} (Over)
+          </span>
+        );
+      }
+      if (numVal > 0) {
+        return (
+          <span className="text-xs font-bold text-amber-600 dark:text-amber-400" title="Shortage / Partial">
+            +{numVal.toFixed(2)} (Short)
+          </span>
+        );
+      }
+      return <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">0.00</span>;
+    }
     if (column.isLink) {
       return value && String(value).startsWith("http") ? (
         <a

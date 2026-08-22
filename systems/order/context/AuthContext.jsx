@@ -20,7 +20,10 @@ export function AuthProvider({ children }) {
       const parsed = parseUserPermissions(rawUser.page_access, rawUser.role);
 
       const mappedUser = {
+        id: rawUser.id,
         username: rawUser.username,
+        role: rawUser.role,
+        page_access: rawUser.page_access,
         firmName: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map(f => f.trim()).filter(Boolean),
         globalFirms: rawUser.firm_name === "all" ? "all" : (rawUser.firm_name || "").split(",").map(f => f.trim()).filter(Boolean),
         isReadOnly: parsed.isViewOnly,

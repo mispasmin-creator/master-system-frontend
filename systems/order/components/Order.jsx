@@ -36,6 +36,7 @@ import { toast } from "sonner";
 const COLUMN_CONFIG = [
   { id: "date", label: "PO Date" },
   { id: "poNumber", label: "PO / DO No." },
+  { id: "orderNumberOfProduction", label: "Production Order ID" },
   { id: "partyName", label: "Party Name" },
   { id: "productName", label: "Product" },
   { id: "transport", label: "Transporter Type" },
@@ -233,9 +234,9 @@ export default function Order() {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter((o) =>
-        ["doNumber", "partyPoNo", "partyName", "productName", "contactPersonName", "firmName"].some((f) =>
+        ["doNumber", "partyPoNo", "orderNumberOfProduction", "partyName", "productName", "contactPersonName", "firmName"].some((f) =>
           String(o[f] || "").toLowerCase().includes(term)
-        )
+        ) || (o.productionOrder?.id && String(o.productionOrder.id).toLowerCase().includes(term))
       );
     }
     return filtered;
@@ -306,6 +307,7 @@ export default function Order() {
         switch (c.id) {
           case "date": return formatDate(o.partyPoDate);
           case "poNumber": return o.partyPoNo || "No PO";
+          case "orderNumberOfProduction": return o.orderNumberOfProduction || o.productionOrder?.id || "";
           case "partyName": return o.partyName || "";
           case "productName": return o.productName || "";
           case "transport": return o.typeOfTransporting || "";
@@ -514,6 +516,7 @@ export default function Order() {
                             </div>
                           </TableCell>
                         )}
+                        {visibleColumns.orderNumberOfProduction && <TableCell />}
                         {visibleColumns.partyName && <TableCell className="text-sm">{group.partyName}</TableCell>}
                         {visibleColumns.productName && <TableCell className="text-sm">{group.productName}</TableCell>}
                         {visibleColumns.transport && <TableCell />}
@@ -533,6 +536,11 @@ export default function Order() {
                           <TableCell />
                           {visibleColumns.date && <TableCell className="text-[10px] text-zinc-400">{formatDate(o.partyPoDate)}</TableCell>}
                           {visibleColumns.poNumber && <TableCell className="pl-6 italic text-zinc-600 dark:text-zinc-300">{o.doNumber}</TableCell>}
+                          {visibleColumns.orderNumberOfProduction && (
+                            <TableCell className="font-mono text-xs text-blue-600 dark:text-blue-400">
+                              {o.orderNumberOfProduction || o.productionOrder?.id || "—"}
+                            </TableCell>
+                          )}
                           {visibleColumns.partyName && <TableCell className="text-zinc-500">{o.partyName}</TableCell>}
                           {visibleColumns.productName && <TableCell>{o.productName}</TableCell>}
                           {visibleColumns.transport && <TableCell className="text-[10px] text-zinc-400">{o.typeOfTransporting}</TableCell>}
@@ -585,6 +593,7 @@ export default function Order() {
                   <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-4 pb-2 border-b">Basic Information</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <DetailField label="DO Number" value={selectedOrder.doNumber} />
+                    <DetailField label="Production Order ID" value={selectedOrder.orderNumberOfProduction || selectedOrder.productionOrder?.id || selectedOrder.productionOrder?.deliveryOrderNo} />
                     <DetailField label="Party PO Number" value={selectedOrder.partyPoNo} />
                     <DetailField label="Firm Name" value={selectedOrder.firmName} />
                     <DetailField label="Party Name" value={selectedOrder.partyName} />
@@ -823,230 +832,230 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
         <SheetBody>
           <form id="order-receipt-form" onSubmit={handleSubmit} className="space-y-8 pb-4">
             {/* Basic Information */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">1. Basic Information</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Firm Name *</Label>
-                <SearchableSelect value={form.firmName} onValueChange={(v) => set("firmName", v)} options={masterData.firmNameOptions} placeholder="Select Firm" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">PARTY PO NO (As Per PO Exact) *</Label>
-                <Input value={form.partyPoNo} onChange={(e) => set("partyPoNo", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Party PO Date *</Label>
-                <Input type="date" value={form.partyPoDate} onChange={(e) => set("partyPoDate", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Party Name *</Label>
-                <SearchableSelect value={form.partyName} onValueChange={handlePartyChange} options={masterData.partyNameOptions} placeholder="Select Party Name" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">GST Number</Label>
-                <Input value={form.gstNumber} onChange={(e) => set("gstNumber", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Address</Label>
-                <Textarea value={form.address} readOnly className="h-9 bg-zinc-50 dark:bg-zinc-900" placeholder="Auto-filled from Party Name" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Type Of Transporting</Label>
-                <Select value={form.typeOfTransporting} onValueChange={(v) => set("typeOfTransporting", v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select transport type" /></SelectTrigger>
-                  <SelectContent>{TRANSPORT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              {form.typeOfTransporting === "Ex Factory But paid by Us" && (
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">1. Basic Information</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Freight Amount *</Label>
-                  <Input type="number" min="0" step="0.01" value={form.freightAmount} onChange={(e) => set("freightAmount", e.target.value)} className="h-9" />
+                  <Label className="text-xs">Firm Name *</Label>
+                  <SearchableSelect value={form.firmName} onValueChange={(v) => set("firmName", v)} options={masterData.firmNameOptions} placeholder="Select Firm" />
                 </div>
-              )}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Type of Packaging</Label>
-                <Select value={form.typeOfPackaging} onValueChange={(v) => set("typeOfPackaging", v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select packaging type" /></SelectTrigger>
-                  <SelectContent>{PACKAGING_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Type Of Measurement (UOM)</Label>
-                <Select value={form.typeOfMeasurement} onValueChange={(v) => set("typeOfMeasurement", v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select UOM" /></SelectTrigger>
-                  <SelectContent>{(masterData.uomOptions || []).map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Upload PO *</Label>
-                <div className="flex items-center gap-2">
-                  <Input type="file" onChange={handleFileChange} className="h-9 cursor-pointer" />
-                  {uploadingFile && <Loader2 className="animate-spin w-4 h-4 text-emerald-500 shrink-0" />}
-                  {soFile && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 truncate max-w-[140px]">✓ {soFile}</Badge>}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Contact & Order Details */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">2. Contact & Order Details</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Contact Person Name *</Label>
-                <Input value={form.contactPersonName} onChange={(e) => set("contactPersonName", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Contact Person WhatsApp No. *</Label>
-                <Input type="tel" value={form.contactPersonWhatsapp} onChange={(e) => set("contactPersonWhatsapp", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Order Received From</Label>
-                <Select value={form.orderReceivedFrom} onValueChange={(v) => set("orderReceivedFrom", v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select source" /></SelectTrigger>
-                  <SelectContent>{ORDER_RECEIVED_FROM_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Type Of PI</Label>
-                <Select value={form.typeOfPi} onValueChange={(v) => set("typeOfPi", v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select PI type" /></SelectTrigger>
-                  <SelectContent>{(masterData.typeOfPiOptions || []).map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Customer Category</Label>
-                <SearchableSelect value={form.customerCategory} onValueChange={(v) => set("customerCategory", v)} options={masterData.customerCategoryOptions} placeholder="Select Customer Category" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Marketing Sales Person</Label>
-                <SearchableSelect value={form.marketingSalesPerson} onValueChange={(v) => set("marketingSalesPerson", v)} options={masterData.marketingSalesPersonOptions} placeholder="Select manager" />
-              </div>
-            </div>
-          </div>
-
-          {/* Payment & Terms */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">3. Payment & Terms</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Total PO Value With Tax</Label>
-                <Input type="number" value={form.adjustedAmount} onChange={(e) => set("adjustedAmount", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Payment to Be Taken</Label>
-                <Select value={form.paymentToBeTaken} onValueChange={(v) => set("paymentToBeTaken", v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select payment type" /></SelectTrigger>
-                  <SelectContent>{YES_NO.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Retention Payment</Label>
-                <Select value={form.retentionPayment} onValueChange={(v) => set("retentionPayment", v)}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>{YES_NO.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              {form.retentionPayment === "Yes" && (
-                <>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Retention Percentage</Label>
-                    <Input type="number" value={form.retentionPercentage} onChange={(e) => set("retentionPercentage", e.target.value)} className="h-9" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Lead Time for Retention</Label>
-                    <Input value={form.leadTimeForRetention} onChange={(e) => set("leadTimeForRetention", e.target.value)} className="h-9" placeholder="e.g., 30 days" />
-                  </div>
-                </>
-              )}
-              <div className="space-y-1.5">
-                <Label className="text-xs">Lead Time For Collection Of Final Payment</Label>
-                <Input value={form.leadTimeForCollectionOfFinalPayment} onChange={(e) => set("leadTimeForCollectionOfFinalPayment", e.target.value)} className="h-9" placeholder="e.g., 15 days" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Lead Time to Reach Factory (Days)</Label>
-                <Input type="number" min="0" value={form.leadTimeToReachFactory} onChange={(e) => set("leadTimeToReachFactory", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Specific Concern</Label>
-                <Input value={form.specificConcern} onChange={(e) => set("specificConcern", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Reference No.</Label>
-                <Input value={form.referenceNo} onChange={(e) => set("referenceNo", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">TC Required</Label>
-                <Select value={form.tcRequired} onValueChange={(v) => set("tcRequired", v)}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>{YES_NO.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Free Replacement (FOC)</Label>
-                <Select value={form.freeReplacementFoc} onValueChange={(v) => set("freeReplacementFoc", v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Yes">Yes</SelectItem>
-                    <SelectItem value="No">No</SelectItem>
-                    <SelectItem value="Yes But Adjusted">Yes But Adjusted</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Type Of Application</Label>
-                <Select value={form.typeOfApplication} onValueChange={(v) => set("typeOfApplication", v)}>
-                  <SelectTrigger className="h-9"><SelectValue placeholder="Select application type" /></SelectTrigger>
-                  <SelectContent>{APPLICATION_TYPES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              {piDueDatePreview && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">PI Due Date <span className="text-emerald-600">(Auto-calculated)</span></Label>
-                  <Input type="date" value={piDueDatePreview} readOnly className="h-9 bg-emerald-50 dark:bg-emerald-950/30" />
+                  <Label className="text-xs">PARTY PO NO (As Per PO Exact) *</Label>
+                  <Input value={form.partyPoNo} onChange={(e) => set("partyPoNo", e.target.value)} className="h-9" />
                 </div>
-              )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Party PO Date *</Label>
+                  <Input type="date" value={form.partyPoDate} onChange={(e) => set("partyPoDate", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Party Name *</Label>
+                  <SearchableSelect value={form.partyName} onValueChange={handlePartyChange} options={masterData.partyNameOptions} placeholder="Select Party Name" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">GST Number</Label>
+                  <Input value={form.gstNumber} onChange={(e) => set("gstNumber", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Address</Label>
+                  <Textarea value={form.address} readOnly className="h-9 bg-zinc-50 dark:bg-zinc-900" placeholder="Auto-filled from Party Name" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Type Of Transporting</Label>
+                  <Select value={form.typeOfTransporting} onValueChange={(v) => set("typeOfTransporting", v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select transport type" /></SelectTrigger>
+                    <SelectContent>{TRANSPORT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {form.typeOfTransporting === "Ex Factory But paid by Us" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Freight Amount *</Label>
+                    <Input type="number" min="0" step="0.01" value={form.freightAmount} onChange={(e) => set("freightAmount", e.target.value)} className="h-9" />
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Type of Packaging</Label>
+                  <Select value={form.typeOfPackaging} onValueChange={(v) => set("typeOfPackaging", v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select packaging type" /></SelectTrigger>
+                    <SelectContent>{PACKAGING_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Type Of Measurement (UOM)</Label>
+                  <Select value={form.typeOfMeasurement} onValueChange={(v) => set("typeOfMeasurement", v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select UOM" /></SelectTrigger>
+                    <SelectContent>{(masterData.uomOptions || []).map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Upload PO *</Label>
+                  <div className="flex items-center gap-2">
+                    <Input type="file" onChange={handleFileChange} className="h-9 cursor-pointer" />
+                    {uploadingFile && <Loader2 className="animate-spin w-4 h-4 text-emerald-500 shrink-0" />}
+                    {soFile && <Badge variant="outline" className="text-xs bg-green-50 text-green-700 truncate max-w-[140px]">✓ {soFile}</Badge>}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Products */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">4. Products</h3>
-              <Button type="button" size="sm" onClick={() => setShowProductForm(true)} className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5">
-                <Plus className="w-3.5 h-3.5" /> Add Product
-              </Button>
+            {/* Contact & Order Details */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">2. Contact & Order Details</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Contact Person Name *</Label>
+                  <Input value={form.contactPersonName} onChange={(e) => set("contactPersonName", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Contact Person WhatsApp No. *</Label>
+                  <Input type="tel" value={form.contactPersonWhatsapp} onChange={(e) => set("contactPersonWhatsapp", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Order Received From</Label>
+                  <Select value={form.orderReceivedFrom} onValueChange={(v) => set("orderReceivedFrom", v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select source" /></SelectTrigger>
+                    <SelectContent>{ORDER_RECEIVED_FROM_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Type Of PI</Label>
+                  <Select value={form.typeOfPi} onValueChange={(v) => set("typeOfPi", v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select PI type" /></SelectTrigger>
+                    <SelectContent>{(masterData.typeOfPiOptions || []).map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Customer Category</Label>
+                  <SearchableSelect value={form.customerCategory} onValueChange={(v) => set("customerCategory", v)} options={masterData.customerCategoryOptions} placeholder="Select Customer Category" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Marketing Sales Person</Label>
+                  <SearchableSelect value={form.marketingSalesPerson} onValueChange={(v) => set("marketingSalesPerson", v)} options={masterData.marketingSalesPersonOptions} placeholder="Select manager" />
+                </div>
+              </div>
             </div>
-            {products.length > 0 ? (
-              <div className="space-y-2">
-                {products.map((p) => (
-                  <div key={p._id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                    <div className="flex items-center gap-3">
-                      <Package className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="font-semibold text-sm">{p.productName}</p>
-                        <div className="flex flex-wrap gap-1.5 mt-1">
-                          <Badge variant="outline" className="text-xs">Qty: {p.quantity}</Badge>
-                          <Badge variant="outline" className="text-xs">Rate: {fmtMoney(p.rateOfMaterial)}</Badge>
-                          <Badge variant="outline" className="text-xs">Advance: {p.advance}%</Badge>
-                          {p.aluminaPercent && <Badge variant="outline" className="text-xs">Al: {p.aluminaPercent}%</Badge>}
-                          {p.ironPercent && <Badge variant="outline" className="text-xs">Fe: {p.ironPercent}%</Badge>}
+
+            {/* Payment & Terms */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">3. Payment & Terms</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Total PO Value With Tax</Label>
+                  <Input type="number" value={form.adjustedAmount} onChange={(e) => set("adjustedAmount", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Payment to Be Taken</Label>
+                  <Select value={form.paymentToBeTaken} onValueChange={(v) => set("paymentToBeTaken", v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select payment type" /></SelectTrigger>
+                    <SelectContent>{YES_NO.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Retention Payment</Label>
+                  <Select value={form.retentionPayment} onValueChange={(v) => set("retentionPayment", v)}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{YES_NO.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {form.retentionPayment === "Yes" && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Retention Percentage</Label>
+                      <Input type="number" value={form.retentionPercentage} onChange={(e) => set("retentionPercentage", e.target.value)} className="h-9" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Lead Time for Retention</Label>
+                      <Input value={form.leadTimeForRetention} onChange={(e) => set("leadTimeForRetention", e.target.value)} className="h-9" placeholder="e.g., 30 days" />
+                    </div>
+                  </>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Lead Time For Collection Of Final Payment</Label>
+                  <Input value={form.leadTimeForCollectionOfFinalPayment} onChange={(e) => set("leadTimeForCollectionOfFinalPayment", e.target.value)} className="h-9" placeholder="e.g., 15 days" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Lead Time to Reach Factory (Days)</Label>
+                  <Input type="number" min="0" value={form.leadTimeToReachFactory} onChange={(e) => set("leadTimeToReachFactory", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Specific Concern</Label>
+                  <Input value={form.specificConcern} onChange={(e) => set("specificConcern", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Reference No.</Label>
+                  <Input value={form.referenceNo} onChange={(e) => set("referenceNo", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">TC Required</Label>
+                  <Select value={form.tcRequired} onValueChange={(v) => set("tcRequired", v)}>
+                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{YES_NO.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Free Replacement (FOC)</Label>
+                  <Select value={form.freeReplacementFoc} onValueChange={(v) => set("freeReplacementFoc", v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                      <SelectItem value="Yes But Adjusted">Yes But Adjusted</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Type Of Application</Label>
+                  <Select value={form.typeOfApplication} onValueChange={(v) => set("typeOfApplication", v)}>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select application type" /></SelectTrigger>
+                    <SelectContent>{APPLICATION_TYPES.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {piDueDatePreview && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">PI Due Date <span className="text-emerald-600">(Auto-calculated)</span></Label>
+                    <Input type="date" value={piDueDatePreview} readOnly className="h-9 bg-emerald-50 dark:bg-emerald-950/30" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Products */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-zinc-700 dark:text-zinc-200">4. Products</h3>
+                <Button type="button" size="sm" onClick={() => setShowProductForm(true)} className="bg-orange-600 hover:bg-orange-700 text-white gap-1.5">
+                  <Plus className="w-3.5 h-3.5" /> Add Product
+                </Button>
+              </div>
+              {products.length > 0 ? (
+                <div className="space-y-2">
+                  {products.map((p) => (
+                    <div key={p._id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                      <div className="flex items-center gap-3">
+                        <Package className="w-5 h-5 text-orange-600" />
+                        <div>
+                          <p className="font-semibold text-sm">{p.productName}</p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            <Badge variant="outline" className="text-xs">Qty: {p.quantity}</Badge>
+                            <Badge variant="outline" className="text-xs">Rate: {fmtMoney(p.rateOfMaterial)}</Badge>
+                            <Badge variant="outline" className="text-xs">Advance: {p.advance}%</Badge>
+                            {p.aluminaPercent && <Badge variant="outline" className="text-xs">Al: {p.aluminaPercent}%</Badge>}
+                            {p.ironPercent && <Badge variant="outline" className="text-xs">Fe: {p.ironPercent}%</Badge>}
+                          </div>
                         </div>
                       </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeProduct(p._id)} className="text-red-600 hover:text-red-700 h-8 w-8">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeProduct(p._id)} className="text-red-600 hover:text-red-700 h-8 w-8">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-900 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800">
-                <Package className="w-10 h-10 text-zinc-300 mx-auto mb-2" />
-                <p className="text-zinc-500 text-sm font-medium">No products added yet</p>
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-900 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800">
+                  <Package className="w-10 h-10 text-zinc-300 mx-auto mb-2" />
+                  <p className="text-zinc-500 text-sm font-medium">No products added yet</p>
+                </div>
+              )}
+            </div>
           </form>
         </SheetBody>
         <SheetFooter>
@@ -1062,45 +1071,45 @@ function NewOrderDialog({ open, onClose, onSuccess, masterData, partyToFirm, use
             <SheetHeader className="px-6 py-4 border-b shrink-0"><SheetTitle>Add Product</SheetTitle></SheetHeader>
             <SheetBody>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Product Name *</Label>
-                <SearchableSelect value={currentProduct.productName} onValueChange={(v) => handleProductChange("productName", v)} options={masterData.productNameOptions} placeholder="Select Product" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Quantity *</Label>
-                <Input type="number" value={currentProduct.quantity} onChange={(e) => handleProductChange("quantity", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Rate Of Material *</Label>
-                <Input type="number" value={currentProduct.rateOfMaterial} onChange={(e) => handleProductChange("rateOfMaterial", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Total (Qty × Rate)</Label>
-                <Input readOnly value={(num(currentProduct.quantity) * num(currentProduct.rateOfMaterial)) || ""} className="h-9 bg-zinc-50 dark:bg-zinc-900" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Alumina%</Label>
-                <Input value={currentProduct.aluminaPercent} onChange={(e) => handleProductChange("aluminaPercent", e.target.value)} className="h-9" placeholder="e.g. 70 or 70-80" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Iron%</Label>
-                <Input value={currentProduct.ironPercent} onChange={(e) => handleProductChange("ironPercent", e.target.value)} className="h-9" placeholder="e.g. 1.2 or 1.2-1.5" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Advance%</Label>
-                <Input type="number" min="0" max="100" value={currentProduct.advance} onChange={(e) => handleProductChange("advance", e.target.value)} className="h-9" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Basic% (auto)</Label>
-                <Input readOnly value={100 - num(currentProduct.advance)} className="h-9 bg-zinc-50 dark:bg-zinc-900" />
-              </div>
-              {form.typeOfTransporting === "Ex Factory But paid by Us" && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Freight Amount (this product)</Label>
-                  <Input type="number" value={currentProduct.freightAmount} onChange={(e) => handleProductChange("freightAmount", e.target.value)} className="h-9" />
+                  <Label className="text-xs">Product Name *</Label>
+                  <SearchableSelect value={currentProduct.productName} onValueChange={(v) => handleProductChange("productName", v)} options={masterData.productNameOptions} placeholder="Select Product" />
                 </div>
-              )}
-            </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Quantity *</Label>
+                  <Input type="number" value={currentProduct.quantity} onChange={(e) => handleProductChange("quantity", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Rate Of Material *</Label>
+                  <Input type="number" value={currentProduct.rateOfMaterial} onChange={(e) => handleProductChange("rateOfMaterial", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Total (Qty × Rate)</Label>
+                  <Input readOnly value={(num(currentProduct.quantity) * num(currentProduct.rateOfMaterial)) || ""} className="h-9 bg-zinc-50 dark:bg-zinc-900" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Alumina%</Label>
+                  <Input value={currentProduct.aluminaPercent} onChange={(e) => handleProductChange("aluminaPercent", e.target.value)} className="h-9" placeholder="e.g. 70 or 70-80" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Iron%</Label>
+                  <Input value={currentProduct.ironPercent} onChange={(e) => handleProductChange("ironPercent", e.target.value)} className="h-9" placeholder="e.g. 1.2 or 1.2-1.5" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Advance%</Label>
+                  <Input type="number" min="0" max="100" value={currentProduct.advance} onChange={(e) => handleProductChange("advance", e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Basic% (auto)</Label>
+                  <Input readOnly value={100 - num(currentProduct.advance)} className="h-9 bg-zinc-50 dark:bg-zinc-900" />
+                </div>
+                {form.typeOfTransporting === "Ex Factory But paid by Us" && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Freight Amount (this product)</Label>
+                    <Input type="number" value={currentProduct.freightAmount} onChange={(e) => handleProductChange("freightAmount", e.target.value)} className="h-9" />
+                  </div>
+                )}
+              </div>
             </SheetBody>
             <SheetFooter>
               <Button type="button" variant="outline" onClick={() => setShowProductForm(false)}>Cancel</Button>

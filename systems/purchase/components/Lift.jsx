@@ -287,7 +287,7 @@ const normalizeBackendPoItems = (po) => {
 };
 
 export default function LiftMaterial() {
-  const { user, isSuperAdmin } = useContext(AuthContext);
+  const { user, isSuperAdmin, isReadOnly, hasPageFirmAccess } = useContext(AuthContext);
   const { updateCount } = useNotification();
   const [superAdminEditItem, setSuperAdminEditItem] = useState(null);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -302,6 +302,7 @@ export default function LiftMaterial() {
   const [error, setError] = useState(null);
   const [areaOptions, setAreaOptions] = useState([]);
   const [transporterOptions, setTransporterOptions] = useState([]);
+  const [transporterMasterMap, setTransporterMasterMap] = useState({});
   const [typeOptions, setTypeOptions] = useState([]);
   const [rateTypeOptions, setRateTypeOptions] = useState([]);
   const [formData, setFormData] = useState(createEmptyLiftForm);
@@ -354,10 +355,16 @@ export default function LiftMaterial() {
 
       setAreaOptions(masterData.areaLiftingOptions);
       setTransporterOptions(masterData.transporterOptions);
-      setFormData((prev) => ({
-        ...prev,
-        TransporterName: masterData.transporterOptions[0]?.value || "",
-      }));
+      setTransporterMasterMap(masterData.transporterMasterMap || {});
+      setFormData((prev) => {
+        const defaultTransporter = masterData.transporterOptions[0]?.value || "";
+        const defaultMaster = masterData.transporterMasterMap?.[defaultTransporter];
+        return {
+          ...prev,
+          TransporterName: defaultTransporter,
+          rateType: prev.rateType || defaultMaster?.rateType || "",
+        };
+      });
       setTypeOptions(masterData.typeOptions);
       setRateTypeOptions(masterData.rateTypeOptions);
     } catch (error) {
@@ -365,6 +372,7 @@ export default function LiftMaterial() {
       setAreaOptions([]);
       setTypeOptions([]);
       setTransporterOptions([]);
+      setTransporterMasterMap({});
       setRateTypeOptions([]);
     } finally {
       setMasterDataLoading(false);
@@ -1057,13 +1065,16 @@ export default function LiftMaterial() {
 
     if (
       (name === "transportingRate" ||
+        name === "additionalTruckQty" ||
         name === "truckQty" ||
         name === "rateType") &&
       updatedForm.rateType === "Per MT"
     ) {
       const tRate = parseFloat(updatedForm.transportingRate) || 0;
-      const bQty = parseFloat(updatedForm.truckQty) || 0;
-      updatedForm.transportRate = (tRate * bQty).toFixed(2);
+      const bQty = parseFloat(updatedForm.additionalTruckQty || updatedForm.truckQty) || 0;
+      if (tRate > 0 && bQty > 0) {
+        updatedForm.transportRate = (tRate * bQty).toFixed(2);
+      }
     } else if (name === "rateType") {
       updatedForm.transportRate = "";
       if (value !== "Per MT") {
@@ -1078,15 +1089,31 @@ export default function LiftMaterial() {
   const handleFormSelectChange = (name, value) => {
     const updatedForm = { ...formData, [name]: value };
 
+    if (name === "TransporterName" && value) {
+      const masterInfo = transporterMasterMap[value];
+      if (masterInfo) {
+        if (masterInfo.rateType && !updatedForm.rateType) {
+          updatedForm.rateType = masterInfo.rateType;
+        }
+        if (masterInfo.rate && !updatedForm.transportingRate && (masterInfo.rateType === "Per MT" || updatedForm.rateType === "Per MT")) {
+          updatedForm.transportingRate = masterInfo.rate;
+        }
+      }
+    }
+
     if (
       (name === "transportingRate" ||
+        name === "additionalTruckQty" ||
         name === "truckQty" ||
-        name === "rateType") &&
+        name === "rateType" ||
+        name === "TransporterName") &&
       updatedForm.rateType === "Per MT"
     ) {
       const tRate = parseFloat(updatedForm.transportingRate) || 0;
-      const bQty = parseFloat(updatedForm.truckQty) || 0;
-      updatedForm.transportRate = (tRate * bQty).toFixed(2);
+      const bQty = parseFloat(updatedForm.additionalTruckQty || updatedForm.truckQty) || 0;
+      if (tRate > 0 && bQty > 0) {
+        updatedForm.transportRate = (tRate * bQty).toFixed(2);
+      }
     } else if (name === "rateType") {
       updatedForm.transportRate = "";
       if (value !== "Per MT") {
@@ -1492,10 +1519,30 @@ export default function LiftMaterial() {
     <div className="p-4 space-y-4 md:p-6 bg-slate-50 dark:bg-zinc-950">
       <Card className="border-none shadow-md">
         <CardHeader className="p-4 border-b border-gray-200 dark:border-zinc-800">
-          <CardTitle className="flex items-center gap-2 text-lg text-gray-700 dark:text-zinc-300">
-            <Truck className="h-5 w-5 text-[#2fa36b]" />
-            Lift
-          </CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg text-gray-700 dark:text-zinc-300">
+              <Truck className="h-5 w-5 text-[#2fa36b]" />
+              Lift
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              {user?.role && (
+                <Badge variant="outline" className="text-xs bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-300">
+                  Role: <span className="font-semibold ml-1 capitalize">{user.role}</span>
+                </Badge>
+              )}
+              {isSuperAdmin && (
+                <div className="flex items-center gap-1.5 bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                  <ShieldCheck size={14} />
+                  Super Admin Mode
+                </div>
+              )}
+              {isReadOnly && (
+                <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300 text-xs">
+                  View Only
+                </Badge>
+              )}
+            </div>
+          </div>
 
           {masterDataLoading && (
             <div className="flex items-center gap-2 text-sm text-[#2fa36b]">
@@ -1884,7 +1931,7 @@ export default function LiftMaterial() {
                                         onClick={() => handlePOSelect(po)}
                                         size="xs"
                                         variant="outline"
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || isReadOnly}
                                         className="px-2 py-1 text-xs h-7"
                                       >
                                         Create Lift
@@ -1907,7 +1954,7 @@ export default function LiftMaterial() {
                                         size="xs"
                                         variant="destructive"
                                         className="px-2 py-1 text-xs h-7"
-                                        disabled={isSubmitting}
+                                        disabled={isSubmitting || isReadOnly}
                                       >
                                         Cancel PO
                                       </Button>
@@ -2203,6 +2250,7 @@ export default function LiftMaterial() {
             { label: "Date Of Bill", dbKey: "dateOfBill", value: superAdminEditItem.dateOfBill, type: "date" },
             { label: "Qty", dbKey: "qty", value: superAdminEditItem.quantity, type: "number" },
             { label: "Lifting Qty", dbKey: "liftingQty", value: superAdminEditItem.liftingQty, type: "number" },
+            { label: "Material Billing Quantity", dbKey: "truckQty", value: superAdminEditItem.additionalTruckQty, type: "number" },
             { label: "Truck No.", dbKey: "truckNo", value: superAdminEditItem.truckNo, type: "text" },
             { label: "Firm Name", dbKey: "firmName", value: superAdminEditItem.firmName, type: "text" },
             { label: "Rate", dbKey: "rate", value: superAdminEditItem.rate, type: "number" },
@@ -2547,6 +2595,64 @@ export default function LiftMaterial() {
                     );
                   })}
                 </div>
+
+                {formData.TransporterName && transporterMasterMap[formData.TransporterName] && (
+                  <div className="p-3.5 mb-6 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg text-xs">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5 font-semibold text-blue-800 dark:text-blue-300">
+                        <Truck className="w-3.5 h-3.5" />
+                        Transporter Profile: {formData.TransporterName}
+                      </div>
+                      <Badge variant="outline" className="text-xs bg-blue-100/70 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-blue-300">
+                        Role: Transporter
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 text-slate-600 dark:text-zinc-300">
+                      {transporterMasterMap[formData.TransporterName].gstNumber && (
+                        <div>
+                          <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">GST Number</span>
+                          <span className="font-medium">{transporterMasterMap[formData.TransporterName].gstNumber}</span>
+                        </div>
+                      )}
+                      {transporterMasterMap[formData.TransporterName].phoneNumber && (
+                        <div>
+                          <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">Phone</span>
+                          <span className="font-medium">{transporterMasterMap[formData.TransporterName].phoneNumber}</span>
+                        </div>
+                      )}
+                      {transporterMasterMap[formData.TransporterName].email && (
+                        <div>
+                          <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">Email</span>
+                          <span className="font-medium">{transporterMasterMap[formData.TransporterName].email}</span>
+                        </div>
+                      )}
+                      {transporterMasterMap[formData.TransporterName].bankAccountNo && (
+                        <div>
+                          <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">Bank A/C</span>
+                          <span className="font-medium">{transporterMasterMap[formData.TransporterName].bankAccountNo}</span>
+                        </div>
+                      )}
+                      {transporterMasterMap[formData.TransporterName].ifscCode && (
+                        <div>
+                          <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">IFSC Code</span>
+                          <span className="font-medium">{transporterMasterMap[formData.TransporterName].ifscCode}</span>
+                        </div>
+                      )}
+                      {transporterMasterMap[formData.TransporterName].rateType && (
+                        <div>
+                          <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">Default Rate Type</span>
+                          <span className="font-medium">{transporterMasterMap[formData.TransporterName].rateType}</span>
+                        </div>
+                      )}
+                      {transporterMasterMap[formData.TransporterName].firmName && (
+                        <div>
+                          <span className="text-slate-400 dark:text-zinc-500 block text-[10px] uppercase font-bold">Firm</span>
+                          <span className="font-medium">{transporterMasterMap[formData.TransporterName].firmName}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {formData.Type !== "Common" && (
                   <div className="col-span-3">
