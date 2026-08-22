@@ -528,7 +528,7 @@ export default function FullkittingTransportingPage() {
         const hasLocalError = hasError;
 
         return (
-            <Card className="shadow-sm border border-border flex-1 flex flex-col overflow-hidden">
+            <Card className="flex-1 flex flex-col overflow-hidden">
                 <CardHeader className="py-3 px-4 bg-muted/30">
                     <div className="flex justify-between items-center">
                         <div>
@@ -659,7 +659,7 @@ export default function FullkittingTransportingPage() {
 
 
     return (
-        <div className="space-y-4 p-4 md:p-6 bg-slate-50 dark:bg-zinc-950">
+        <div className="space-y-4 p-4 md:p-6">
             {superAdminEditKitItem && (
                 <SuperAdminEditModal
                     title={`Edit Lift — ${superAdminEditKitItem.liftNumber}`}
@@ -679,8 +679,8 @@ export default function FullkittingTransportingPage() {
                     onSaved={() => { setSuperAdminEditKitItem(null); fetchData(); }}
                 />
             )}
-            <Card className="shadow-md border-none">
-                <CardHeader className="p-4 border-b border-gray-200 dark:border-zinc-800">
+            <Card className="">
+                <CardHeader className="p-4">
                     <CardTitle className="flex items-center gap-2 text-gray-700 dark:text-zinc-300 text-lg">
                         <PackageSearch className="h-5 w-5 text-[#2fa36b]" />
                         Full Kitting & Transporting

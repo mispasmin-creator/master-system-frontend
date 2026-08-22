@@ -307,8 +307,8 @@ export default function ManagementUnloadApproval() {
   };
 
   return (
-    <Card className="w-full max-w-full mx-auto bg-white border border-gray-200 rounded-lg shadow-md">
-      <CardHeader className="p-4 border-b border-gray-200">
+    <Card className="w-full max-w-full mx-auto rounded-lg">
+      <CardHeader className="p-4">
         <CardTitle className="flex items-center gap-2 text-lg text-gray-800">
             <AlertTriangle className="h-5 w-5 text-[#2fa36b]" />
             Unload App.

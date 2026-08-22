@@ -1273,7 +1273,7 @@ export default function MismatchAnalysis() {
     const hasError = error && data.length === 0;
 
     return (
-      <Card className="shadow-sm border border-border flex-1 flex-col">
+      <Card className="flex-1 flex-col">
         <CardHeader className="py-3 px-4 bg-red-50/50 dark:bg-red-500/10">
           <div className="flex justify-between items-center">
             <div>
@@ -1536,8 +1536,8 @@ export default function MismatchAnalysis() {
       )}
 
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="shadow-md border-none">
-          <CardHeader className="p-4 border-b border-gray-200 dark:border-zinc-800">
+        <Card className="">
+          <CardHeader className="p-4">
             <CardTitle className="flex items-center gap-2 text-gray-700 dark:text-zinc-300 text-lg">
               <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" /> Mismatch
               Analysis Dashboard

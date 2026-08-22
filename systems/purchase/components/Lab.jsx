@@ -935,7 +935,7 @@ export default function LabTesting() {
     const hasError = errorData && data.length === 0 && activeTab === tabKey;
 
     return (
-      <Card className="flex flex-col flex-1 border shadow-sm border-border">
+      <Card className="flex flex-col flex-1">
         <CardHeader className="px-4 py-3 bg-muted/30">
           <div className="flex items-center justify-between">
             <div>
@@ -1172,8 +1172,8 @@ export default function LabTesting() {
   };
 
   return (
-    <div className="p-4 space-y-6 md:p-6 bg-slate-50 dark:bg-zinc-950">
-      <Card className="border-none shadow-md">
+    <div className="p-4 space-y-6 md:p-6">
+      <Card className="">
         <CardHeader className="rounded-t-lg bg-gradient-to-r from-green-50 to-emerald-50 dark:from-emerald-500/10 dark:to-emerald-500/5">
           <CardTitle className="flex items-center gap-2 text-gray-700 dark:text-zinc-300">
             <Beaker className="h-6 w-6 text-[#2fa36b]" />

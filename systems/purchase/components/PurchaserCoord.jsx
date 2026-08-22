@@ -131,9 +131,9 @@ export default function PurchaserCoordinate() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 bg-slate-50">
-      <Card className="shadow-md border-gray-200">
-        <CardHeader className="border-b bg-white">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <Card className="">
+        <CardHeader className="bg-white">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -211,7 +211,7 @@ export default function PurchaserCoordinate() {
 
           {selectedCoord && (
             <div className="space-y-4 py-4">
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
+              <div className="p-4 rounded-lg border border-slate-200 space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-500 text-sm font-medium">PO Number:</span>
                   <span className="font-bold">{selectedCoord.po_number}</span>
@@ -293,7 +293,7 @@ function CoordinationTable({ items, onCoordinate, isHistory, loading, getTypeCol
         </thead>
         <tbody className="bg-white divide-y divide-gray-100">
           {items.map((item) => (
-            <tr key={item.id} className="hover:bg-slate-50/50 transition-colors border-b border-gray-100">
+            <tr key={item.id} className="hover:/50 transition-colors border-b border-gray-100">
               <td className="px-4 py-3">
                 {!isHistory ? (
                   <Button 

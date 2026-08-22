@@ -1037,7 +1037,7 @@ export default function CreatePO() {
             <hr />
 
             <div className="grid gap-3 md:grid-cols-3">
-              <Card className="gap-0 rounded-[3px] p-0 shadow-xs">
+              <Card className="gap-0 rounded-[3px] p-0">
                 <CardHeader className="px-5 py-2 bg-muted">
                   <CardTitle className="text-center">
                     Our Commercial Details
@@ -1054,7 +1054,7 @@ export default function CreatePO() {
                   </p>
                 </CardContent>
               </Card>
-              <Card className="gap-0 rounded-[3px] p-0 shadow-xs">
+              <Card className="gap-0 rounded-[3px] p-0">
                 <CardHeader className="px-5 py-2 bg-muted">
                   <CardTitle className="text-center">Billing Address</CardTitle>
                 </CardHeader>
@@ -1065,7 +1065,7 @@ export default function CreatePO() {
                   </p>
                 </CardContent>
               </Card>
-              <Card className="gap-0 rounded-[3px] p-0 shadow-xs">
+              <Card className="gap-0 rounded-[3px] p-0">
                 <CardHeader className="px-5 py-2 bg-muted">
                   <CardTitle className="flex items-center justify-between text-center">
                     Destination Address

@@ -587,8 +587,8 @@ export default function FactoryApprovals() {
   };
 
   return (
-    <Card className="w-full max-w-full mx-auto bg-gradient-to-br from-white via-slate-50/30 to-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden">
-      <CardHeader className="p-6 border-b border-gray-200 bg-gradient-to-r from-slate-50/50 to-transparent">
+    <Card className="w-full max-w-full mx-auto bg-gradient-to-br from-white via-slate-50/30 to-white rounded-2xl overflow-hidden">
+      <CardHeader className="p-6 bg-gradient-to-r from-slate-50/50 to-transparent">
         <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-gradient-to-br from-emerald-600 to-green-600 rounded-lg">
             <Users className="h-5 w-5 text-white" />
@@ -860,7 +860,7 @@ export default function FactoryApprovals() {
               </SheetHeader>
 
               {/* Progress Summary Area */}
-              <div className="px-5 py-3 bg-slate-50/50 border-b border-gray-100 flex-shrink-0">
+              <div className="px-5 py-3 /50 border-b border-gray-100 flex-shrink-0">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-[#2fa36b] animate-pulse" />
@@ -939,7 +939,7 @@ export default function FactoryApprovals() {
                 </div>
 
                 {/* Technical Buckets - Independent Scroll */}
-                <div className="flex-1 flex flex-col bg-slate-50/20">
+                <div className="flex-1 flex flex-col /20">
                   <div className="p-3 pb-2 border-b border-gray-50 bg-gray-50/30 flex-shrink-0">
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">
                       Evaluation Buckets

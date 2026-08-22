@@ -661,8 +661,8 @@ export default function ThreeParty() {
   }, [selectedHistory]);
 
   return (
-    <Card className="relative w-full max-w-full mx-auto bg-white border-0 shadow-lg">
-      <CardHeader className="p-6 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+    <Card className="relative w-full max-w-full mx-auto">
+      <CardHeader className="p-6 bg-gradient-to-r from-gray-50 to-white">
         <CardTitle className="flex items-center gap-3 text-xl font-semibold text-gray-800">
             <Users className="h-5 w-5 text-[#2fa36b]" />
             Three Party

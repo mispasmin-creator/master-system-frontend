@@ -27,19 +27,19 @@ export const AppProvider = ({ children }) => {
     if (storedUser) {
       return {
         user_name: storedUser.username || '',
-        role: [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || ROLES.ADMIN,
+        role: [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || '',
         firm_name: storedUser.firm_name || ''
       };
     }
-    return { user_name: '', role: ROLES.ADMIN, firm_name: '' };
+    return { user_name: '', role: '', firm_name: '' };
   });
 
   const [userRole, setUserRole] = useState(() => {
     const storedUser = getStoredUser();
     if (storedUser) {
-      return [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || ROLES.ADMIN;
+      return [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || '';
     }
-    return ROLES.ADMIN;
+    return '';
   });
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -50,7 +50,7 @@ export const AppProvider = ({ children }) => {
     const storedUser = getStoredUser();
     const token = getToken();
     if (storedUser && token) {
-      const combinedRole = [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || ROLES.ADMIN;
+      const combinedRole = [storedUser.role, storedUser.page_access].filter(Boolean).join(',') || '';
       setIsAuthenticated(true);
       setCurrentUserVal({
         user_name: storedUser.username || '',
@@ -67,7 +67,7 @@ export const AppProvider = ({ children }) => {
     const routeTab = getTabFromPath(window.location.pathname);
     const storedTab = routeTab || localStorage.getItem('fms_active_tab') || 'dashboard';
     const storedUser = getStoredUser();
-    const role = storedUser?.role || ROLES.ADMIN;
+    const role = storedUser?.role || '';
     return canAccessTab(storedTab, role) ? storedTab : 'dashboard';
   });
 

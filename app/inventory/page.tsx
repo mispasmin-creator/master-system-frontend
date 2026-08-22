@@ -10,7 +10,10 @@ const FinishedGood = dynamic(() => import('@/systems/inventory/components/module
 const TradingMaterial = dynamic(() => import('@/systems/inventory/components/modules/TradingMaterial'), { ssr: false });
 const StockAdjustment = dynamic(() => import('@/systems/inventory/components/modules/StockAdjustment'), { ssr: false });
 const History = dynamic(() => import('@/systems/inventory/components/modules/History'), { ssr: false });
-const Settings = dynamic(() => import('@/systems/inventory/components/modules/Settings'), { ssr: false });
+// Shared, Super-Admin-gated User Management (was inventory's own unrestricted,
+// CSV-only page-access editor — replaced so this system uses the same
+// canonical page_access encoding and access rule as every other system.
+const Settings = dynamic(() => import('@/systems/purchase/components/ManageUsers'), { ssr: false });
 
 const inventoryTabs = [
   { id: "dashboard", label: "Dashboard", path: "/" },

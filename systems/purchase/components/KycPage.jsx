@@ -160,7 +160,7 @@ export default function KycPage() {
   };
 
   const renderProductForm = () => (
-    <Card className="shadow-sm border border-border mt-6">
+    <Card className="mt-6">
       <CardHeader className="py-3 px-4 bg-muted/30">
         <CardTitle className="flex items-center text-md font-semibold text-foreground">
           <Briefcase className="h-5 w-5 text-[#2fa36b] mr-2" /> Add New Product
@@ -191,7 +191,7 @@ export default function KycPage() {
   );
 
   const renderTransportationForm = () => (
-    <Card className="shadow-sm border border-border mt-6">
+    <Card className="mt-6">
       <CardHeader className="py-3 px-4 bg-muted/30">
         <CardTitle className="flex items-center text-md font-semibold text-foreground">
           <Truck className="h-5 w-5 text-[#2fa36b] mr-2" /> Add New Transporter
@@ -257,7 +257,7 @@ export default function KycPage() {
   );
 
   const renderVendorForm = () => (
-    <Card className="shadow-sm border border-border mt-6">
+    <Card className="mt-6">
       <CardHeader className="py-3 px-4 bg-muted/30">
         <CardTitle className="flex items-center text-md font-semibold text-foreground">
           <Store className="h-5 w-5 text-[#2fa36b] mr-2" /> Add New Vendor
@@ -351,9 +351,9 @@ export default function KycPage() {
   );
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 p-4 md:p-6">
-      <Card className="w-full max-w-4xl mx-auto shadow-md border-none">
-        <CardHeader className="p-4 border-b border-gray-200">
+    <div className="min-h-screen w-full p-4 md:p-6">
+      <Card className="w-full max-w-4xl mx-auto">
+        <CardHeader className="p-4">
           <CardTitle className="flex items-center gap-2 text-gray-700 text-lg">
             <UserCheck className="h-5 w-5 text-[#2fa36b]" />
             KYC & Master Data Entry

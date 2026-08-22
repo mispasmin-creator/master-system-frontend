@@ -411,7 +411,7 @@ export default function BiltyPage() {
 
   const renderTableSection = (tabKey, title, description, data, columnsMeta, visibilityState) => {
     return (
-      <Card className="shadow-sm border border-border flex-1 flex flex-col">
+      <Card className="flex-1 flex flex-col">
         <CardHeader className="py-3 px-4 bg-muted/30">
           <div className="flex justify-between items-center">
             <div>
@@ -561,7 +561,7 @@ export default function BiltyPage() {
   };
 
   return (
-    <div className="space-y-4 p-4 md:p-6 bg-slate-50 dark:bg-zinc-950">
+    <div className="space-y-4 p-4 md:p-6">
       {superAdminEditLift && (
         <SuperAdminEditModal
           title={`Edit Lift — ${superAdminEditLift.id}`}
@@ -589,8 +589,8 @@ export default function BiltyPage() {
           onSaved={() => { setSuperAdminEditLift(null); fetchLiftData({ force: true, showLoader: false }); }}
         />
       )}
-      <Card className="shadow-md border-none">
-        <CardHeader className="p-4 border-b border-gray-200 dark:border-zinc-800">
+      <Card className="">
+        <CardHeader className="p-4">
           <CardTitle className="flex items-center gap-2 text-gray-700 dark:text-zinc-300 text-lg">
             <Receipt className="h-5 w-5 text-[#2fa36b]" />
             Bilty Page

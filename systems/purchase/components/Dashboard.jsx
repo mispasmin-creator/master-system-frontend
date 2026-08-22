@@ -189,7 +189,7 @@ const StatCard = ({
   };
 
   return (
-    <Card className="border border-zinc-100 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all duration-300">
+    <Card className="transition-all duration-300">
       <CardContent className="p-4 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -1342,7 +1342,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="min-h-screen bg-linear-to-br from-red-50 to-slate-50 flex items-center justify-center p-4">
-        <Card className="max-w-lg w-full shadow-2xl border-red-200">
+        <Card className="max-w-lg w-full">
           <CardContent className="text-center p-8 space-y-6">
             <div className="p-4 bg-red-100 rounded-full inline-block">
               <Archive className="h-12 w-12 text-red-500" />
@@ -1492,7 +1492,7 @@ export default function Dashboard() {
 
             {/* Quantity Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="transition-all duration-300">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <div className="p-2 sm:p-3 bg-linear-to-br from-green-500 to-green-600 rounded-xl sm:rounded-2xl shadow-lg">
@@ -1511,7 +1511,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="transition-all duration-300">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <div className="p-2 sm:p-3 bg-linear-to-br from-amber-500 to-amber-600 rounded-xl sm:rounded-2xl shadow-lg">
@@ -1530,7 +1530,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="transition-all duration-300">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <div className="p-2 sm:p-3 bg-linear-to-br from-blue-500 to-blue-600 rounded-xl sm:rounded-2xl shadow-lg">
@@ -1553,8 +1553,8 @@ export default function Dashboard() {
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* PO Status Chart */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="p-6 border-b border-gray-100">
+              <Card className="">
+                <CardHeader className="p-6">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <PieChart className="h-6 w-6 text-[#2fa36b]" />
                     Material Lift Status Distribution
@@ -1604,8 +1604,8 @@ export default function Dashboard() {
               </Card>
 
               {/* Top Vendors Chart */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="p-6 border-b border-gray-100">
+              <Card className="">
+                <CardHeader className="p-6">
                   <CardTitle className="text-xl flex items-center gap-2">
                     <BarChart3 className="h-6 w-6 text-[#2fa36b]" />
                     Top 10 Vendors by Quantity
@@ -1657,8 +1657,8 @@ export default function Dashboard() {
             </div>
 
             {/* Materials Chart */}
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="p-6 border-b border-gray-100">
+            <Card className="">
+              <CardHeader className="p-6">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Activity className="h-6 w-6 text-[#2fa36b]" />
                   Top 10 Materials by Quantity
@@ -1737,8 +1737,8 @@ export default function Dashboard() {
               </TabsList>
 
               <TabsContent value="pending-lift">
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="p-6 border-b border-gray-100 bg-linear-to-r from-amber-50 to-orange-50">
+                <Card className="">
+                  <CardHeader className="p-6 bg-linear-to-r from-amber-50 to-orange-50">
                     <CardTitle className="text-xl flex items-center gap-2">
                       <Hourglass className="h-6 w-6 text-amber-600" />
                       Purchase Orders Pending Lift
@@ -1830,8 +1830,8 @@ export default function Dashboard() {
               </TabsContent>
 
               <TabsContent value="in-transit">
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="p-6 border-b border-gray-100 bg-linear-to-r from-green-50 to-emerald-50">
+                <Card className="">
+                  <CardHeader className="p-6 bg-linear-to-r from-green-50 to-emerald-50">
                     <CardTitle className="text-xl flex items-center gap-2">
                       <Truck className="h-6 w-6 text-[#2fa36b]" />
                       Materials In-Transit
@@ -1919,8 +1919,8 @@ export default function Dashboard() {
               </TabsContent>
 
               <TabsContent value="received">
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="p-6 border-b border-gray-100 bg-linear-to-r from-green-50 to-emerald-50">
+                <Card className="">
+                  <CardHeader className="p-6 bg-linear-to-r from-green-50 to-emerald-50">
                     <CardTitle className="text-xl flex items-center gap-2">
                       <CheckCircle2 className="h-6 w-6 text-[#2fa36b]" />
                       Received Materials
@@ -2051,8 +2051,8 @@ export default function Dashboard() {
             </div>
 
             {/* Workflow Visualization */}
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="p-6 border-b border-gray-100">
+            <Card className="">
+              <CardHeader className="p-6">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <Activity className="h-6 w-6 text-[#2fa36b]" />
                   Workflow Stage Analysis
@@ -2102,8 +2102,8 @@ export default function Dashboard() {
             </Card>
 
             {/* Detailed Stage Table */}
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="p-6 border-b border-gray-100">
+            <Card className="">
+              <CardHeader className="p-6">
                 <CardTitle className="text-xl flex items-center gap-2">
                   <AlertTriangle className="h-6 w-6 text-amber-600" />
                   Detailed Pending Stages Overview
@@ -2191,8 +2191,8 @@ export default function Dashboard() {
             {/* Category Breakdown Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* INDENT-PO */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="p-4 border-b border-gray-100 bg-linear-to-r from-green-50 to-emerald-50">
+              <Card className="">
+                <CardHeader className="p-4 bg-linear-to-r from-green-50 to-emerald-50">
                   <CardTitle className="text-lg font-bold text-[#268a59]">
                     INDENT-PO Stages
                   </CardTitle>
@@ -2231,8 +2231,8 @@ export default function Dashboard() {
               </Card>
 
               {/* LIFT-ACCOUNTS */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="p-4 border-b border-gray-100 bg-linear-to-r from-green-50 to-cyan-50">
+              <Card className="">
+                <CardHeader className="p-4 bg-linear-to-r from-green-50 to-cyan-50">
                   <CardTitle className="text-lg font-bold text-[#268a59]">
                     LIFT-ACCOUNTS Stages
                   </CardTitle>
@@ -2271,8 +2271,8 @@ export default function Dashboard() {
               </Card>
 
               {/* ACCOUNTS */}
-              <Card className="border-0 shadow-lg">
-                <CardHeader className="p-4 border-b border-gray-100 bg-linear-to-r from-green-50 to-emerald-50">
+              <Card className="">
+                <CardHeader className="p-4 bg-linear-to-r from-green-50 to-emerald-50">
                   <CardTitle className="text-lg font-bold text-[#268a59]">
                     ACCOUNTS Stages
                   </CardTitle>
@@ -2313,8 +2313,8 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="step-tracker" className="space-y-5">
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="p-5 border-b border-gray-100">
+            <Card className="">
+              <CardHeader className="p-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-xl flex items-center gap-2">
@@ -2387,7 +2387,7 @@ export default function Dashboard() {
           <TabsContent value="party" className="space-y-5">
 
             {/* ---- Filters Row ---- */}
-            <Card className="border-0 shadow-md">
+            <Card className="">
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                   <div className="relative flex-1 min-w-0">
@@ -2439,7 +2439,7 @@ export default function Dashboard() {
                     { label: "Accounts Pending", value: filteredParties.reduce((s, p) => s + p.accountsPending, 0), icon: <Archive className="h-5 w-5 text-white" />, gradient: "from-amber-500 to-amber-600" },
                     { label: "Completed", value: filteredParties.reduce((s, p) => s + p.doneCount, 0), icon: <CheckCircle className="h-5 w-5 text-white" />, gradient: "from-emerald-500 to-emerald-600" },
                   ].map((c) => (
-                    <Card key={c.label} className="border-0 shadow-md bg-white">
+                    <Card key={c.label} className="">
                       <CardContent className="p-4 flex items-center gap-3">
                         <div className={`p-2.5 rounded-xl bg-gradient-to-br ${c.gradient} shadow shrink-0`}>{c.icon}</div>
                         <div className="min-w-0">
@@ -2469,8 +2469,8 @@ export default function Dashboard() {
                 </div>
 
                 {/* All Parties Table */}
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="p-5 border-b border-gray-100">
+                <Card className="">
+                  <CardHeader className="p-5">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Users className="h-5 w-5 text-[#2fa36b]" />
                       Party-wise Complete Report
@@ -2592,7 +2592,7 @@ export default function Dashboard() {
               /* ========== PARTY DETAIL VIEW ========== */
               <>
                 {/* Party Header */}
-                <Card className="border-0 shadow-xl bg-gradient-to-r from-[#2fa36b] to-[#5a7a28] text-white">
+                <Card className="bg-gradient-to-r from-[#2fa36b] to-[#5a7a28] text-white">
                   <CardContent className="p-5">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                       <div>
@@ -2652,7 +2652,7 @@ export default function Dashboard() {
 
                 {/* Qty Flow Visual Bar */}
                 {selectedPartyData.totalIndentQty > 0 && (
-                  <Card className="border-0 shadow-md">
+                  <Card className="">
                     <CardContent className="p-4">
                       <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Quantity Flow</p>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -2694,8 +2694,8 @@ export default function Dashboard() {
                 )}
 
                 {/* Indent-wise Detailed Table */}
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="p-5 border-b border-gray-100">
+                <Card className="">
+                  <CardHeader className="p-5">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <FileText className="h-5 w-5 text-[#2fa36b]" />
                       Indent-wise Complete Report
@@ -2833,7 +2833,7 @@ export default function Dashboard() {
                                 {/* ---- Expanded Detail Row ---- */}
                                 {expandedIndent === indent.rlNo && (
                                   <TableRow key={`${indent.rlNo}-exp`}>
-                                    <TableCell colSpan={12} className="p-0 bg-slate-50">
+                                    <TableCell colSpan={12} className="p-0">
                                       <div className="p-4 border-l-4 border-[#2fa36b] space-y-4">
 
                                         {/* Step checklist */}

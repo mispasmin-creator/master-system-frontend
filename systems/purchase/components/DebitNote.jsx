@@ -675,8 +675,8 @@ export default function DebitNote() {
 
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <Card className="w-full max-w-2xl shadow-2xl">
-          <CardHeader className="px-6 py-5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <Card className="w-full max-w-2xl">
+          <CardHeader className="px-6 py-5 bg-gray-50 flex justify-between items-center">
             <CardTitle className="font-semibold text-lg text-gray-800">
             
             Debit Note
@@ -858,8 +858,8 @@ export default function DebitNote() {
       )}
 
       <div className="max-w-7xl mx-auto space-y-6">
-        <Card className="shadow-md border-none">
-          <CardHeader className="p-4 border-b border-gray-200">
+        <Card className="">
+          <CardHeader className="p-4">
             <CardTitle className="flex items-center gap-2 text-gray-700 text-lg">
               <FileText className="h-5 w-5 text-[#2fa36b]" /> Debit Note Management
             </CardTitle>
@@ -957,7 +957,7 @@ export default function DebitNote() {
                   </div>
 
                   {/* Data Table */}
-                  <Card className="shadow-sm border border-border">
+                  <Card className="">
                     <CardHeader className="py-3 px-4 bg-gray-50">
                       <div className="flex justify-between items-center">
                         <div>
@@ -1044,7 +1044,7 @@ export default function DebitNote() {
 
               {/* History Tab */}
               <TabsContent value="history" className="space-y-4">
-                <Card className="shadow-sm border border-border">
+                <Card className="">
                   <CardHeader className="py-3 px-4 bg-gray-50">
                     <div className="flex justify-between items-center">
                       <div>

@@ -119,9 +119,9 @@ export default function TolerancePage() {
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6 bg-slate-50 min-h-screen text-base">
-      <Card className="shadow-md border-none">
-        <CardHeader className="p-4 border-b border-gray-200">
+    <div className="space-y-4 p-4 md:p-6 min-h-screen text-base">
+      <Card className="">
+        <CardHeader className="p-4">
           <CardTitle className="flex items-center gap-2 text-gray-700 text-lg">
             <Scale className="h-5 w-5 text-[#2fa36b]" /> 
             Tolerance Data
@@ -182,7 +182,7 @@ export default function TolerancePage() {
           </div>
 
           {/* Data Table */}
-          <Card className="shadow-sm border border-border">
+          <Card className="">
             <CardHeader className="py-3 px-4 bg-gray-50">
               <div className="flex justify-between items-center">
                 <div>

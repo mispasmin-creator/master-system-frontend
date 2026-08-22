@@ -10,7 +10,6 @@ import { SaleOrders } from './components/modules/SaleOrders';
 import { Logistics } from './components/modules/Logistics';
 import { Invoices } from './components/modules/Invoices';
 import SettingsModule from './components/modules/Settings';
-import LoginModule from './components/modules/Login';
 
 import { useApp, ROLES } from './context/AppContext';
 import { hasPageAccess, canAccessTab } from './lib/utils';
@@ -20,7 +19,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!isAuthenticated) {
-    return <LoginModule />;
+    return <Dashboard />;
   }
 
   const renderActiveModule = () => {

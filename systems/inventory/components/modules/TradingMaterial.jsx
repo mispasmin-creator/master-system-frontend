@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryApi } from '../../lib/api';
-import { Plus, Search, Edit3, Trash2, X } from 'lucide-react';
+import { Search, Edit3, Trash2, X } from 'lucide-react';
 
 export default function TradingMaterial() {
   const [activeFirm, setActiveFirm] = useState('Purab');
@@ -33,17 +33,6 @@ export default function TradingMaterial() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleOpenAdd = () => {
-    setEditingItem(null);
-    setFormData({
-      firmName: activeFirm,
-      productName: '',
-      opStock: '',
-      opStockDate: '',
-    });
-    setModalOpen(true);
   };
 
   const handleOpenEdit = (item) => {
@@ -92,12 +81,6 @@ export default function TradingMaterial() {
           <h1 className="text-xl font-bold text-zinc-900 dark:text-white">Trading Material Inventory</h1>
           <p className="text-sm text-zinc-500">Track trading material purchases, sales, returns, and live current level</p>
         </div>
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Add Item
-        </button>
       </div>
 
       {/* Tabs & Search */}

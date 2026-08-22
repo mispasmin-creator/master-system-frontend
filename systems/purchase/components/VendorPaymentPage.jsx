@@ -32,9 +32,9 @@ export default function VendorPaymentPage() {
   const firmDisplayName = userFirmKey ? firmDisplayNames[userFirmKey] : user?.firmName;
 
   return (
-    <div className="space-y-4 p-4 md:p-6 bg-slate-50 min-h-screen">
-      <Card className="shadow-md border-none">
-        <CardHeader className="p-4 border-b border-gray-200">
+    <div className="space-y-4 p-4 md:p-6 min-h-screen">
+      <Card className="">
+        <CardHeader className="p-4">
           <CardTitle className="flex items-center gap-2 text-gray-700 text-lg">
             <Landmark className="h-5 w-5 text-[#2fa36b]" />
             Vendor Payment

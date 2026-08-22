@@ -391,7 +391,7 @@ export default function ArrangeLogistics() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 flex flex-col bg-slate-50 dark:bg-zinc-950">
+    <div className="p-4 sm:p-6 lg:p-8 flex flex-col">
       {superAdminEditItem && (
         <SuperAdminEditModal
           title={`Edit PO — ${superAdminEditItem.poNumber}`}
@@ -410,8 +410,8 @@ export default function ArrangeLogistics() {
           onSaved={() => { setSuperAdminEditItem(null); }}
         />
       )}
-      <Card className="shadow-md border border-gray-200 dark:border-zinc-800 flex-1 flex flex-col bg-white dark:bg-zinc-900">
-        <CardHeader className="p-4 border-b border-gray-200 dark:border-zinc-800">
+      <Card className="flex-1 flex flex-col">
+        <CardHeader className="p-4">
           <CardTitle className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-3">
             <Truck className="h-6 w-6 text-[#2fa36b]" />
             Arrange Logistics
@@ -457,8 +457,8 @@ export default function ArrangeLogistics() {
                   <p className="font-semibold">No pending logistics items</p>
                 </div>
               ) : (
-                <Card className="shadow-none border flex-1 flex flex-col">
-                  <CardHeader className="py-3 px-4 border-b">
+                <Card className="flex-1 flex flex-col">
+                  <CardHeader className="py-3 px-4">
                     <CardTitle className="flex items-center text-base">
                       <Truck className="w-5 h-5 mr-2 text-[#2fa36b]" />
                       Pending Logistics ({filteredPendingData.length})
@@ -522,8 +522,8 @@ export default function ArrangeLogistics() {
                   <p className="font-semibold">No logistics history yet</p>
                 </div>
               ) : (
-                <Card className="shadow-none border flex-1 flex flex-col">
-                  <CardHeader className="py-3 px-4 border-b">
+                <Card className="flex-1 flex flex-col">
+                  <CardHeader className="py-3 px-4">
                     <CardTitle className="flex items-center text-base">
                       <History className="w-5 h-5 mr-2 text-[#2fa36b]" />
                       Logistics History ({filteredHistoryData.length})

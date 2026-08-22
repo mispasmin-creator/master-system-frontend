@@ -1489,9 +1489,9 @@ export default function LiftMaterial() {
   };
 
   return (
-    <div className="p-4 space-y-4 md:p-6 bg-slate-50 dark:bg-zinc-950">
-      <Card className="border-none shadow-md">
-        <CardHeader className="p-4 border-b border-gray-200 dark:border-zinc-800">
+    <div className="p-4 space-y-4 md:p-6">
+      <Card className="">
+        <CardHeader className="p-4">
           <CardTitle className="flex items-center gap-2 text-lg text-gray-700 dark:text-zinc-300">
             <Truck className="h-5 w-5 text-[#2fa36b]" />
             Lift
@@ -1667,7 +1667,7 @@ export default function LiftMaterial() {
               value="availablePOs"
               className="flex flex-col flex-1 mt-0"
             >
-              <Card className="flex-col flex-1 border shadow-sm border-border">
+              <Card className="flex-col flex-1">
                 <CardHeader className="px-4 py-3 bg-gray-50 dark:bg-zinc-800">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0">
@@ -1939,7 +1939,7 @@ export default function LiftMaterial() {
               value="liftsHistory"
               className="flex flex-col flex-1 mt-0"
             >
-              <Card className="flex-col flex-1 border shadow-sm border-border">
+              <Card className="flex-col flex-1">
                 <CardHeader className="px-4 py-3 bg-gray-50 dark:bg-zinc-800">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div className="min-w-0">
@@ -2217,8 +2217,8 @@ export default function LiftMaterial() {
       )}
       {showPopup && selectedPO && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <Card className="w-full max-w-3xl max-h-[95vh] flex flex-col shadow-2xl">
-            <CardHeader className="flex items-center justify-between py-5 border-b border-gray-200 dark:border-zinc-800 px-7 bg-gray-50 dark:bg-zinc-800 rounded-t-xl">
+          <Card className="w-full max-w-3xl max-h-[95vh] flex flex-col">
+            <CardHeader className="flex items-center justify-between py-5 px-7 bg-gray-50 dark:bg-zinc-800 rounded-t-xl">
               <CardTitle className="text-lg font-semibold text-gray-800 dark:text-white">
                 Record Lift for{" "}
                 <span className="text-[#2fa36b]">{formData.indentNo}</span>
@@ -2234,7 +2234,7 @@ export default function LiftMaterial() {
             </CardHeader>
             <CardContent className="space-y-6 overflow-y-auto p-7 scrollbar-hide">
               <form onSubmit={handleSubmit}>
-                <div className="p-4 mb-6 border rounded-lg bg-slate-50 dark:bg-zinc-800 border-slate-200 dark:border-zinc-700">
+                <div className="p-4 mb-6 border rounded-lg dark:bg-zinc-800 border-slate-200 dark:border-zinc-700">
                   <h4 className="text-sm font-semibold text-[#268a59] mb-2">
                     Selected Purchase Order Details{" "}
                   </h4>
@@ -2268,7 +2268,7 @@ export default function LiftMaterial() {
                 </div>
 
                 <div className="mb-6 overflow-hidden border rounded-lg border-slate-200 dark:border-zinc-700">
-                  <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-zinc-800">
+                  <div className="flex items-center justify-between px-4 py-3 dark:bg-zinc-800">
                     <div>
                       <h4 className="text-sm font-semibold text-slate-800 dark:text-white">
                         Products To Lift
@@ -2297,21 +2297,21 @@ export default function LiftMaterial() {
                   <div className="overflow-auto max-h-[300px] relative custom-scrollbar">
                     <table className="w-full text-sm border-collapse">
                       <thead className="sticky top-0 z-30">
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">Product</th>
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-left bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">RI Number</th>
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">Indent Qty</th>
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">Lifted</th>
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">Pending</th>
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">Bill Rate</th>
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">Lift Qty</th>
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">Amount</th>
-                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-center bg-slate-50/95 backdrop-blur-sm shadow-sm whitespace-nowrap">Remove</th>
+                        <tr className="border-b border-slate-200">
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-left /95 backdrop-blur-sm shadow-sm whitespace-nowrap">Product</th>
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-left /95 backdrop-blur-sm shadow-sm whitespace-nowrap">RI Number</th>
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right /95 backdrop-blur-sm shadow-sm whitespace-nowrap">Indent Qty</th>
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right /95 backdrop-blur-sm shadow-sm whitespace-nowrap">Lifted</th>
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right /95 backdrop-blur-sm shadow-sm whitespace-nowrap">Pending</th>
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right /95 backdrop-blur-sm shadow-sm whitespace-nowrap">Bill Rate</th>
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right /95 backdrop-blur-sm shadow-sm whitespace-nowrap">Lift Qty</th>
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-right /95 backdrop-blur-sm shadow-sm whitespace-nowrap">Amount</th>
+                          <th className="px-3 py-2 text-xs font-bold text-slate-700 uppercase text-center /95 backdrop-blur-sm shadow-sm whitespace-nowrap">Remove</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-slate-100">
                         {selectedLiftItems.map((item) => (
-                          <tr key={item.key} className="hover:bg-slate-50 transition-colors border-b border-slate-100">
+                          <tr key={item.key} className="hover: transition-colors border-b border-slate-100">
                             <td className="px-3 py-2 font-medium text-slate-700 text-xs">
                               {item.material}
                             </td>
@@ -2771,8 +2771,8 @@ export default function LiftMaterial() {
       {/* Cancel Pending PO Quantity Popup */}
       {cancelPendingPO.show && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-9999 p-4">
-          <Card className="w-full max-w-md shadow-2xl">
-            <CardHeader className="flex items-center justify-between px-6 py-5 border-b border-gray-200 bg-gray-50">
+          <Card className="w-full max-w-md">
+            <CardHeader className="flex items-center justify-between px-6 py-5 bg-gray-50">
               <CardTitle className="text-lg font-semibold text-gray-800">
                 Cancel Pending PO Quantity
               </CardTitle>
@@ -2788,7 +2788,7 @@ export default function LiftMaterial() {
 
             <CardContent className="p-6">
               <div className="space-y-4">
-                <div className="p-4 border rounded-lg bg-slate-50">
+                <div className="p-4 border rounded-lg">
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
                       <Label>Indent No.</Label>
